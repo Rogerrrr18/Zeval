@@ -71,6 +71,7 @@ export function OnlineEvalConsole() {
   const [sourceMode, setSourceMode] = useState<"baseline" | "sampleBatch">("baseline");
   const [replyApiBaseUrl, setReplyApiBaseUrl] = useState(MOCK_REPLY_API_BASE_URL);
   const [loading, setLoading] = useState(false);
+  const [replaying, setReplaying] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -86,6 +87,21 @@ export function OnlineEvalConsole() {
       setCustomerId(stored);
     }
   }, []);
+
+  // Online replay runs synchronously and can take minutes (per-turn Reply API
+  // calls + a full evaluate pipeline). Guard against an accidental tab close /
+  // refresh while a replay is in flight so the user does not lose the run.
+  useEffect(() => {
+    if (!replaying) {
+      return;
+    }
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [replaying]);
 
   const loadBaselines = useCallback(async () => {
     setLoadingList(true);
@@ -134,6 +150,7 @@ export function OnlineEvalConsole() {
       return;
     }
     setLoading(true);
+    setReplaying(true);
     setError("");
     setNotice("");
     setReplayResult(null);
@@ -161,6 +178,7 @@ export function OnlineEvalConsole() {
       setError(requestError instanceof Error ? requestError.message : "回放失败");
     } finally {
       setLoading(false);
+      setReplaying(false);
     }
   }
 
@@ -384,11 +402,17 @@ export function OnlineEvalConsole() {
                     />
                   </label>
                 </div>
+                <p className={styles.warnBox}>
+                  <strong>⏳ 执行回放预计需要数分钟。</strong>
+                  系统会逐条调用 Reply API 重写 assistant，再跑一次完整评估 pipeline。
+                  此过程为<strong>同步执行</strong>，运行期间请<strong>保持本页打开</strong>，不要刷新或关闭标签页，否则本次回放结果会丢失。
+                </p>
                 <div className={styles.rowActions} style={{ marginTop: 14 }}>
                   <button
                     type="button"
                     className={styles.secondaryButton}
                     onClick={() => goToStep(0)}
+                    disabled={replaying}
                   >
                     ← 返回选基线
                   </button>
@@ -398,9 +422,17 @@ export function OnlineEvalConsole() {
                     disabled={loading || (sourceMode === "baseline" ? !selectedRunId : !selectedSampleBatchId)}
                     onClick={() => void handleReplay()}
                   >
-                    {loading ? "执行中…" : "执行回放评估"}
+                    {replaying ? "回放执行中，请稍候…" : "执行回放评估"}
                   </button>
                 </div>
+                {replaying ? (
+                  <div className={styles.runningBox}>
+                    <span className={styles.runningDot} aria-hidden="true" />
+                    <span>
+                      回放进行中：正在逐条调用 Reply API 并执行评估，预计数分钟。请保持本页打开，切勿刷新或关闭。
+                    </span>
+                  </div>
+                ) : null}
                 <ul className={styles.metaList} style={{ marginTop: 14 }}>
                   <li>系统会按选中样本的 user 轮逐条调用 Reply API，把 assistant 替换为新版本输出。</li>
                   <li>Sample batch 模式会从案例池 transcript 还原 rawRows，适合固定回归集。</li>
