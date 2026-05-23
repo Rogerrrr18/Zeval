@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "agentRunId": "agent_prompt_20260424_8fa004",
+  "packageId": "rem_20260423_80eadd",
+  "channel": "prompt",
+  "status": "running",
+  "title": "Timeline Smoke",
+  "summary": "before after validation transition",
+  "content": "# smoke",
+  "notes": "",
+  "startingValidationLinks": {
+    "replayValidationRunId": "val_replay_20260424_37f53c",
+    "offlineValidationRunId": "val_offline_20260424_dfd227"
+  },
+  "validationLinks": {
+    "replayValidationRunId": "val_replay_20260424_1e06ce",
+    "offlineValidationRunId": "val_offline_20260424_dfd227"
+  },
+  "createdAt": "2026-04-24T03:12:49.321Z",
+  "updatedAt": "2026-04-24T03:12:49.322Z"
+}

@@ -1,0 +1,57 @@
+{
+  "taskId": "v2_dataset_bc_1776997463483_fd433c_label",
+  "goldSetVersion": "v2",
+  "caseId": "dataset_bc_1776997463483_fd433c",
+  "reviewStatus": "draft",
+  "dimensions": [
+    {
+      "dimension": "共情程度",
+      "score": 3,
+      "evidence": "别套话我就问今天能不能解决",
+      "notes": "auto-prefill：基于 badcase tags 与 transcript 初筛，请人工复核。"
+    },
+    {
+      "dimension": "答非所问/无视风险",
+      "score": 2,
+      "evidence": "别套话我就问今天能不能解决",
+      "notes": "auto-prefill：目标失败/理解障碍/话题偏移会降低该维度。"
+    },
+    {
+      "dimension": "说教感/压迫感",
+      "score": 4,
+      "evidence": "别套话我就问今天能不能解决",
+      "notes": "auto-prefill：当前仅基于升级风险保守降分。"
+    },
+    {
+      "dimension": "情绪恢复能力",
+      "score": 2,
+      "evidence": "别套话我就问今天能不能解决",
+      "notes": "auto-prefill：恢复失败或目标失败会降低该维度。"
+    }
+  ],
+  "goalCompletion": {
+    "status": "failed",
+    "score": 1,
+    "evidence": [
+      "别套话我就问今天能不能解决"
+    ]
+  },
+  "recoveryTrace": {
+    "status": "none",
+    "qualityScore": 0,
+    "notes": "auto-prefill：未命中 recovery_failed，默认无恢复轨迹；如 transcript 中存在情绪下探再恢复，请人工改为 completed。"
+  },
+  "reviewer": "reviewer",
+  "reviewedAt": "",
+  "reviewNotes": "Auto-prefill generated from deterministic badcase signals. Review required before approval.",
+  "autoPrefill": {
+    "source": "eval-datasets:bc_1776997463483_fd433c",
+    "generatedAt": "2026-04-24T12:09:14.695Z",
+    "reasons": [
+      "baselineCaseScore=0.34",
+      "failureSeverityScore=0.66",
+      "tags=escalation_keyword,goal_failed,long_response_gap",
+      "suggestedAction=优先把失败 session 编译为 remediation spec，并补一键回放验证。"
+    ]
+  }
+}

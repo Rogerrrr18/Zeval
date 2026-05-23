@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zeval.ai/schemas/chart-payload.schema.json",
+  "title": "ChartPayload",
+  "type": "object",
+  "required": [
+    "chartKey",
+    "title",
+    "description",
+    "chartType",
+    "xField",
+    "yField",
+    "data"
+  ],
+  "properties": {
+    "chartKey": {
+      "type": "string",
+      "enum": [
+        "emotionCurve",
+        "dropoffDistribution",
+        "activeHourDistribution",
+        "topicSwitchFrequency"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "chartType": {
+      "type": "string",
+      "enum": ["line", "bar"]
+    },
+    "xField": {
+      "type": "string"
+    },
+    "yField": {
+      "type": "string"
+    },
+    "seriesField": {
+      "type": "string"
+    },
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": ["string", "number", "boolean", "null"]
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

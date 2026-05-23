@@ -1,0 +1,136 @@
+scenarioId: assetops-tsfm-anomaly-forecast
+displayName: AssetOps 时间序列预测与异常检测
+version: 1
+description: 面向 AssetOpsBench TSFM 任务，评估 forecasting、fine-tuning、TSAD 与预测结果解释。
+
+applicability:
+  domains:
+    - industrial-asset-operations
+    - time-series-analysis
+    - predictive-maintenance
+  taskTypes:
+    - Forecasting
+    - Anomaly Detection
+    - Model Selection
+    - Predictive Maintenance
+  assetOpsBenchTools:
+    - get_ai_tasks
+    - get_tsfm_models
+    - run_tsfm_forecasting
+    - run_tsfm_finetuning
+    - run_tsad
+    - run_integrated_tsad
+  notSuitableFor:
+    - pure-factual-lookup
+    - customer-support
+
+dataRequirements:
+  requiredFields:
+    - sessionId
+    - role
+    - content
+  recommendedFields:
+    - datasetPath
+    - timestampColumn
+    - targetColumns
+    - forecastHorizon
+    - modelCheckpoint
+    - outputArtifact
+    - expectedAnswer
+    - trace
+  degradation:
+    missingToolTrace: cannot_verify_execution_validity
+    missingOutputArtifact: judge_interpretation_only
+
+metricProfile:
+  enabledCoreMetrics:
+    - sessionDepthDistribution
+    - avgResponseGapSec
+    - topicSwitchRate
+  customMetrics:
+    - taskCompletion
+    - taskSelectionCorrectness
+    - datasetParameterCorrectness
+    - outputArtifactTraceability
+    - anomalyInterpretationQuality
+    - metricReportingCompleteness
+    - uncertaintyDisclosure
+    - hallucinationControl
+
+judgeRubrics:
+  subjectiveDimensions:
+    - id: taskSelectionCorrectness
+      displayName: 任务选择正确性
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: datasetParameterCorrectness
+      displayName: 数据参数准确性
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: outputArtifactTraceability
+      displayName: 输出产物可追溯性
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: anomalyInterpretationQuality
+      displayName: 异常解释质量
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: uncertaintyDisclosure
+      displayName: 不确定性披露
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+
+businessKpis:
+  - id: predictive_workflow_success
+    displayName: 预测工作流成功率
+    description: 是否选择正确 TSFM/TSAD 工具、传入正确数据参数并产出可追踪结果。
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: taskSelectionCorrectness
+          weight: 0.3
+        - source: subjective
+          metricId: datasetParameterCorrectness
+          weight: 0.3
+        - source: subjective
+          metricId: outputArtifactTraceability
+          weight: 0.25
+      secondary:
+        - source: subjective
+          metricId: hallucinationControl
+          weight: 0.15
+    successThreshold: 0.8
+    degradedThreshold: 0.58
+  - id: decision_readiness
+    displayName: 决策可用性
+    description: 预测或异常检测结果是否能支持维护判断，并说明不确定性。
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: anomalyInterpretationQuality
+          weight: 0.45
+        - source: subjective
+          metricId: uncertaintyDisclosure
+          weight: 0.3
+      secondary:
+        - source: subjective
+          metricId: metricReportingCompleteness
+          weight: 0.25
+    successThreshold: 0.76
+    degradedThreshold: 0.52
+
+onboardingQuestions:
+  - id: task_mix
+    question: 本批样本主要是 forecasting、fine-tuning、TSAD，还是 integrated TSAD？
+  - id: artifact_available
+    question: 是否能拿到模型输出 JSON/CSV 产物用于客观校验？
+  - id: acceptable_metrics
+    question: 该业务更关心误差指标、异常召回、误报率，还是维护建议质量？
+

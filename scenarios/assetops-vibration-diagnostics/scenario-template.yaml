@@ -1,0 +1,140 @@
+scenarioId: assetops-vibration-diagnostics
+displayName: AssetOps 振动诊断
+version: 1
+description: 面向 AssetOpsBench vibration tasks，评估 FFT、包络谱、轴承频率、ISO 10816 严重度与故障诊断。
+
+applicability:
+  domains:
+    - industrial-asset-operations
+    - vibration-analysis
+    - rotating-equipment-diagnostics
+  taskTypes:
+    - Knowledge Query
+    - Bearing Analysis
+    - Signal Analysis
+    - Fault Classification
+    - Decision Support
+  assetOpsBenchTools:
+    - get_vibration_data
+    - list_vibration_sensors
+    - compute_fft_spectrum
+    - compute_envelope_spectrum
+    - assess_vibration_severity
+    - calculate_bearing_frequencies
+    - list_known_bearings
+    - diagnose_vibration
+  notSuitableFor:
+    - text-only-customer-support
+    - work-order-only-analytics
+
+dataRequirements:
+  requiredFields:
+    - sessionId
+    - role
+    - content
+  recommendedFields:
+    - rpm
+    - bearingDesignation
+    - dataId
+    - sensorName
+    - rmsVelocity
+    - machineGroup
+    - expectedAnswer
+    - trace
+  degradation:
+    missingSignalArtifact: judge_method_and_reasoning_only
+    missingRpm: expect_partial_diagnosis_warning
+
+metricProfile:
+  enabledCoreMetrics:
+    - sessionDepthDistribution
+    - topicSwitchRate
+    - avgResponseGapSec
+  customMetrics:
+    - taskCompletion
+    - signalAcquisitionAccuracy
+    - bearingFrequencyCalculationAccuracy
+    - spectralAnalysisCorrectness
+    - severityClassificationCorrectness
+    - faultDiagnosisEvidenceQuality
+    - maintenanceRecommendationQuality
+    - uncertaintyDisclosure
+    - hallucinationControl
+
+judgeRubrics:
+  subjectiveDimensions:
+    - id: bearingFrequencyCalculationAccuracy
+      displayName: 轴承频率计算准确性
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: spectralAnalysisCorrectness
+      displayName: 频谱分析正确性
+      scale: 1-5
+      weight: 0.25
+      llmRequired: true
+    - id: severityClassificationCorrectness
+      displayName: 严重度分类正确性
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: faultDiagnosisEvidenceQuality
+      displayName: 故障诊断证据质量
+      scale: 1-5
+      weight: 0.25
+      llmRequired: true
+    - id: maintenanceRecommendationQuality
+      displayName: 维护建议质量
+      scale: 1-5
+      weight: 0.1
+      llmRequired: true
+
+businessKpis:
+  - id: diagnostic_accuracy
+    displayName: 诊断准确性
+    description: 是否正确使用振动分析方法识别故障、严重度和关键证据。
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: spectralAnalysisCorrectness
+          weight: 0.3
+        - source: subjective
+          metricId: faultDiagnosisEvidenceQuality
+          weight: 0.35
+        - source: subjective
+          metricId: severityClassificationCorrectness
+          weight: 0.2
+      secondary:
+        - source: subjective
+          metricId: hallucinationControl
+          weight: 0.15
+    successThreshold: 0.8
+    degradedThreshold: 0.58
+  - id: maintenance_triage_quality
+    displayName: 维护优先级判断
+    description: 是否基于 ISO zone、故障证据和不确定性给出合理维护建议。
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: maintenanceRecommendationQuality
+          weight: 0.45
+        - source: subjective
+          metricId: faultDiagnosisEvidenceQuality
+          weight: 0.3
+      secondary:
+        - source: subjective
+          metricId: uncertaintyDisclosure
+          weight: 0.25
+    successThreshold: 0.76
+    degradedThreshold: 0.52
+
+onboardingQuestions:
+  - id: vibration_source
+    question: 样本使用真实 CouchDB 振动数据，还是本地 data_id 模拟数据？
+  - id: rpm_availability
+    question: 任务中是否总是提供 RPM？缺失 RPM 时是否允许 partial diagnosis？
+  - id: bearing_database
+    question: 轴承型号是否来自内置数据库，还是需要支持自定义几何参数？
+

@@ -1,0 +1,1167 @@
+[
+  {
+    "dialogue_id": "1_00000",
+    "services": [
+      "Restaurants_1"
+    ],
+    "turns": [
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "INFORM_INTENT",
+                "canonical_values": [
+                  "FindRestaurants"
+                ],
+                "slot": "intent",
+                "values": [
+                  "FindRestaurants"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [],
+            "state": {
+              "active_intent": "FindRestaurants",
+              "requested_slots": [],
+              "slot_values": {}
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "I am feeling hungry so I would like to find a place to eat."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "REQUEST",
+                "canonical_values": [],
+                "slot": "city",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": []
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "Do you have a specific which you want the eating place to be located at?"
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "INFORM",
+                "canonical_values": [
+                  "San Jose"
+                ],
+                "slot": "city",
+                "values": [
+                  "San Jose"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [
+              {
+                "exclusive_end": 37,
+                "slot": "city",
+                "start": 29
+              }
+            ],
+            "state": {
+              "active_intent": "FindRestaurants",
+              "requested_slots": [],
+              "slot_values": {
+                "city": [
+                  "San Jose"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "I would like for it to be in San Jose."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "REQUEST",
+                "canonical_values": [
+                  "Mexican",
+                  "Italian"
+                ],
+                "slot": "cuisine",
+                "values": [
+                  "Mexican",
+                  "Italian"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [
+              {
+                "exclusive_end": 59,
+                "slot": "cuisine",
+                "start": 52
+              },
+              {
+                "exclusive_end": 68,
+                "slot": "cuisine",
+                "start": 61
+              }
+            ]
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "Is there a specific cuisine type you enjoy, such as Mexican, Italian or something else?"
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "INFORM",
+                "canonical_values": [
+                  "American"
+                ],
+                "slot": "cuisine",
+                "values": [
+                  "American"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [
+              {
+                "exclusive_end": 34,
+                "slot": "cuisine",
+                "start": 26
+              }
+            ],
+            "state": {
+              "active_intent": "FindRestaurants",
+              "requested_slots": [],
+              "slot_values": {
+                "city": [
+                  "San Jose"
+                ],
+                "cuisine": [
+                  "American"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "I usually like eating the American type of food."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "OFFER",
+                "canonical_values": [
+                  "71 Saint Peter"
+                ],
+                "slot": "restaurant_name",
+                "values": [
+                  "71 Saint Peter"
+                ]
+              },
+              {
+                "act": "OFFER",
+                "canonical_values": [
+                  "San Jose"
+                ],
+                "slot": "city",
+                "values": [
+                  "San Jose"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "service_call": {
+              "method": "FindRestaurants",
+              "parameters": {
+                "city": "San Jose",
+                "cuisine": "American"
+              }
+            },
+            "service_results": [
+              {
+                "city": "San Jose",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "408-971-8523",
+                "price_range": "moderate",
+                "restaurant_name": "71 Saint Peter",
+                "serves_alcohol": "True",
+                "street_address": "71 North San Pedro Street"
+              },
+              {
+                "city": "San Jose",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "408-261-5787",
+                "price_range": "moderate",
+                "restaurant_name": "Bazille",
+                "serves_alcohol": "True",
+                "street_address": "2400 Forest Avenue"
+              },
+              {
+                "city": "San Jose",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "408-292-4300",
+                "price_range": "moderate",
+                "restaurant_name": "Billy Berk's",
+                "serves_alcohol": "True",
+                "street_address": "99 South 1st Street"
+              },
+              {
+                "city": "San Jose",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "408-343-7230",
+                "price_range": "moderate",
+                "restaurant_name": "Bj's Restaurant & Brewhouse",
+                "serves_alcohol": "True",
+                "street_address": "511 Coleman Avenue"
+              },
+              {
+                "city": "San Jose",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "408-816-7251",
+                "price_range": "expensive",
+                "restaurant_name": "Black Sheep Brasserie",
+                "serves_alcohol": "True",
+                "street_address": "1202 Lincoln Avenue"
+              },
+              {
+                "city": "San Jose",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "408-238-9110",
+                "price_range": "moderate",
+                "restaurant_name": "Chuck E. Cheese's",
+                "serves_alcohol": "False",
+                "street_address": "2445 Fontaine Road"
+              },
+              {
+                "city": "San Jose",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "408-292-7444",
+                "price_range": "moderate",
+                "restaurant_name": "Famous Dave's Bar-b-que",
+                "serves_alcohol": "False",
+                "street_address": "61 Curtner Avenue"
+              },
+              {
+                "city": "San Jose",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "408-287-6969",
+                "price_range": "moderate",
+                "restaurant_name": "Firehouse No.1 Gastropub",
+                "serves_alcohol": "True",
+                "street_address": "69 North San Pedro Street"
+              },
+              {
+                "city": "San Jose",
+                "cuisine": "American",
+                "has_live_music": "True",
+                "phone_number": "408-279-4888",
+                "price_range": "moderate",
+                "restaurant_name": "Hukilau",
+                "serves_alcohol": "True",
+                "street_address": "230 Jackson Street"
+              },
+              {
+                "city": "San Jose",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "408-998-1440",
+                "price_range": "moderate",
+                "restaurant_name": "John's Of Willow Glen",
+                "serves_alcohol": "False",
+                "street_address": "1238 Lincoln Avenue"
+              }
+            ],
+            "slots": [
+              {
+                "exclusive_end": 28,
+                "slot": "restaurant_name",
+                "start": 14
+              },
+              {
+                "exclusive_end": 76,
+                "slot": "city",
+                "start": 68
+              }
+            ]
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "I see that at 71 Saint Peter there is a good restaurant which is in San Jose."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "REQUEST",
+                "canonical_values": [],
+                "slot": "street_address",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [],
+            "state": {
+              "active_intent": "FindRestaurants",
+              "requested_slots": [
+                "street_address"
+              ],
+              "slot_values": {
+                "city": [
+                  "San Jose"
+                ],
+                "cuisine": [
+                  "American"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "Can you give me the address of this restaurant."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "INFORM",
+                "canonical_values": [
+                  "71 North San Pedro Street"
+                ],
+                "slot": "street_address",
+                "values": [
+                  "71 North San Pedro Street"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [
+              {
+                "exclusive_end": 81,
+                "slot": "street_address",
+                "start": 56
+              }
+            ]
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "If you want to go to this restaurant you can find it at 71 North San Pedro Street."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "REQUEST",
+                "canonical_values": [],
+                "slot": "phone_number",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [],
+            "state": {
+              "active_intent": "FindRestaurants",
+              "requested_slots": [
+                "phone_number"
+              ],
+              "slot_values": {
+                "city": [
+                  "San Jose"
+                ],
+                "cuisine": [
+                  "American"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "Can you give me the phone number that I can contact them with?"
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "INFORM",
+                "canonical_values": [
+                  "408-971-8523"
+                ],
+                "slot": "phone_number",
+                "values": [
+                  "408-971-8523"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [
+              {
+                "exclusive_end": 49,
+                "slot": "phone_number",
+                "start": 37
+              }
+            ]
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "If you want to phone them you can at 408-971-8523."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "REQUEST_ALTS",
+                "canonical_values": [],
+                "slot": "",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [],
+            "state": {
+              "active_intent": "FindRestaurants",
+              "requested_slots": [],
+              "slot_values": {
+                "city": [
+                  "San Jose"
+                ],
+                "cuisine": [
+                  "American"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "Is there some other restaurant which you can suggest?"
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "OFFER",
+                "canonical_values": [
+                  "Bazille"
+                ],
+                "slot": "restaurant_name",
+                "values": [
+                  "Bazille"
+                ]
+              },
+              {
+                "act": "OFFER",
+                "canonical_values": [
+                  "San Jose"
+                ],
+                "slot": "city",
+                "values": [
+                  "San Jose"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [
+              {
+                "exclusive_end": 26,
+                "slot": "restaurant_name",
+                "start": 19
+              },
+              {
+                "exclusive_end": 67,
+                "slot": "city",
+                "start": 59
+              }
+            ]
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "How would you like Bazille restaurant which is situated in San Jose."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "INFORM",
+                "canonical_values": [
+                  "moderate"
+                ],
+                "slot": "price_range",
+                "values": [
+                  "moderate"
+                ]
+              },
+              {
+                "act": "INFORM",
+                "canonical_values": [
+                  "Palo Alto"
+                ],
+                "slot": "city",
+                "values": [
+                  "Palo Alto"
+                ]
+              },
+              {
+                "act": "REQUEST_ALTS",
+                "canonical_values": [],
+                "slot": "",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [
+              {
+                "exclusive_end": 122,
+                "slot": "city",
+                "start": 113
+              }
+            ],
+            "state": {
+              "active_intent": "FindRestaurants",
+              "requested_slots": [],
+              "slot_values": {
+                "city": [
+                  "Palo Alto"
+                ],
+                "cuisine": [
+                  "American"
+                ],
+                "price_range": [
+                  "moderate"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "Do you have another restaurant matching my needs? For example a restaurant which is economical and is located in Palo Alto."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "OFFER",
+                "canonical_values": [
+                  "Bird Dog"
+                ],
+                "slot": "restaurant_name",
+                "values": [
+                  "Bird Dog"
+                ]
+              },
+              {
+                "act": "OFFER",
+                "canonical_values": [
+                  "Palo Alto"
+                ],
+                "slot": "city",
+                "values": [
+                  "Palo Alto"
+                ]
+              },
+              {
+                "act": "INFORM_COUNT",
+                "canonical_values": [
+                  "7"
+                ],
+                "slot": "count",
+                "values": [
+                  "7"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "service_call": {
+              "method": "FindRestaurants",
+              "parameters": {
+                "city": "Palo Alto",
+                "cuisine": "American",
+                "price_range": "moderate"
+              }
+            },
+            "service_results": [
+              {
+                "city": "Palo Alto",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "650-688-2614",
+                "price_range": "moderate",
+                "restaurant_name": "Bazille",
+                "serves_alcohol": "True",
+                "street_address": "550 Stanford Shopping Center"
+              },
+              {
+                "city": "Palo Alto",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "650-656-8180",
+                "price_range": "moderate",
+                "restaurant_name": "Bird Dog",
+                "serves_alcohol": "False",
+                "street_address": "420 Ramona Street"
+              },
+              {
+                "city": "Palo Alto",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "650-327-0284",
+                "price_range": "moderate",
+                "restaurant_name": "Bistro Elan",
+                "serves_alcohol": "False",
+                "street_address": "2363 Birch Street"
+              },
+              {
+                "city": "Palo Alto",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "650-326-8640",
+                "price_range": "moderate",
+                "restaurant_name": "Cafe Brioche",
+                "serves_alcohol": "True",
+                "street_address": "445 California Avenue"
+              },
+              {
+                "city": "Palo Alto",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "650-493-6787",
+                "price_range": "moderate",
+                "restaurant_name": "Cibo Restaurant & Bar",
+                "serves_alcohol": "False",
+                "street_address": "3398 El Camino Real"
+              },
+              {
+                "city": "Palo Alto",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "650-322-7509",
+                "price_range": "moderate",
+                "restaurant_name": "Local Union 271",
+                "serves_alcohol": "False",
+                "street_address": "271 University Avenue"
+              },
+              {
+                "city": "Palo Alto",
+                "cuisine": "American",
+                "has_live_music": "False",
+                "phone_number": "650-321-3514",
+                "price_range": "moderate",
+                "restaurant_name": "Palo Alto Grill",
+                "serves_alcohol": "True",
+                "street_address": "140 University Avenue"
+              }
+            ],
+            "slots": [
+              {
+                "exclusive_end": 61,
+                "slot": "restaurant_name",
+                "start": 53
+              },
+              {
+                "exclusive_end": 116,
+                "slot": "city",
+                "start": 107
+              }
+            ]
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "I see that 7 restaurants suit to what you requested. Bird Dog seems as a good restaurant and is located in Palo Alto."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "INFORM_INTENT",
+                "canonical_values": [
+                  "ReserveRestaurant"
+                ],
+                "slot": "intent",
+                "values": [
+                  "ReserveRestaurant"
+                ]
+              },
+              {
+                "act": "SELECT",
+                "canonical_values": [],
+                "slot": "",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [],
+            "state": {
+              "active_intent": "ReserveRestaurant",
+              "requested_slots": [],
+              "slot_values": {
+                "city": [
+                  "Palo Alto"
+                ],
+                "cuisine": [
+                  "American"
+                ],
+                "price_range": [
+                  "moderate"
+                ],
+                "restaurant_name": [
+                  "Bird Dog"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "Alright, that seems good. I would like to make a booking at this restaurant."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "REQUEST",
+                "canonical_values": [],
+                "slot": "time",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": []
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "For which time do you want the booking to be?"
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "INFORM",
+                "canonical_values": [
+                  "11:30"
+                ],
+                "slot": "time",
+                "values": [
+                  "11:30 am"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [
+              {
+                "exclusive_end": 34,
+                "slot": "time",
+                "start": 26
+              }
+            ],
+            "state": {
+              "active_intent": "ReserveRestaurant",
+              "requested_slots": [],
+              "slot_values": {
+                "city": [
+                  "Palo Alto"
+                ],
+                "cuisine": [
+                  "American"
+                ],
+                "price_range": [
+                  "moderate"
+                ],
+                "restaurant_name": [
+                  "Bird Dog"
+                ],
+                "time": [
+                  "11:30 am"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "I will be eating there at 11:30 am so make it for then."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "CONFIRM",
+                "canonical_values": [
+                  "Bird Dog"
+                ],
+                "slot": "restaurant_name",
+                "values": [
+                  "Bird Dog"
+                ]
+              },
+              {
+                "act": "CONFIRM",
+                "canonical_values": [
+                  "Palo Alto"
+                ],
+                "slot": "city",
+                "values": [
+                  "Palo Alto"
+                ]
+              },
+              {
+                "act": "CONFIRM",
+                "canonical_values": [
+                  "11:30"
+                ],
+                "slot": "time",
+                "values": [
+                  "11:30 am"
+                ]
+              },
+              {
+                "act": "CONFIRM",
+                "canonical_values": [
+                  "2"
+                ],
+                "slot": "party_size",
+                "values": [
+                  "2"
+                ]
+              },
+              {
+                "act": "CONFIRM",
+                "canonical_values": [
+                  "2019-03-01"
+                ],
+                "slot": "date",
+                "values": [
+                  "today"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [
+              {
+                "exclusive_end": 86,
+                "slot": "restaurant_name",
+                "start": 78
+              },
+              {
+                "exclusive_end": 110,
+                "slot": "city",
+                "start": 101
+              },
+              {
+                "exclusive_end": 70,
+                "slot": "time",
+                "start": 62
+              },
+              {
+                "exclusive_end": 120,
+                "slot": "date",
+                "start": 115
+              }
+            ]
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "Can you please confirm that you want to book a table for 2 at 11:30 am at the Bird Dog restaurant in Palo Alto for today."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "REQUEST",
+                "canonical_values": [],
+                "slot": "has_live_music",
+                "values": []
+              },
+              {
+                "act": "AFFIRM",
+                "canonical_values": [],
+                "slot": "",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [],
+            "state": {
+              "active_intent": "ReserveRestaurant",
+              "requested_slots": [
+                "has_live_music"
+              ],
+              "slot_values": {
+                "city": [
+                  "Palo Alto"
+                ],
+                "cuisine": [
+                  "American"
+                ],
+                "date": [
+                  "today"
+                ],
+                "party_size": [
+                  "2"
+                ],
+                "price_range": [
+                  "moderate"
+                ],
+                "restaurant_name": [
+                  "Bird Dog"
+                ],
+                "time": [
+                  "11:30 am"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "That suits me well. Can you tell me if they feature live music?"
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "INFORM",
+                "canonical_values": [
+                  "False"
+                ],
+                "slot": "has_live_music",
+                "values": [
+                  "False"
+                ]
+              },
+              {
+                "act": "NOTIFY_SUCCESS",
+                "canonical_values": [],
+                "slot": "",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "service_call": {
+              "method": "ReserveRestaurant",
+              "parameters": {
+                "city": "Palo Alto",
+                "date": "2019-03-01",
+                "party_size": "2",
+                "restaurant_name": "Bird Dog",
+                "time": "11:30"
+              }
+            },
+            "service_results": [
+              {
+                "city": "Palo Alto",
+                "cuisine": "American",
+                "date": "2019-03-01",
+                "has_live_music": "False",
+                "party_size": "2",
+                "phone_number": "650-656-8180",
+                "price_range": "moderate",
+                "restaurant_name": "Bird Dog",
+                "serves_alcohol": "False",
+                "street_address": "420 Ramona Street",
+                "time": "11:30"
+              }
+            ],
+            "slots": []
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "Your booking has been made without errors, but unfortunately they do not have live music."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "REQUEST",
+                "canonical_values": [],
+                "slot": "serves_alcohol",
+                "values": []
+              },
+              {
+                "act": "REQUEST",
+                "canonical_values": [],
+                "slot": "street_address",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [],
+            "state": {
+              "active_intent": "ReserveRestaurant",
+              "requested_slots": [
+                "serves_alcohol",
+                "street_address"
+              ],
+              "slot_values": {
+                "city": [
+                  "Palo Alto"
+                ],
+                "cuisine": [
+                  "American"
+                ],
+                "date": [
+                  "today"
+                ],
+                "party_size": [
+                  "2"
+                ],
+                "price_range": [
+                  "moderate"
+                ],
+                "restaurant_name": [
+                  "Bird Dog"
+                ],
+                "time": [
+                  "11:30 am"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "Will I be able to find liquor there? Can you give me the address of their location?"
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "INFORM",
+                "canonical_values": [
+                  "420 Ramona Street"
+                ],
+                "slot": "street_address",
+                "values": [
+                  "420 Ramona Street"
+                ]
+              },
+              {
+                "act": "INFORM",
+                "canonical_values": [
+                  "False"
+                ],
+                "slot": "serves_alcohol",
+                "values": [
+                  "False"
+                ]
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [
+              {
+                "exclusive_end": 46,
+                "slot": "street_address",
+                "start": 29
+              }
+            ]
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "The restaurant is located at 420 Ramona Street. Unfortunately they do not serve alcohol at the restaurant."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "THANK_YOU",
+                "canonical_values": [],
+                "slot": "",
+                "values": []
+              },
+              {
+                "act": "GOODBYE",
+                "canonical_values": [],
+                "slot": "",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": [],
+            "state": {
+              "active_intent": "ReserveRestaurant",
+              "requested_slots": [],
+              "slot_values": {
+                "city": [
+                  "Palo Alto"
+                ],
+                "cuisine": [
+                  "American"
+                ],
+                "date": [
+                  "today"
+                ],
+                "party_size": [
+                  "2"
+                ],
+                "price_range": [
+                  "moderate"
+                ],
+                "restaurant_name": [
+                  "Bird Dog"
+                ],
+                "time": [
+                  "11:30 am"
+                ]
+              }
+            }
+          }
+        ],
+        "speaker": "USER",
+        "utterance": "I appreciate it very much. That would be all."
+      },
+      {
+        "frames": [
+          {
+            "actions": [
+              {
+                "act": "GOODBYE",
+                "canonical_values": [],
+                "slot": "",
+                "values": []
+              }
+            ],
+            "service": "Restaurants_1",
+            "slots": []
+          }
+        ],
+        "speaker": "SYSTEM",
+        "utterance": "Have a good time!"
+      }
+    ]
+  }
+]

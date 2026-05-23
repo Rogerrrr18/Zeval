@@ -1,0 +1,1132 @@
+{
+  "schemaVersion": 1,
+  "customerId": "default",
+  "runId": "pm_mock_refund_baseline",
+  "createdAt": "2026-05-07T09:56:01.499Z",
+  "label": "PM mock refund baseline",
+  "sourceFileName": "pm-mock-refund.json",
+  "evaluate": {
+    "runId": "pm_mock_refund_baseline",
+    "meta": {
+      "sessions": 1,
+      "messages": 4,
+      "hasTimestamp": true,
+      "generatedAt": "2026-05-07T09:56:01.499Z",
+      "warnings": [
+        "主观评估当前为降级模式（LLM judge 调用失败或未启用）。"
+      ]
+    },
+    "summaryCards": [
+      {
+        "key": "sessionCount",
+        "label": "会话规模",
+        "value": "1",
+        "hint": "4 条消息进入本次评估"
+      },
+      {
+        "key": "responseGap",
+        "label": "平均响应间隔",
+        "value": "9s",
+        "hint": "越低通常意味着更平顺的交互节奏"
+      },
+      {
+        "key": "topicSwitch",
+        "label": "话题切换率",
+        "value": "0.00",
+        "hint": "这里按每个 session 的平均 segment 切换次数统计"
+      },
+      {
+        "key": "emotion",
+        "label": "平均情绪分",
+        "value": "53.1",
+        "hint": "当前为规则近似 + 局部校正结果"
+      },
+      {
+        "key": "empathy",
+        "label": "共情得分",
+        "value": "1/5",
+        "hint": "情绪分与共情分联合反映体验质量"
+      },
+      {
+        "key": "goalCompletion",
+        "label": "目标达成率",
+        "value": "0%",
+        "hint": "0/1 个 session 明确达成用户初始目标"
+      },
+      {
+        "key": "badCaseCount",
+        "label": "Bad Case",
+        "value": "1",
+        "hint": "已识别可沉淀进案例池的失败 session"
+      },
+      {
+        "key": "recoveryTrace",
+        "label": "恢复轨迹",
+        "value": "0",
+        "hint": "当前尚未识别到明显的失败后恢复弧线"
+      },
+      {
+        "key": "signals",
+        "label": "高风险信号",
+        "value": "0",
+        "hint": "来自隐式推断信号层的高风险项数量"
+      }
+    ],
+    "topicSegments": [
+      {
+        "sessionId": "refund_s1",
+        "topicSegmentId": "refund_s1_topic_1",
+        "topicSegmentIndex": 1,
+        "topicLabel": "开场连接",
+        "topicSummary": "开场连接：我想申请退款，订单号 A123。",
+        "topicSource": "rule",
+        "topicConfidence": 0.42,
+        "startTurn": 1,
+        "endTurn": 4,
+        "messageCount": 4,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 53.1,
+        "emotionEvidence": "我想申请退款，订单号 A123。",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 0.8,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 1.5,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2
+      }
+    ],
+    "enrichedRows": [
+      {
+        "sessionId": "refund_s1",
+        "timestamp": "2026-05-07T00:00:00.000Z",
+        "role": "user",
+        "content": "我想申请退款，订单号 A123。",
+        "turnIndex": 1,
+        "timestampMs": 1778112000000,
+        "activeHour": 8,
+        "topic": "开场连接",
+        "topicSegmentId": "refund_s1_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：我想申请退款，订单号 A123。",
+        "topicStartTurn": 1,
+        "topicEndTurn": 4,
+        "topicSource": "rule",
+        "topicConfidence": 0.42,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 53.1,
+        "emotionEvidence": "我想申请退款，订单号 A123。",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 0.8,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 1.5,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": null,
+        "isDropoffTurn": false,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 10
+      },
+      {
+        "sessionId": "refund_s1",
+        "timestamp": "2026-05-07T00:00:06.000Z",
+        "role": "assistant",
+        "content": "退款规则在页面上，你自己看一下。",
+        "turnIndex": 2,
+        "timestampMs": 1778112006000,
+        "activeHour": 8,
+        "topic": "开场连接",
+        "topicSegmentId": "refund_s1_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：我想申请退款，订单号 A123。",
+        "topicStartTurn": 1,
+        "topicEndTurn": 4,
+        "topicSource": "rule",
+        "topicConfidence": 0.42,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 53.1,
+        "emotionEvidence": "我想申请退款，订单号 A123。",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 0.8,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 1.5,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": 6,
+        "isDropoffTurn": false,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 10
+      },
+      {
+        "sessionId": "refund_s1",
+        "timestamp": "2026-05-07T00:00:16.000Z",
+        "role": "user",
+        "content": "那我下一步应该怎么办？",
+        "turnIndex": 3,
+        "timestampMs": 1778112016000,
+        "activeHour": 8,
+        "topic": "开场连接",
+        "topicSegmentId": "refund_s1_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：我想申请退款，订单号 A123。",
+        "topicStartTurn": 1,
+        "topicEndTurn": 4,
+        "topicSource": "rule",
+        "topicConfidence": 0.42,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 53.1,
+        "emotionEvidence": "我想申请退款，订单号 A123。",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 0.8,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 1.5,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": 10,
+        "isDropoffTurn": false,
+        "isQuestion": true,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 7
+      },
+      {
+        "sessionId": "refund_s1",
+        "timestamp": "2026-05-07T00:00:26.000Z",
+        "role": "assistant",
+        "content": "按页面提示操作就行。",
+        "turnIndex": 4,
+        "timestampMs": 1778112026000,
+        "activeHour": 8,
+        "topic": "开场连接",
+        "topicSegmentId": "refund_s1_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：我想申请退款，订单号 A123。",
+        "topicStartTurn": 1,
+        "topicEndTurn": 4,
+        "topicSource": "rule",
+        "topicConfidence": 0.42,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 53.1,
+        "emotionEvidence": "我想申请退款，订单号 A123。",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 0.8,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 1.5,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": 10,
+        "isDropoffTurn": true,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 7
+      }
+    ],
+    "enrichedCsv": "sessionId,timestamp,role,content,turnIndex,topic,topicSegmentId,topicSegmentIndex,topicSummary,topicStartTurn,topicEndTurn,topicSource,topicConfidence,emotionPolarity,emotionIntensity,emotionLabel,emotionBaseScore,emotionScore,emotionEvidence,emotionSource,emotionConfidence,emotionValenceWeight,emotionLengthWeight,emotionStyleWeight,emotionGapWeight,emotionRecoveryWeight,emotionRiskPenalty,responseGapSec,isDropoffTurn,isQuestion,isTopicSwitch,activeHour,tokenCountEstimate\nrefund_s1,2026-05-07T00:00:00.000Z,user,我想申请退款，订单号 A123。,1,开场连接,refund_s1_topic_1,1,开场连接：我想申请退款，订单号 A123。,1,4,rule,0.42,neutral,low,中性-低强度,52,53.1,我想申请退款，订单号 A123。,rule,0.63,0,0.8,0,1.5,0,1.2,,false,false,false,8,10\nrefund_s1,2026-05-07T00:00:06.000Z,assistant,退款规则在页面上，你自己看一下。,2,开场连接,refund_s1_topic_1,1,开场连接：我想申请退款，订单号 A123。,1,4,rule,0.42,neutral,low,中性-低强度,52,53.1,我想申请退款，订单号 A123。,rule,0.63,0,0.8,0,1.5,0,1.2,6,false,false,false,8,10\nrefund_s1,2026-05-07T00:00:16.000Z,user,那我下一步应该怎么办？,3,开场连接,refund_s1_topic_1,1,开场连接：我想申请退款，订单号 A123。,1,4,rule,0.42,neutral,low,中性-低强度,52,53.1,我想申请退款，订单号 A123。,rule,0.63,0,0.8,0,1.5,0,1.2,10,false,true,false,8,7\nrefund_s1,2026-05-07T00:00:26.000Z,assistant,按页面提示操作就行。,4,开场连接,refund_s1_topic_1,1,开场连接：我想申请退款，订单号 A123。,1,4,rule,0.42,neutral,low,中性-低强度,52,53.1,我想申请退款，订单号 A123。,rule,0.63,0,0.8,0,1.5,0,1.2,10,true,false,false,8,7",
+    "objectiveMetrics": {
+      "sessionDepthDistribution": {
+        "4-8": 1
+      },
+      "dropoffTurnDistribution": {
+        "4": 1
+      },
+      "avgResponseGapSec": 8.67,
+      "topicSwitchRate": 0,
+      "userQuestionRepeatRate": 0,
+      "agentResolutionSignalRate": 1,
+      "escalationKeywordHitRate": 0,
+      "activeHourDistribution": {
+        "8": 4
+      },
+      "userQuestionRate": 0.5,
+      "avgUserMessageLength": 13.5,
+      "userMessageLengthTrend": -5,
+      "avgAssistantMessageLength": 13
+    },
+    "subjectiveMetrics": {
+      "status": "degraded",
+      "emotionCurve": [
+        {
+          "sessionId": "refund_s1",
+          "topicSegmentId": "refund_s1_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 1,
+          "emotionScore": 53.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        },
+        {
+          "sessionId": "refund_s1",
+          "topicSegmentId": "refund_s1_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 2,
+          "emotionScore": 53.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        },
+        {
+          "sessionId": "refund_s1",
+          "topicSegmentId": "refund_s1_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 3,
+          "emotionScore": 53.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        },
+        {
+          "sessionId": "refund_s1",
+          "topicSegmentId": "refund_s1_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 4,
+          "emotionScore": 53.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        }
+      ],
+      "emotionTurningPoints": [],
+      "dimensions": [
+        {
+          "dimension": "共情程度",
+          "score": 1,
+          "reason": "共情语句密度与安抚表达",
+          "evidence": "当前结果为规则降级模式，证据来自关键词与对话结构近似推断。",
+          "confidence": 0.58
+        },
+        {
+          "dimension": "答非所问/无视风险",
+          "score": 5,
+          "reason": "topic 切换、提问后偏移与理解障碍信号",
+          "evidence": "当前结果为规则降级模式，证据来自关键词与对话结构近似推断。",
+          "confidence": 0.58
+        },
+        {
+          "dimension": "说教感/压迫感",
+          "score": 5,
+          "reason": "强指导词与命令式语气",
+          "evidence": "当前结果为规则降级模式，证据来自关键词与对话结构近似推断。",
+          "confidence": 0.58
+        },
+        {
+          "dimension": "情绪恢复能力",
+          "score": 4,
+          "reason": "情绪低谷后的恢复速度与恢复失败风险",
+          "evidence": "当前结果为规则降级模式，证据来自关键词与对话结构近似推断。",
+          "confidence": 0.58
+        }
+      ],
+      "signals": [
+        {
+          "signalKey": "interestDeclineRisk",
+          "score": 0.48,
+          "severity": "medium",
+          "triggeredRules": [
+            "连续短回复"
+          ],
+          "reason": "后半段用户回复更短且互动欲望下降，存在兴趣衰减迹象。",
+          "evidence": "[turn 3] 那我下一步应该怎么办？",
+          "evidenceTurnRange": "refund_s1:1-3",
+          "confidence": 0.78
+        },
+        {
+          "signalKey": "understandingBarrierRisk",
+          "score": 0.2,
+          "severity": "low",
+          "triggeredRules": [],
+          "reason": "当前没有显著的理解障碍信号。",
+          "evidence": "[turn 3] 那我下一步应该怎么办？",
+          "evidenceTurnRange": "refund_s1:3-3",
+          "confidence": 0.6
+        },
+        {
+          "signalKey": "emotionRecoveryFailureRisk",
+          "score": 0.22,
+          "severity": "low",
+          "triggeredRules": [],
+          "reason": "低谷情绪在后续轮次中出现恢复，当前恢复风险较低。",
+          "evidence": "[turn 1] 我想申请退款，订单号 A123。",
+          "evidenceTurnRange": "refund_s1:1-4",
+          "confidence": 0.64
+        }
+      ],
+      "goalCompletions": [
+        {
+          "sessionId": "refund_s1",
+          "status": "unclear",
+          "score": 3,
+          "userIntent": "我想申请退款，订单号 A123。",
+          "intentSource": "rule",
+          "achievementEvidence": [],
+          "failureReasons": [],
+          "triggeredRules": [],
+          "confidence": 0.45,
+          "source": "rule"
+        }
+      ],
+      "recoveryTraces": [
+        {
+          "sessionId": "refund_s1",
+          "status": "none",
+          "failureTurn": null,
+          "recoveryTurn": null,
+          "spanTurns": null,
+          "failureType": "unknown",
+          "repairStrategy": null,
+          "repairStrategySource": "fallback",
+          "qualityScore": 0,
+          "evidence": [],
+          "triggeredRules": [],
+          "confidence": 0.45
+        }
+      ]
+    },
+    "evalCaseBundle": {
+      "generatedAt": "2026-05-07T09:56:01.496Z",
+      "caseCount": 1,
+      "cases": [
+        {
+          "caseId": "case_refund_s1",
+          "sessionId": "refund_s1",
+          "input": "我想申请退款，订单号 A123。",
+          "actualOutput": "按页面提示操作就行。",
+          "turns": [
+            {
+              "turnIndex": 1,
+              "role": "user",
+              "content": "我想申请退款，订单号 A123。",
+              "timestamp": "2026-05-07T00:00:00.000Z",
+              "topic": "开场连接",
+              "emotionScore": 53.1
+            },
+            {
+              "turnIndex": 2,
+              "role": "assistant",
+              "content": "退款规则在页面上，你自己看一下。",
+              "timestamp": "2026-05-07T00:00:06.000Z",
+              "topic": "开场连接",
+              "emotionScore": 53.1
+            },
+            {
+              "turnIndex": 3,
+              "role": "user",
+              "content": "那我下一步应该怎么办？",
+              "timestamp": "2026-05-07T00:00:16.000Z",
+              "topic": "开场连接",
+              "emotionScore": 53.1
+            },
+            {
+              "turnIndex": 4,
+              "role": "assistant",
+              "content": "按页面提示操作就行。",
+              "timestamp": "2026-05-07T00:00:26.000Z",
+              "topic": "开场连接",
+              "emotionScore": 53.1
+            }
+          ],
+          "toolsCalled": [],
+          "expectedTools": [],
+          "metadata": {
+            "messageCount": 4,
+            "userMessageCount": 2,
+            "assistantMessageCount": 2
+          }
+        }
+      ],
+      "capabilityReport": {
+        "availableFields": {
+          "turns": true,
+          "expected_output": false,
+          "retrieval_context": false,
+          "tools_called": false,
+          "expected_tools": false,
+          "trace": false,
+          "frames": false,
+          "slots": false,
+          "state": false,
+          "service_call": false,
+          "service_results": false,
+          "schema": false
+        },
+        "fieldSources": {
+          "turns": [
+            "parser.normalizer"
+          ]
+        },
+        "missingFields": [
+          "expected_output",
+          "retrieval_context",
+          "tools_called",
+          "expected_tools",
+          "trace",
+          "frames",
+          "slots",
+          "state",
+          "service_call",
+          "service_results",
+          "schema"
+        ],
+        "enabledMetricGroups": [
+          "basic_chat_eval"
+        ],
+        "disabledMetricGroups": [
+          {
+            "group": "schema_aware_eval",
+            "missingFields": [
+              "frames",
+              "slots",
+              "state"
+            ],
+            "reason": "上传数据没有提供该指标组需要的字段。"
+          },
+          {
+            "group": "service_call_eval",
+            "missingFields": [
+              "service_call"
+            ],
+            "reason": "上传数据没有提供该指标组需要的字段。"
+          },
+          {
+            "group": "service_result_grounding",
+            "missingFields": [
+              "service_call",
+              "service_results"
+            ],
+            "reason": "上传数据没有提供该指标组需要的字段。"
+          },
+          {
+            "group": "actual_tool_trace_eval",
+            "missingFields": [
+              "trace"
+            ],
+            "reason": "上传数据没有提供该指标组需要的字段。"
+          },
+          {
+            "group": "retrieval_eval",
+            "missingFields": [
+              "retrieval_context",
+              "expected_output"
+            ],
+            "reason": "上传数据没有提供该指标组需要的字段。"
+          }
+        ],
+        "warnings": [
+          "缺少 expected_output，答案正确性类指标暂不能做严格对照评分。",
+          "缺少真实 trace/span，Agent 执行效率与工具调用路径指标会跳过。"
+        ]
+      }
+    },
+    "metricRegistry": {
+      "generatedAt": "2026-05-07T09:56:01.498Z",
+      "definitions": [
+        {
+          "id": "avgResponseGapSec",
+          "displayName": "平均响应间隔",
+          "description": "用户消息到助手回复之间的平均间隔。",
+          "category": "objective",
+          "kind": "objective",
+          "scope": "dataset",
+          "threshold": 0.78,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "rule"
+        },
+        {
+          "id": "topicSwitchRate",
+          "displayName": "话题切换控制",
+          "description": "会话中的 topic 切换是否保持在可控范围内。",
+          "category": "objective",
+          "kind": "objective",
+          "scope": "dataset",
+          "threshold": 0.72,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "rule"
+        },
+        {
+          "id": "agentResolutionSignalRate",
+          "displayName": "解决态信号",
+          "description": "助手是否给出明确处理承诺、下一步或解决动作。",
+          "category": "objective",
+          "kind": "objective",
+          "scope": "session",
+          "threshold": 0.68,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "rule"
+        },
+        {
+          "id": "goalCompletion",
+          "displayName": "目标达成",
+          "description": "用户初始目标是否在会话结束前被满足。",
+          "category": "subjective",
+          "kind": "llm_dag",
+          "scope": "session",
+          "threshold": 0.7,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "llm"
+        },
+        {
+          "id": "empathy",
+          "displayName": "共情质量",
+          "description": "助手是否识别用户情绪并给出合适承接。",
+          "category": "subjective",
+          "kind": "llm_geval",
+          "scope": "session",
+          "threshold": 0.68,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "llm"
+        },
+        {
+          "id": "offTopicRisk",
+          "displayName": "答非所问控制",
+          "description": "助手是否避免无视用户问题或偏离当前任务。",
+          "category": "subjective",
+          "kind": "llm_geval",
+          "scope": "session",
+          "threshold": 0.68,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "llm"
+        },
+        {
+          "id": "serviceCallGrounding",
+          "displayName": "调用参数追溯",
+          "description": "service_call 参数是否能从此前 dialogue state 中追溯。",
+          "category": "structured",
+          "kind": "structured",
+          "scope": "trace",
+          "threshold": 0.85,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "state",
+            "service_call"
+          ],
+          "evaluator": "rule"
+        },
+        {
+          "id": "serviceResultAvailability",
+          "displayName": "工具结果覆盖",
+          "description": "service_call 是否有对应 service_results 或 tool result。",
+          "category": "structured",
+          "kind": "structured",
+          "scope": "trace",
+          "threshold": 0.95,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "service_call",
+            "service_results"
+          ],
+          "evaluator": "rule"
+        },
+        {
+          "id": "schemaSlotCompliance",
+          "displayName": "Schema Slot 合法率",
+          "description": "slot/state/call 参数是否属于对应 service schema。",
+          "category": "structured",
+          "kind": "structured",
+          "scope": "dataset",
+          "threshold": 0.95,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "schema",
+            "slots"
+          ],
+          "evaluator": "rule"
+        },
+        {
+          "id": "traceStepEfficiency",
+          "displayName": "执行步骤效率",
+          "description": "Agent trace 中是否存在不必要步骤或绕路。",
+          "category": "trace",
+          "kind": "trace",
+          "scope": "trace",
+          "threshold": 0.72,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "trace"
+          ],
+          "evaluator": "hybrid"
+        },
+        {
+          "id": "syntheticCoverage",
+          "displayName": "合成用例覆盖",
+          "description": "当前场景是否配置 synthetic case seeds 用于补充边界测试。",
+          "category": "synthetic",
+          "kind": "synthetic",
+          "scope": "dataset",
+          "threshold": 0.5,
+          "direction": "higher-is-better",
+          "requiredFields": [],
+          "evaluator": "rule"
+        }
+      ],
+      "results": [
+        {
+          "id": "avgResponseGapSec",
+          "displayName": "平均响应间隔",
+          "description": "用户消息到助手回复之间的平均间隔。",
+          "category": "objective",
+          "kind": "objective",
+          "scope": "dataset",
+          "threshold": 0.78,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "rule",
+          "score": 0.9277,
+          "rawValue": "9s",
+          "status": "ready",
+          "reason": "平均响应间隔 9 秒。",
+          "evidence": [
+            "平均响应间隔 9 秒。"
+          ],
+          "confidence": 0.9,
+          "missingFields": [],
+          "success": true,
+          "cacheHit": false
+        },
+        {
+          "id": "topicSwitchRate",
+          "displayName": "话题切换控制",
+          "description": "会话中的 topic 切换是否保持在可控范围内。",
+          "category": "objective",
+          "kind": "objective",
+          "scope": "dataset",
+          "threshold": 0.72,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "rule",
+          "score": 1,
+          "rawValue": "0.00",
+          "status": "ready",
+          "reason": "平均 topic 切换 0.00 次/会话。",
+          "evidence": [
+            "平均 topic 切换 0.00 次/会话。"
+          ],
+          "confidence": 0.9,
+          "missingFields": [],
+          "success": true,
+          "cacheHit": false
+        },
+        {
+          "id": "agentResolutionSignalRate",
+          "displayName": "解决态信号",
+          "description": "助手是否给出明确处理承诺、下一步或解决动作。",
+          "category": "objective",
+          "kind": "objective",
+          "scope": "session",
+          "threshold": 0.68,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "rule",
+          "score": 1,
+          "rawValue": "100%",
+          "status": "ready",
+          "reason": "末轮助手解决态信号覆盖率。",
+          "evidence": [
+            "末轮助手解决态信号覆盖率。"
+          ],
+          "confidence": 0.9,
+          "missingFields": [],
+          "success": true,
+          "cacheHit": false
+        },
+        {
+          "id": "goalCompletion",
+          "displayName": "目标达成",
+          "description": "用户初始目标是否在会话结束前被满足。",
+          "category": "subjective",
+          "kind": "llm_dag",
+          "scope": "session",
+          "threshold": 0.7,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "llm",
+          "score": 0.6,
+          "rawValue": "60%",
+          "status": "degraded",
+          "reason": "按 session 判断用户初始目标是否达成。 当前为降级模式。",
+          "evidence": [
+            "按 session 判断用户初始目标是否达成。"
+          ],
+          "confidence": 0.55,
+          "missingFields": [],
+          "success": false,
+          "cacheHit": false
+        },
+        {
+          "id": "empathy",
+          "displayName": "共情质量",
+          "description": "助手是否识别用户情绪并给出合适承接。",
+          "category": "subjective",
+          "kind": "llm_geval",
+          "scope": "session",
+          "threshold": 0.68,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "llm",
+          "score": 0.2,
+          "rawValue": "20%",
+          "status": "degraded",
+          "reason": "共情程度维度归一化得分。 当前为降级模式。",
+          "evidence": [
+            "共情程度维度归一化得分。"
+          ],
+          "confidence": 0.55,
+          "missingFields": [],
+          "success": false,
+          "cacheHit": false
+        },
+        {
+          "id": "offTopicRisk",
+          "displayName": "答非所问控制",
+          "description": "助手是否避免无视用户问题或偏离当前任务。",
+          "category": "subjective",
+          "kind": "llm_geval",
+          "scope": "session",
+          "threshold": 0.68,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "turns"
+          ],
+          "evaluator": "llm",
+          "score": 1,
+          "rawValue": "100%",
+          "status": "degraded",
+          "reason": "答非所问/无视风险控制得分。 当前为降级模式。",
+          "evidence": [
+            "答非所问/无视风险控制得分。"
+          ],
+          "confidence": 0.55,
+          "missingFields": [],
+          "success": true,
+          "cacheHit": false
+        },
+        {
+          "id": "serviceCallGrounding",
+          "displayName": "调用参数追溯",
+          "description": "service_call 参数是否能从此前 dialogue state 中追溯。",
+          "category": "structured",
+          "kind": "structured",
+          "scope": "trace",
+          "threshold": 0.85,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "state",
+            "service_call"
+          ],
+          "evaluator": "rule",
+          "score": null,
+          "status": "skipped",
+          "success": null,
+          "reason": "缺少字段：state, service_call。",
+          "evidence": [],
+          "missingFields": [
+            "state",
+            "service_call"
+          ],
+          "confidence": 1,
+          "cacheHit": false
+        },
+        {
+          "id": "serviceResultAvailability",
+          "displayName": "工具结果覆盖",
+          "description": "service_call 是否有对应 service_results 或 tool result。",
+          "category": "structured",
+          "kind": "structured",
+          "scope": "trace",
+          "threshold": 0.95,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "service_call",
+            "service_results"
+          ],
+          "evaluator": "rule",
+          "score": null,
+          "status": "skipped",
+          "success": null,
+          "reason": "缺少字段：service_call, service_results。",
+          "evidence": [],
+          "missingFields": [
+            "service_call",
+            "service_results"
+          ],
+          "confidence": 1,
+          "cacheHit": false
+        },
+        {
+          "id": "schemaSlotCompliance",
+          "displayName": "Schema Slot 合法率",
+          "description": "slot/state/call 参数是否属于对应 service schema。",
+          "category": "structured",
+          "kind": "structured",
+          "scope": "dataset",
+          "threshold": 0.95,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "schema",
+            "slots"
+          ],
+          "evaluator": "rule",
+          "score": null,
+          "status": "skipped",
+          "success": null,
+          "reason": "缺少字段：schema, slots。",
+          "evidence": [],
+          "missingFields": [
+            "schema",
+            "slots"
+          ],
+          "confidence": 1,
+          "cacheHit": false
+        },
+        {
+          "id": "traceStepEfficiency",
+          "displayName": "执行步骤效率",
+          "description": "Agent trace 中是否存在不必要步骤或绕路。",
+          "category": "trace",
+          "kind": "trace",
+          "scope": "trace",
+          "threshold": 0.72,
+          "direction": "higher-is-better",
+          "requiredFields": [
+            "trace"
+          ],
+          "evaluator": "hybrid",
+          "score": null,
+          "status": "skipped",
+          "success": null,
+          "reason": "缺少字段：trace。",
+          "evidence": [],
+          "missingFields": [
+            "trace"
+          ],
+          "confidence": 1,
+          "cacheHit": false
+        },
+        {
+          "id": "syntheticCoverage",
+          "displayName": "合成用例覆盖",
+          "description": "当前场景是否配置 synthetic case seeds 用于补充边界测试。",
+          "category": "synthetic",
+          "kind": "synthetic",
+          "scope": "dataset",
+          "threshold": 0.5,
+          "direction": "higher-is-better",
+          "requiredFields": [],
+          "evaluator": "rule",
+          "score": null,
+          "status": "skipped",
+          "reason": "等待 scenario skill 配置 synthetic case seeds 后启用。",
+          "evidence": [],
+          "confidence": 1,
+          "missingFields": [],
+          "success": null,
+          "cacheHit": false
+        }
+      ],
+      "passRate": 0.6667,
+      "readyCount": 3,
+      "degradedCount": 3,
+      "skippedCount": 5,
+      "errorCount": 0,
+      "gateStatus": "warning",
+      "gateReasons": [
+        "WARNING：目标达成 未达阈值，score=0.60。",
+        "WARNING：共情质量 未达阈值，score=0.20。",
+        "INFO：尚未接入真实 trace/span，Agent 执行效率类指标暂不可评。"
+      ]
+    },
+    "scenarioEvaluation": null,
+    "badCaseAssets": [
+      {
+        "caseKey": "refund_s1_topic_1_5a22a2fb38",
+        "sessionId": "refund_s1",
+        "title": "第 1 轮出现失败信号：我想申请退款，订单号 A123。",
+        "severityScore": 0.12,
+        "normalizedTranscriptHash": "5a22a2fb389d5b71325ef02b8c302687337e6b6802501ad6d74d9d5d8c7568d8",
+        "duplicateGroupKey": "generic:开场连接:goal_unclear",
+        "topicSegmentId": "refund_s1_topic_1",
+        "topicIndex": 1,
+        "topicRange": {
+          "startTurn": 1,
+          "endTurn": 4
+        },
+        "topicLabel": "开场连接",
+        "topicSummary": "开场连接：我想申请退款，订单号 A123。",
+        "tags": [
+          "goal_unclear"
+        ],
+        "transcript": "[turn 1] [user] 我想申请退款，订单号 A123。\n[turn 2] [assistant] 退款规则在页面上，你自己看一下。\n[turn 3] [user] 那我下一步应该怎么办？\n[turn 4] [assistant] 按页面提示操作就行。",
+        "evidence": [],
+        "autoSignals": [],
+        "suggestedAction": "将该片段沉淀到 bad case 池，并纳入下一轮 sample batch 与回放对比。",
+        "sourceRunId": "pm_mock_refund_baseline"
+      }
+    ],
+    "charts": [
+      {
+        "chartKey": "emotionCurve",
+        "title": "情绪轨迹",
+        "description": "按会话与轮次呈现 100 分制情绪分，用于判断波动、恢复与 segment 质量。",
+        "chartType": "line",
+        "xField": "turnIndex",
+        "yField": "emotionScore",
+        "seriesField": "sessionId",
+        "data": [
+          {
+            "sessionId": "refund_s1",
+            "turnIndex": 1,
+            "emotionScore": 53.1
+          },
+          {
+            "sessionId": "refund_s1",
+            "turnIndex": 2,
+            "emotionScore": 53.1
+          },
+          {
+            "sessionId": "refund_s1",
+            "turnIndex": 3,
+            "emotionScore": 53.1
+          },
+          {
+            "sessionId": "refund_s1",
+            "turnIndex": 4,
+            "emotionScore": 53.1
+          }
+        ]
+      },
+      {
+        "chartKey": "dropoffDistribution",
+        "title": "流失断点",
+        "description": "识别用户流失出现在哪些轮次，用于定位关键断点。",
+        "chartType": "bar",
+        "xField": "turnIndex",
+        "yField": "dropoffCount",
+        "data": [
+          {
+            "turnIndex": 4,
+            "dropoffCount": 1
+          }
+        ]
+      },
+      {
+        "chartKey": "activeHourDistribution",
+        "title": "活跃时段",
+        "description": "查看不同时段与角色消息量，判断交互发生高峰。",
+        "chartType": "bar",
+        "xField": "activeHour",
+        "yField": "messageCount",
+        "seriesField": "role",
+        "data": [
+          {
+            "activeHour": "8",
+            "role": "user",
+            "messageCount": 2
+          },
+          {
+            "activeHour": "8",
+            "role": "assistant",
+            "messageCount": 2
+          }
+        ]
+      },
+      {
+        "chartKey": "topicSwitchFrequency",
+        "title": "话题切换",
+        "description": "统计每个会话中的话题跳转次数，判断对话连贯度。",
+        "chartType": "bar",
+        "xField": "sessionId",
+        "yField": "topicSwitchCount",
+        "data": [
+          {
+            "sessionId": "refund_s1",
+            "topicSwitchCount": 0
+          }
+        ]
+      }
+    ],
+    "suggestions": [
+      "P0：当前平均情绪分为 53.1，其中 0 个轮次低于 40 分，建议在低谷后两轮内强制触发共情确认与恢复性追问。",
+      "P0：当前目标达成率为 0% ，共有 0 个 session 明确未达成，建议优先把这些 bad case 编译为调优包并加入回放回归。",
+      "P0：平均响应间隔为 9 秒，建议首轮确认性回复压缩到 20 秒内，并监控长间隔后的 topic 延续判断。",
+      "P1：当前 topic segment 切换共 0 次，建议在切段前加入“主题确认句”，减少无意跳转。",
+      "P1：用户主动提问 1 次；理解障碍风险为 low，建议执行“先回答、再扩展”的固定顺序。",
+      "P1：当前识别到 0 条成功恢复轨迹、0 条失败恢复轨迹，建议沉淀成功修复话术并对失败片段生成 remediation spec。",
+      "P1：兴趣衰减风险为 medium、情绪恢复失败风险为 low，建议把信号层直接接入策略触发器。",
+      "P2：当前共情维度得分 1/5，建议继续沉淀 segment 级证据片段，提升主观评估的可解释性。"
+    ]
+  },
+  "rawRows": [
+    {
+      "sessionId": "refund_s1",
+      "timestamp": "2026-05-07T00:00:00.000Z",
+      "role": "user",
+      "content": "我想申请退款，订单号 A123。"
+    },
+    {
+      "sessionId": "refund_s1",
+      "timestamp": "2026-05-07T00:00:06.000Z",
+      "role": "assistant",
+      "content": "退款规则在页面上，你自己看一下。"
+    },
+    {
+      "sessionId": "refund_s1",
+      "timestamp": "2026-05-07T00:00:16.000Z",
+      "role": "user",
+      "content": "那我下一步应该怎么办？"
+    },
+    {
+      "sessionId": "refund_s1",
+      "timestamp": "2026-05-07T00:00:26.000Z",
+      "role": "assistant",
+      "content": "按页面提示操作就行。"
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+package_id: "rem_20260506_49bae1"
+created_at: "2026-05-06T09:52:58.235Z"
+source_run_id: "run_1778047856944"
+scenario_id: null
+priority: "P0"
+goal: "用户目标只部分达成，仍需额外追问或人工补救。"
+problem_summary:
+  - "用户目标只部分达成，仍需额外追问或人工补救。"
+  - "用户情绪显著下探，当前回复无法稳住体验。"
+  - "用户主任务没有完成，session 结束在失败态。"
+  - "失败出现后没有被有效修复，体验在低谷停留过久。"
+selected_case_keys:
+  - "1_00042_topic_1_543a98f41b"
+  - "1_00094_topic_1_4890e05e9e"
+  - "1_00123_topic_1_5745d90923"
+  - "1_00001_topic_1_daf0b65e02"
+  - "1_00002_topic_1_405dc1e5d0"
+edit_scope:
+  - "prompt"
+  - "orchestration"
+constraints:
+  - "不要降低现有安全拒答质量。"
+  - "不要让平均响应时延恶化超过 20%。"
+  - "不要破坏当前已支持的业务场景与回放链路。"
+  - "优先保证用户主任务闭环，不要用冗长解释替代动作完成。"
+target_metrics:
+  - metric_id: "goal_completion_rate"
+    display_name: "目标达成率"
+    current_value: 0.8594
+    target_value: 1
+    direction: "increase"
+    reason: "失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。"
+  - metric_id: "recovery_completion_rate"
+    display_name: "恢复成功率"
+    current_value: 0.5
+    target_value: 0.7
+    direction: "increase"
+    reason: "已出现失败后未能拉回的 session，需要补完整的修复序列。"
+  - metric_id: "emotion_recovery_score"
+    display_name: "情绪恢复能力"
+    current_value: 3
+    target_value: 4
+    direction: "increase"
+    reason: "主观维度显示情绪恢复不足，需要增强安抚、澄清与动作承诺。"
+execution_notes:
+  - "优先处理 P0/P1 失败标签最多的 case。"
+  - "如需改 prompt，请同步说明 why 与 expected behavior。"
+  - "如需改代码或 orchestration，保持回放输入兼容。"

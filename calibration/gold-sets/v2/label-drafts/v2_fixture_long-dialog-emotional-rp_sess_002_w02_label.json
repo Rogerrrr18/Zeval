@@ -1,0 +1,45 @@
+{
+  "taskId": "v2_fixture_long-dialog-emotional-rp_sess_002_w02_label",
+  "goldSetVersion": "v2",
+  "caseId": "fixture_long-dialog-emotional-rp_sess_002_w02",
+  "reviewStatus": "draft",
+  "dimensions": [
+    {
+      "dimension": "共情程度",
+      "score": null,
+      "evidence": "",
+      "notes": ""
+    },
+    {
+      "dimension": "答非所问/无视风险",
+      "score": null,
+      "evidence": "",
+      "notes": ""
+    },
+    {
+      "dimension": "说教感/压迫感",
+      "score": null,
+      "evidence": "",
+      "notes": ""
+    },
+    {
+      "dimension": "情绪恢复能力",
+      "score": null,
+      "evidence": "",
+      "notes": ""
+    }
+  ],
+  "goalCompletion": {
+    "status": null,
+    "score": null,
+    "evidence": []
+  },
+  "recoveryTrace": {
+    "status": null,
+    "qualityScore": null,
+    "notes": ""
+  },
+  "reviewer": "reviewer",
+  "reviewedAt": "",
+  "reviewNotes": ""
+}

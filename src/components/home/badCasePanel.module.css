@@ -1,0 +1,113 @@
+.list {
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid rgb(0 0 0 / 0.06);
+  border-radius: 18px;
+  background: #ffffff;
+  transition: border-color 160ms ease;
+}
+
+.card:hover {
+  border-color: rgb(0 0 0 / 0.16);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header h3 {
+  margin: 0;
+  color: #0b0b0b;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.header p {
+  margin: 6px 0 0;
+  color: #6b6b6b;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.severityBadge {
+  display: inline-flex;
+  align-items: center;
+  height: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgb(220 38 38 / 0.1);
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgb(0 0 0 / 0.08);
+  background: #fafafa;
+  color: #4a4a4a;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.evidenceBlock {
+  display: grid;
+  gap: 6px;
+}
+
+.evidenceBlock strong {
+  color: #8a8a8a;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.evidenceBlock ul {
+  margin: 0;
+  padding-left: 16px;
+  color: #4a4a4a;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.actionText {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fafafa;
+  color: #0b0b0b;
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.empty {
+  padding: 24px;
+  border: 1px dashed rgb(0 0 0 / 0.1);
+  border-radius: 16px;
+  background: #fafafa;
+  color: #8a8a8a;
+  font-size: 13px;
+  line-height: 1.65;
+  text-align: center;
+}

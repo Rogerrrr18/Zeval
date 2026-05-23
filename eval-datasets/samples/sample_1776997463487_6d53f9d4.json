@@ -1,0 +1,13 @@
+{
+  "sampleBatchId": "sample_1776997463487_6d53f9d4",
+  "caseIds": [
+    "bc_1776997463483_fd433c"
+  ],
+  "requestedGoodcaseCount": 0,
+  "requestedBadcaseCount": 1,
+  "strategy": "remediation_regression_smoke_v1",
+  "targetVersion": "smoke_remediation_001",
+  "createdAt": "2026-04-24T02:24:23.487Z",
+  "actualGoodcaseCount": 0,
+  "actualBadcaseCount": 1
+}

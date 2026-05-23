@@ -1,0 +1,72 @@
+变量名,中文名,含义,计算方法,关联指标
+sessionId,会话编号,标识同一轮完整对话会话,原始输入字段，按会话聚合使用,"Raw Layer, topic 切分, 全部指标"
+timestamp,消息时间,表示消息发生时间,原始输入字段，解析后用于时序计算,"avgResponseGapSec, activeHourDistribution, topic continuity"
+role,消息角色,表示发言方是用户还是 AI 或系统,原始输入字段，参与角色过滤,"userQuestionRate, avgAssistantMessageLength, empathyScore"
+content,消息内容,单条消息正文,原始输入字段，参与文本规则判断,"isQuestion, 情绪判断, 风险信号"
+turnIndex,轮次编号,表示消息在同一 session 内的顺序,按 session 排序后生成,"sessionDepthDistribution, dropoffTurnDistribution, emotionTurningPoints"
+topicSegmentId,主题分段编号,表示同一 session 内的主题切片标识,由 topic 切分模块生成,"topicSwitchRate, topicSegments, subjective judge"
+topicSummary,主题摘要,对主题段内容的简要概括,由切分后摘要规则生成,"topicSegments, subjective_dimension_judge"
+emotionPolarity,情绪倾向,表示正向中性负向或复杂情绪,由 LLM 或规则判断,"segment_emotion_baseline, emotionScore"
+emotionIntensity,情绪强度,表示低中高强度,由 LLM 或规则判断,"segment_emotion_baseline, emotionRiskPenalty"
+emotionBaseScore,情绪基准分,大模型给出的 segment 原始情绪分,LLM 输出 0-100 基准分,"emotionScore, emotionCurve"
+emotionScore,情绪最终分,经本地评分函数修正后的情绪分,"emotionBaseScore + emotionValenceWeight + emotionLengthWeight + emotionStyleWeight + emotionGapWeight + emotionRecoveryWeight - emotionRiskPenalty","emotionCurve, emotionTurningPoints, emotionRecovery"
+responseGapSec,响应间隔秒数,当前消息与上一条消息之间的时间差,"timestamp(i) - timestamp(i-1)","avgResponseGapSec, emotionGapWeight, interestDeclineRisk"
+isQuestion,是否提问,当前消息是否为问句,"content 包含 ? 或 ？","userQuestionRate, understandingBarrierRisk"
+isTopicSwitch,是否主题切换,当前消息相对上一条是否进入新主题段,比较前后 topicSegmentId 是否变化,"topicSwitchRate, offTopicOrIgnoreRisk, understandingBarrierRisk"
+tokenCountEstimate,估算Token数,按字符数近似估算 token 规模,"ceil(length(content)/1.6)","Enriched Layer, 成本估算"
+sessionDepthDistribution,会话深度分布,统计每个 session 的最大轮次后再按深度桶聚合,"sessionDepth(session)=max(turnIndex); 按 1-3 / 4-8 / 9+ 分桶统计",客观指标
+dropoffTurnDistribution,流失轮次分布,统计对话主要在哪一轮停止,"count(isDropoffTurn=true 且 turnIndex=当前轮次)",客观指标
+avgResponseGapSec,平均响应间隔,统计所有有效相邻消息的平均间隔,"sum(responseGapSec)/count(valid responseGapSec)",客观指标
+activeHourDistribution,活跃时段分布,统计消息主要出现在哪些小时,"activeHour=hour(timestamp); 按小时计数",客观指标
+topicSwitchRate,主题切换率,统计每个 session 的平均主题切换次数,"unique(topicSegmentId in session)-1 后按 session 求平均",客观指标
+userQuestionRate,用户提问率,统计用户消息中问句占比,"count(user row where isQuestion=true)/count(all user row)",客观指标
+avgUserMessageLength,用户平均消息长度,衡量用户表达投入程度,"sum(length(content) for user rows)/count(user rows)",客观指标
+avgAssistantMessageLength,AI平均消息长度,判断 AI 是否过长压迫或过短敷衍,"sum(length(content) for assistant rows)/count(assistant rows)",客观指标
+userMessageLengthTrend,用户消息长度趋势,判断用户回复是否逐渐变短或变长,按用户消息序列对长度做线性斜率计算,客观指标
+topic_continuity_review,主题连续性复核,长间隔后判断是否还延续上一主题,"gapSec>=180 且 useLlm=true 时由 LLM 输出 isContinuation",topic 切分
+segment_emotion_baseline,分段情绪基准判断,为每个 topic segment 给出主观情绪基准,LLM 输出 emotionPolarity emotionIntensity emotionBaseScore emotionEvidence emotionConfidence,情绪评分
+subjective_dimension_judge,主观维度评审,为每个 session 输出四个主观维度评分,LLM 根据切分结果与信号层输出 score reason evidence confidence,主观指标
+emotionValenceWeight,情绪倾向修正,基于正负向表达密度做加减分,"clamp(((positiveCount-negativeCount)/totalRows)*12,-8,8)",emotionScore
+positiveCount,正向表达次数,统计正向情绪关键词命中次数,按 segment 内正向模式匹配计数,"emotionValenceWeight, emotionBaseScore"
+negativeCount,负向表达次数,统计负向情绪关键词命中次数,按 segment 内负向模式匹配计数,"emotionValenceWeight, emotionBaseScore"
+totalRows,总消息数,当前主题段内消息总数,segment 内行数统计,emotionValenceWeight
+emotionLengthWeight,长度结构修正,基于用户与 AI 发言长度结构做修正,"用户长度和 AI 长度分段打分后求和并 clamp 到 -8~8",emotionScore
+avgUserLength,用户平均消息长度,当前主题段内用户消息平均长度,segment 内用户消息长度平均值,"emotionLengthWeight, emotionRiskPenalty"
+avgAssistantLength,AI平均消息长度,当前主题段内 AI 消息平均长度,segment 内 assistant 消息长度平均值,emotionLengthWeight
+emotionStyleWeight,表达风格修正,根据共情表达和说教表达做修正,"clamp(empathyCount*1.5 - preachyCount*3,-8,8)",emotionScore
+empathyCount,共情表达次数,统计 AI 回应中共情类表达的命中次数,按共情词规则计数,"emotionStyleWeight, empathyScore"
+preachyCount,说教表达次数,统计 AI 回应中命令式或说教表达次数,按说教词规则计数,"emotionStyleWeight, preachinessRisk"
+emotionGapWeight,响应节奏修正,根据平均响应时间快慢做修正,"avgGapSec>90 扣5分；>45 扣2分；0<avgGapSec<20 加1.5分",emotionScore
+avgGapSec,平均响应间隔,当前主题段内相邻消息平均间隔,对 segment 内有效响应间隔求平均,"emotionGapWeight, interestDeclineRisk"
+emotionRecoveryWeight,恢复迹象修正,根据同一主题段内是否出现恢复迹象做修正,"首条负向末条正向 +6；首条负向且 AI 有共情 +3.5；负向且 AI 无支持 -3",emotionScore
+emotionRiskPenalty,风险惩罚项,对高风险主题段做额外扣分,"最后一条为 assistant +1.2；负向高强度 +2.8；用户平均长度<=6且负向 +1.5",emotionScore
+empathyScore,共情得分,衡量 AI 的理解接纳和安抚能力,"empathyHitRate*5 后 clamp 到 1-5 并四舍五入",主观指标
+empathyHitRate,共情命中率,AI 回复中共情类表达的占比,"count(assistant row contains empathy words)/count(assistant rows)",empathyScore
+offTopicOrIgnoreRisk,答非所问忽视风险,衡量 AI 是否偏题或忽视用户关键点,"5 - topicSwitchRowRate*8 - understandingBarrierRisk*2 后 clamp 到 1-5",主观指标
+topicSwitchRowRate,主题切换行占比,所有消息中发生主题切换的占比,"count(row where isTopicSwitch=true)/count(all rows)",offTopicOrIgnoreRisk
+preachinessRisk,说教压迫风险,衡量 AI 是否带有命令式或压迫性表达,"5 - preachyRate*10 后 clamp 到 1-5",主观指标
+preachyRate,说教命中率,AI 回复中说教表达的占比,"count(assistant row contains preachy words)/count(assistant rows)",preachinessRisk
+emotionRecovery,情绪恢复能力,衡量负向情绪能否恢复到稳定状态,"根据低情绪轮次 高情绪轮次 和 emotionRecoveryFailureRisk 综合计算 1-5 分",主观指标
+lowEmotionCount,低情绪轮次数,统计情绪分低于阈值的消息数,"count(row where emotionScore<=40)","emotionRecovery, emotionRecoveryFailureRisk"
+positiveCountRecovery,高情绪轮次数,统计情绪分高于恢复阈值的消息数,"count(row where emotionScore>=65)",emotionRecovery
+emotionTurningPoints,情绪拐点,标记情绪曲线中显著上升或下降的位置,"abs(current.emotionScore-previous.emotionScore)>=12 即记为拐点",主观指标
+scoreDelta,分数变化值,相邻两点情绪分差值,"current.emotionScore - previous.emotionScore",emotionTurningPoints
+interestDeclineRisk,兴趣下降风险,识别用户兴趣衰减和潜在流失,"基于后段回复变短 间隔拉长 提问率下降做加权累加",隐式推断信号
+lateAvgLength,后段平均长度,后半段用户消息平均长度,将对话按前后段拆分后计算,"interestDeclineRisk"
+earlyAvgLength,前段平均长度,前半段用户消息平均长度,将对话按前后段拆分后计算,"interestDeclineRisk"
+lateAvgGap,后段平均间隔,后半段消息平均间隔,将对话按前后段拆分后计算,"interestDeclineRisk"
+earlyAvgGap,前段平均间隔,前半段消息平均间隔,将对话按前后段拆分后计算,"interestDeclineRisk"
+lateQuestionRate,后段提问率,后半段用户消息提问占比,将对话按前后段拆分后计算,interestDeclineRisk
+earlyQuestionRate,前段提问率,前半段用户消息提问占比,将对话按前后段拆分后计算,interestDeclineRisk
+understandingBarrierRisk,理解障碍风险,识别 AI 没理解用户或表达不清,基于困惑表达 重复问题 和问后切题失败做累加,隐式推断信号
+confusionRows,困惑表达行数,用户表达困惑或不理解的消息数,按困惑关键词或澄清表达计数,understandingBarrierRisk
+normalizedQuestion,归一化问题,去噪后的用户问题文本,用于判断是否出现重复提问,"understandingBarrierRisk, 问题重复检测"
+emotionRecoveryFailureRisk,情绪恢复失败风险,识别负向情绪持续且没有明显回升,基于低情绪持续和流失前低情绪做累加,隐式推断信号
+summaryCards,摘要卡片,首页展示的核心业务指标概览,由 summary 模块根据评估结果组装,"前端展示, PM 概览"
+enrichedRows,补全明细行,补全后的逐行中间层数据,由 enrich 流程生成,"Enriched Layer, 全部指标"
+enrichedCsv,补全结果CSV,补全后的可下载中间产物,将 enrichedRows 导出为 CSV,"复核, 回放, 数据留档"
+objectiveMetrics,客观指标结果,所有客观指标的聚合结果,由 objectiveMetrics 模块统一输出,"前端摘要, 图表, 建议"
+subjectiveMetrics,主观指标结果,所有主观维度与情绪信号的聚合结果,由 subjectiveMetrics 模块统一输出,"前端摘要, 图表, 建议"
+topicSegments,主题分段结果,session 内主题切分后的结果集合,由 segmenter 模块输出,"topicSwitchRate, 情绪评分, 主观评审"
+charts,图表数据,供前端绘制图表的结构化数据,由 chartBuilder 根据指标结果生成,前端展示
+suggestions,优化建议,基于指标与信号输出的行动建议,由 suggest 模块生成,业务复盘

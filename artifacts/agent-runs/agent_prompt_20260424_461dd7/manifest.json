@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "agentRunId": "agent_prompt_20260424_461dd7",
+  "packageId": "rem_20260424_8200cb",
+  "channel": "prompt",
+  "status": "draft",
+  "title": "Smoke E2E Agent Run",
+  "summary": "agent run created from smoke-end-to-end script",
+  "content": "Verify full loop execution from raw CSV.",
+  "notes": "",
+  "startingValidationLinks": {
+    "replayValidationRunId": "val_replay_20260424_c85d1b",
+    "offlineValidationRunId": "val_offline_20260424_ae944b"
+  },
+  "validationLinks": {
+    "replayValidationRunId": "val_replay_20260424_c85d1b",
+    "offlineValidationRunId": "val_offline_20260424_ae944b"
+  },
+  "createdAt": "2026-04-24T09:42:02.965Z",
+  "updatedAt": "2026-04-24T09:42:02.965Z"
+}

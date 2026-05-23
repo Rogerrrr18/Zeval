@@ -1,0 +1,142 @@
+scenarioId: assetops-end-to-end-orchestration
+displayName: AssetOps 多 Agent 端到端编排
+version: 1
+description: 面向跨 IoT、FMSR、TSFM、WO、Vibration 的多步骤工业运维 Agent 任务，评估计划、工具选择、执行链路与最终决策。
+
+applicability:
+  domains:
+    - industrial-asset-operations
+    - multi-agent-benchmark
+    - maintenance-decision-support
+  taskTypes:
+    - Multi-step Workflow
+    - Root Cause Analysis
+    - Predictive Maintenance Recommendation
+    - Agent Orchestration
+  assetOpsBenchTools:
+    - sites
+    - assets
+    - sensors
+    - history
+    - get_failure_modes
+    - get_failure_mode_sensor_mapping
+    - run_integrated_tsad
+    - get_events
+    - generate_or_recommend_work_order
+  notSuitableFor:
+    - single-turn-factual-only
+
+dataRequirements:
+  requiredFields:
+    - sessionId
+    - role
+    - content
+  recommendedFields:
+    - plan
+    - trace
+    - toolName
+    - toolArguments
+    - toolResult
+    - expectedTrajectory
+    - expectedAnswer
+  degradation:
+    missingTrace: cannot_score_sequence_strictly
+    missingExpectedTrajectory: judge_final_answer_and_evidence_only
+
+metricProfile:
+  enabledCoreMetrics:
+    - sessionDepthDistribution
+    - avgResponseGapSec
+    - topicSwitchRate
+    - userQuestionRepeatRate
+  customMetrics:
+    - taskCompletion
+    - planningCompleteness
+    - agentSequenceCorrectness
+    - toolSelectionCorrectness
+    - parameterBindingAccuracy
+    - evidenceChainCompleteness
+    - resultSynthesisQuality
+    - recoveryFromToolFailure
+    - hallucinationControl
+
+judgeRubrics:
+  subjectiveDimensions:
+    - id: planningCompleteness
+      displayName: 计划完整性
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: agentSequenceCorrectness
+      displayName: Agent 顺序正确性
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: evidenceChainCompleteness
+      displayName: 证据链完整性
+      scale: 1-5
+      weight: 0.25
+      llmRequired: true
+    - id: resultSynthesisQuality
+      displayName: 结果综合质量
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: recoveryFromToolFailure
+      displayName: 工具失败恢复能力
+      scale: 1-5
+      weight: 0.15
+      llmRequired: true
+
+businessKpis:
+  - id: orchestration_success
+    displayName: 编排成功率
+    description: 是否把多工具、多 Agent 链路按正确顺序完成，并产出正确答案。
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: planningCompleteness
+          weight: 0.25
+        - source: subjective
+          metricId: agentSequenceCorrectness
+          weight: 0.3
+        - source: subjective
+          metricId: toolSelectionCorrectness
+          weight: 0.25
+      secondary:
+        - source: subjective
+          metricId: parameterBindingAccuracy
+          weight: 0.2
+    successThreshold: 0.8
+    degradedThreshold: 0.56
+  - id: decision_readiness
+    displayName: 端到端决策可用性
+    description: 最终输出是否整合了证据链、约束和维护行动建议。
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: evidenceChainCompleteness
+          weight: 0.35
+        - source: subjective
+          metricId: resultSynthesisQuality
+          weight: 0.35
+      secondary:
+        - source: subjective
+          metricId: hallucinationControl
+          weight: 0.15
+        - source: subjective
+          metricId: recoveryFromToolFailure
+          weight: 0.15
+    successThreshold: 0.76
+    degradedThreshold: 0.52
+
+onboardingQuestions:
+  - id: expected_trajectory_available
+    question: 是否有 AssetOpsBench ground truth trajectory 可用于严格评估？
+  - id: agent_framework
+    question: 待评估的是 MetaAgent、AgentHive、Plan-Execute，还是自研 Agent？
+  - id: tool_trace_format
+    question: 工具轨迹是 OpenTelemetry spans、JSON turns，还是普通文本日志？
+

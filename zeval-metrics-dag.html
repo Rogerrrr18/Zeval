@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zeval 主客观评测指标 DAG</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #111827;
+        --muted: #64748b;
+        --line: #d9e2ef;
+        --soft: #edf2f7;
+        --blue: #2563eb;
+        --cyan: #0891b2;
+        --green: #059669;
+        --amber: #d97706;
+        --rose: #e11d48;
+        --slate: #334155;
+        --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.55;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        background: #0f172a;
+        color: white;
+      }
+
+      .hero {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 44px 28px 36px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: #67e8f9;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 820px;
+        font-size: 42px;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        margin: 18px 0 0;
+        max-width: 860px;
+        color: #cbd5e1;
+        font-size: 16px;
+      }
+
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      section {
+        margin: 0 0 24px;
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-size: 22px;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        margin: 24px 0 10px;
+        font-size: 17px;
+        letter-spacing: 0;
+      }
+
+      p {
+        margin: 0 0 12px;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .source-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 16px;
+        margin: 14px 0 0;
+        padding: 0;
+        list-style: none;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .source-list code,
+      td code {
+        padding: 2px 5px;
+        border-radius: 5px;
+        background: #eef2ff;
+        color: #3730a3;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 28px;
+        padding: 5px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        color: var(--slate);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--slate);
+      }
+
+      .dot.raw {
+        background: var(--slate);
+      }
+
+      .dot.objective {
+        background: var(--blue);
+      }
+
+      .dot.subjective {
+        background: var(--rose);
+      }
+
+      .dot.signal {
+        background: var(--amber);
+      }
+
+      .dot.output {
+        background: var(--green);
+      }
+
+      .dag-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfdff;
+      }
+
+      svg {
+        display: block;
+        min-width: 1120px;
+        width: 100%;
+        height: auto;
+      }
+
+      .node rect {
+        stroke-width: 1.4;
+        rx: 8;
+      }
+
+      .node text {
+        fill: #0f172a;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .node .small {
+        fill: #64748b;
+        font-size: 11px;
+        font-weight: 500;
+      }
+
+      .edge {
+        fill: none;
+        stroke: #8aa0bd;
+        stroke-width: 1.7;
+        marker-end: url(#arrow);
+      }
+
+      .edge.strong {
+        stroke-width: 2.4;
+        stroke: #334155;
+      }
+
+      .edge.blue {
+        stroke: #3b82f6;
+      }
+
+      .edge.rose {
+        stroke: #fb7185;
+      }
+
+      .edge.green {
+        stroke: #10b981;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .card {
+        min-height: 136px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .card h3 {
+        margin: 0 0 8px;
+      }
+
+      .card ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        font-size: 13px;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+        text-align: left;
+      }
+
+      th {
+        background: #f8fafc;
+        color: #334155;
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      tbody tr:hover {
+        background: #fbfdff;
+      }
+
+      .kind {
+        display: inline-flex;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .kind.obj {
+        background: #dbeafe;
+        color: #1d4ed8;
+      }
+
+      .kind.sub {
+        background: #ffe4e6;
+        color: #be123c;
+      }
+
+      .kind.sig {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .kind.ext {
+        background: #dcfce7;
+        color: #047857;
+      }
+
+      .kind.aux {
+        background: #e2e8f0;
+        color: #334155;
+      }
+
+      details {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      details + details {
+        margin-top: 10px;
+      }
+
+      summary {
+        cursor: pointer;
+        padding: 14px 16px;
+        font-weight: 750;
+      }
+
+      .details-body {
+        padding: 0 16px 16px;
+      }
+
+      .note {
+        padding: 12px 14px;
+        border-left: 4px solid var(--cyan);
+        border-radius: 6px;
+        background: #ecfeff;
+        color: #164e63;
+        font-size: 14px;
+      }
+
+      @media (max-width: 820px) {
+        .hero,
+        main {
+          padding-left: 18px;
+          padding-right: 18px;
+        }
+
+        h1 {
+          font-size: 32px;
+        }
+
+        section {
+          padding: 18px;
+        }
+
+        .grid,
+        .source-list {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="hero">
+        <p class="eyebrow">Zeval Metric Architecture</p>
+        <h1>主客观评测指标与 DAG 依赖关系</h1>
+        <p class="subtitle">
+          本文件按当前代码实现梳理，不按早期规划臆测。核心链路是 raw chatlog -> normalized rows -> enriched rows
+          -> objective / subjective metrics -> charts, suggestions, badcases, remediation, validation。
+        </p>
+        <div class="legend">
+          <span class="pill"><span class="dot raw"></span>输入 / 中间层</span>
+          <span class="pill"><span class="dot objective"></span>客观指标</span>
+          <span class="pill"><span class="dot subjective"></span>主观指标</span>
+          <span class="pill"><span class="dot signal"></span>隐式信号</span>
+          <span class="pill"><span class="dot output"></span>下游产物</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <h2>代码依据</h2>
+        <p class="muted">
+          当前评测主链路入口为 <code>runEvaluatePipeline</code>。它先做 enrich，再并行组织客观、主观、场景、扩展指标和下游产物。
+        </p>
+        <ul class="source-list">
+          <li><code>src/pipeline/evaluateRun.ts</code>：评测总编排</li>
+          <li><code>src/pipeline/objectiveMetrics.ts</code>：客观指标聚合</li>
+          <li><code>src/pipeline/subjectiveMetrics.ts</code>：主观指标聚合</li>
+          <li><code>src/pipeline/signals.ts</code>：隐式风险信号</li>
+          <li><code>src/pipeline/goalCompletion.ts</code>：目标达成评估</li>
+          <li><code>src/pipeline/recoveryTrace.ts</code>：失败-恢复轨迹</li>
+          <li><code>src/pipeline/emotion.ts</code>：segment 情绪评分</li>
+          <li><code>src/pipeline/metricRegistry.ts</code>：统一 gate/registry</li>
+          <li><code>src/pipeline/extendedMetrics/index.ts</code>：可选扩展指标</li>
+          <li><code>src/pipeline/badCases.ts</code>：badcase 资产抽取</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>整体 DAG</h2>
+        <p class="muted">
+          高层依赖图如下。图里只画主边，具体字段级依赖见后面的指标表。
+        </p>
+        <div class="dag-wrap" aria-label="Zeval metrics DAG">
+          <svg viewBox="0 0 1320 690" role="img">
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="#8aa0bd"></path>
+              </marker>
+              <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.08" />
+              </filter>
+            </defs>
+
+            <path class="edge strong" d="M180 175 C235 175 245 175 300 175"></path>
+            <path class="edge strong" d="M470 175 C525 175 535 175 590 175"></path>
+            <path class="edge blue" d="M760 120 C820 90 850 85 905 90"></path>
+            <path class="edge rose" d="M760 175 C820 175 850 175 905 175"></path>
+            <path class="edge green" d="M760 230 C820 260 850 270 905 280"></path>
+
+            <path class="edge blue" d="M1080 90 C1130 90 1140 130 1190 130"></path>
+            <path class="edge rose" d="M1080 175 C1130 175 1140 175 1190 175"></path>
+            <path class="edge green" d="M1080 280 C1130 280 1140 220 1190 220"></path>
+
+            <path class="edge" d="M470 175 C510 265 530 350 590 420"></path>
+            <path class="edge rose" d="M760 420 C820 420 850 420 905 420"></path>
+            <path class="edge green" d="M1080 420 C1130 420 1140 420 1190 420"></path>
+
+            <path class="edge" d="M470 175 C500 325 525 520 590 585"></path>
+            <path class="edge" d="M760 585 C820 585 850 585 905 585"></path>
+            <path class="edge green" d="M1080 585 C1130 585 1140 500 1190 500"></path>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(40 120)">
+              <rect width="140" height="110" fill="#ffffff" stroke="#cbd5e1"></rect>
+              <text x="16" y="28">Raw Chatlog</text>
+              <text class="small" x="16" y="54">sessionId</text>
+              <text class="small" x="16" y="72">timestamp / role</text>
+              <text class="small" x="16" y="90">content</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(300 120)">
+              <rect width="170" height="110" fill="#ffffff" stroke="#cbd5e1"></rect>
+              <text x="16" y="28">Normalize</text>
+              <text class="small" x="16" y="54">turnIndex</text>
+              <text class="small" x="16" y="72">timestampMs</text>
+              <text class="small" x="16" y="90">activeHour</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(590 75)">
+              <rect width="170" height="90" fill="#ffffff" stroke="#cbd5e1"></rect>
+              <text x="16" y="28">Topic Segment</text>
+              <text class="small" x="16" y="54">topicSegmentId</text>
+              <text class="small" x="16" y="72">topicSummary</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(590 185)">
+              <rect width="170" height="90" fill="#ffffff" stroke="#cbd5e1"></rect>
+              <text x="16" y="28">Emotion Score</text>
+              <text class="small" x="16" y="54">base + weights</text>
+              <text class="small" x="16" y="72">emotionScore</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(590 375)">
+              <rect width="170" height="90" fill="#ffffff" stroke="#cbd5e1"></rect>
+              <text x="16" y="28">Enriched Flags</text>
+              <text class="small" x="16" y="54">responseGapSec</text>
+              <text class="small" x="16" y="72">isQuestion / switch</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(590 540)">
+              <rect width="170" height="90" fill="#ffffff" stroke="#cbd5e1"></rect>
+              <text x="16" y="28">Optional Inputs</text>
+              <text class="small" x="16" y="54">trace / tools</text>
+              <text class="small" x="16" y="72">retrieval / schema</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(905 45)">
+              <rect width="175" height="90" fill="#eff6ff" stroke="#60a5fa"></rect>
+              <text x="16" y="28">Objective Metrics</text>
+              <text class="small" x="16" y="54">gap / switch / depth</text>
+              <text class="small" x="16" y="72">question / length / SLA</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(905 145)">
+              <rect width="175" height="100" fill="#fff1f2" stroke="#fb7185"></rect>
+              <text x="16" y="28">Subjective Metrics</text>
+              <text class="small" x="16" y="54">dimensions</text>
+              <text class="small" x="16" y="72">goal completion</text>
+              <text class="small" x="16" y="90">recovery traces</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(905 270)">
+              <rect width="175" height="90" fill="#fff7ed" stroke="#f59e0b"></rect>
+              <text x="16" y="28">Implicit Signals</text>
+              <text class="small" x="16" y="54">interest decline</text>
+              <text class="small" x="16" y="72">barrier / recovery risk</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(905 375)">
+              <rect width="175" height="90" fill="#f0fdf4" stroke="#34d399"></rect>
+              <text x="16" y="28">Metric Registry</text>
+              <text class="small" x="16" y="54">normalized scores</text>
+              <text class="small" x="16" y="72">threshold gates</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(905 540)">
+              <rect width="175" height="90" fill="#ecfeff" stroke="#22d3ee"></rect>
+              <text x="16" y="28">Extended Metrics</text>
+              <text class="small" x="16" y="54">RAG / Agent / Safety</text>
+              <text class="small" x="16" y="72">only if inputs exist</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(1190 95)">
+              <rect width="105" height="55" fill="#f0fdf4" stroke="#34d399"></rect>
+              <text x="15" y="32">Charts</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(1190 155)">
+              <rect width="105" height="55" fill="#f0fdf4" stroke="#34d399"></rect>
+              <text x="15" y="32">Summary</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(1190 215)">
+              <rect width="105" height="55" fill="#f0fdf4" stroke="#34d399"></rect>
+              <text x="15" y="32">Suggestions</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(1190 395)">
+              <rect width="105" height="55" fill="#f0fdf4" stroke="#34d399"></rect>
+              <text x="15" y="32">Badcases</text>
+            </g>
+
+            <g class="node" filter="url(#softShadow)" transform="translate(1190 475)">
+              <rect width="105" height="55" fill="#f0fdf4" stroke="#34d399"></rect>
+              <text x="15" y="24">Remediation</text>
+              <text class="small" x="15" y="42">Validation</text>
+            </g>
+          </svg>
+        </div>
+      </section>
+
+      <section>
+        <h2>核心分层</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>1. 中间层</h3>
+            <ul>
+              <li>Raw: <code>sessionId</code>, <code>timestamp</code>, <code>role</code>, <code>content</code></li>
+              <li>Normalized: <code>turnIndex</code>, <code>timestampMs</code>, <code>activeHour</code></li>
+              <li>Enriched: topic, emotion, gap, question, switch, dropoff flags</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>2. 指标层</h3>
+            <ul>
+              <li>客观指标：纯规则/聚合，稳定可回归</li>
+              <li>主观指标：LLM judge + 规则降级</li>
+              <li>隐式信号：可解释风险信号，服务 badcase 和调优包</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>3. 产物层</h3>
+            <ul>
+              <li>图表与 summary cards</li>
+              <li>优化建议 suggestions</li>
+              <li>badcase assets, remediation package, validation gates</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>客观指标</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>指标</th>
+              <th>类型</th>
+              <th>直接父节点</th>
+              <th>计算逻辑</th>
+              <th>主要下游</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>sessionDepthDistribution</code><br />会话深度分布</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>sessionId</code>, <code>turnIndex</code></td>
+              <td>按 session 取最大轮次，分到 <code>1-3</code>, <code>4-8</code>, <code>9+</code>。</td>
+              <td>工作台概览、数据质量判断</td>
+            </tr>
+            <tr>
+              <td><code>dropoffTurnDistribution</code><br />流失轮次分布</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>isDropoffTurn</code>, <code>turnIndex</code></td>
+              <td>统计最后一条 assistant 消息所在轮次。</td>
+              <td><code>dropoffDistribution</code> 图表、流失定位</td>
+            </tr>
+            <tr>
+              <td><code>avgResponseGapSec</code><br />平均响应间隔</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>timestampMs</code>, <code>responseGapSec</code></td>
+              <td>所有有效相邻消息间隔求均值。</td>
+              <td>summary、suggestions、metric registry、long gap badcase</td>
+            </tr>
+            <tr>
+              <td><code>topicSwitchRate</code><br />话题切换率</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>topicSegmentId</code>, <code>sessionId</code></td>
+              <td>每个 session 的唯一 topic segment 数减一，再按 session 求均值。</td>
+              <td>summary、registry、场景 KPI、off-topic 风险</td>
+            </tr>
+            <tr>
+              <td><code>userQuestionRepeatRate</code><br />用户重复提问率</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>role=user</code>, <code>isQuestion</code>, <code>content</code></td>
+              <td>用户问题归一化后统计重复问题占比。</td>
+              <td>场景 KPI、调优包 target metric、badcase tag</td>
+            </tr>
+            <tr>
+              <td><code>agentResolutionSignalRate</code><br />解决态信号覆盖率</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>role=assistant</code>, <code>content</code></td>
+              <td>session 内 assistant 是否命中“已处理/提交/补发/退款/工单号”等解决态表达。</td>
+              <td>registry、场景 KPI、目标达成辅助解释</td>
+            </tr>
+            <tr>
+              <td><code>escalationKeywordHitRate</code><br />升级关键词命中率</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>content</code></td>
+              <td>session 是否命中“转人工/投诉/主管/经理/工单”等升级表达。</td>
+              <td>场景 KPI、调优包 target metric、badcase tag</td>
+            </tr>
+            <tr>
+              <td><code>activeHourDistribution</code><br />活跃时段分布</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>timestamp</code>, <code>activeHour</code>, <code>role</code></td>
+              <td>按小时和角色统计消息量。</td>
+              <td><code>activeHourDistribution</code> 图表</td>
+            </tr>
+            <tr>
+              <td><code>userQuestionRate</code><br />用户提问率</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>role=user</code>, <code>isQuestion</code></td>
+              <td>用户消息里问句占比。</td>
+              <td>suggestions、兴趣衰减/理解障碍辅助判断</td>
+            </tr>
+            <tr>
+              <td><code>avgUserMessageLength</code><br />用户平均消息长度</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>role=user</code>, <code>content.length</code></td>
+              <td>用户消息长度均值。</td>
+              <td>兴趣衰减、情绪 length weight、用户投入度判断</td>
+            </tr>
+            <tr>
+              <td><code>userMessageLengthTrend</code><br />用户消息长度趋势</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>role=user</code>, <code>content.length</code>, message order</td>
+              <td>对用户消息长度序列做简单线性斜率。</td>
+              <td>兴趣衰减解释、体验走势判断</td>
+            </tr>
+            <tr>
+              <td><code>avgAssistantMessageLength</code><br />AI 平均消息长度</td>
+              <td><span class="kind obj">objective</span></td>
+              <td><code>role=assistant</code>, <code>content.length</code></td>
+              <td>assistant 消息长度均值。</td>
+              <td>说教/压迫感辅助解释、情绪 length weight</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>主观指标与信号</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>指标 / 信号</th>
+              <th>类型</th>
+              <th>直接父节点</th>
+              <th>计算逻辑</th>
+              <th>主要下游</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>emotionCurve</code><br />情绪曲线</td>
+              <td><span class="kind sub">subjective</span></td>
+              <td><code>emotionScore</code>, <code>turnIndex</code>, <code>sessionId</code></td>
+              <td>逐行输出 0-100 情绪分。情绪分来自 segment 基准分 + 本地权重修正。</td>
+              <td>情绪图、summary、suggestions、recovery、badcase</td>
+            </tr>
+            <tr>
+              <td><code>emotionTurningPoints</code><br />情绪拐点</td>
+              <td><span class="kind sub">subjective</span></td>
+              <td><code>emotionScore</code> 相邻差值</td>
+              <td>同 session 相邻行情绪变化绝对值 >= 12 时记为拐点。</td>
+              <td>情绪复盘、证据定位</td>
+            </tr>
+            <tr>
+              <td><code>共情程度</code></td>
+              <td><span class="kind sub">subjective</span></td>
+              <td>assistant 内容、topic segment、implicit signals</td>
+              <td>LLM 模式按 session judge；降级模式按“理解/明白/支持/陪你/辛苦/正常”等共情表达密度打 1-5 分。</td>
+              <td>summary、registry <code>empathy</code>、suggestions、调优包 target</td>
+            </tr>
+            <tr>
+              <td><code>答非所问/无视风险</code></td>
+              <td><span class="kind sub">subjective</span></td>
+              <td><code>isTopicSwitch</code>, <code>understandingBarrierRisk</code>, transcript</td>
+              <td>LLM 模式按 transcript + signal judge；降级模式为 <code>5 - topicSwitchRowRate*8 - barrierRisk*2</code> 后 clamp。</td>
+              <td>registry <code>offTopicRisk</code>、badcase、调优包 target</td>
+            </tr>
+            <tr>
+              <td><code>说教感/压迫感</code></td>
+              <td><span class="kind sub">subjective</span></td>
+              <td>assistant 内容</td>
+              <td>LLM 模式 judge；降级模式按“应该/必须/你要/一定要”等命令式表达比例扣分。</td>
+              <td>场景 KPI alias <code>preachiness</code>、策略建议</td>
+            </tr>
+            <tr>
+              <td><code>情绪恢复能力</code></td>
+              <td><span class="kind sub">subjective</span></td>
+              <td><code>emotionScore</code>, <code>emotionRecoveryFailureRisk</code></td>
+              <td>低谷轮次、恢复轮次和恢复失败信号共同决定 1-5 分。</td>
+              <td>场景 KPI alias <code>emotionRecovery</code>、调优包 target</td>
+            </tr>
+            <tr>
+              <td><code>goalCompletions</code><br />目标达成</td>
+              <td><span class="kind sub">subjective</span></td>
+              <td>session transcript、解决态、放弃/升级/失败表达、重复提问、情绪回升</td>
+              <td>规则先判 achieved / partial / failed / unclear；unclear 且启用 LLM 时再由 LLM 抽取 intent 并终裁。</td>
+              <td>summary 目标达成率、registry、badcase、recovery、remediation</td>
+            </tr>
+            <tr>
+              <td><code>recoveryTraces</code><br />失败-恢复轨迹</td>
+              <td><span class="kind sub">subjective</span></td>
+              <td><code>emotionScore</code>, <code>isQuestion</code>, <code>isTopicSwitch</code>, 困惑表达, <code>goalCompletions</code></td>
+              <td>先找失败点，再在 4 轮窗口内找道歉/重述/澄清/情绪恢复/目标达成信号，给出 status 与 qualityScore。</td>
+              <td>summary、suggestions、badcase、调优包示例</td>
+            </tr>
+            <tr>
+              <td><code>interestDeclineRisk</code><br />兴趣衰减风险</td>
+              <td><span class="kind sig">signal</span></td>
+              <td>前后段用户长度、响应间隔、提问率</td>
+              <td>后半段回复变短、间隔拉长、提问意愿下降时累加风险分。</td>
+              <td>suggestions、场景 KPI、风险解释</td>
+            </tr>
+            <tr>
+              <td><code>understandingBarrierRisk</code><br />理解障碍风险</td>
+              <td><span class="kind sig">signal</span></td>
+              <td>困惑表达、重复问题、用户提问后 assistant topic switch</td>
+              <td>命中“什么意思/不懂/没明白”等表达、重复提问或问后偏题时累加风险。</td>
+              <td>off-topic 维度、suggestions、badcase</td>
+            </tr>
+            <tr>
+              <td><code>emotionRecoveryFailureRisk</code><br />情绪恢复失败风险</td>
+              <td><span class="kind sig">signal</span></td>
+              <td><code>emotionScore</code>, <code>isDropoffTurn</code></td>
+              <td>低情绪后 4 轮内未恢复到 60 分，或断点前仍处低谷时升高风险。</td>
+              <td>情绪恢复能力、suggestions、badcase</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>情绪评分子 DAG</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>节点</th>
+              <th>父节点</th>
+              <th>作用</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>emotionBaseScore</code></td>
+              <td>topic segment transcript；LLM 或规则关键词</td>
+              <td>每个 topic segment 的 0-100 基准情绪分。</td>
+            </tr>
+            <tr>
+              <td><code>emotionValenceWeight</code></td>
+              <td>正向/负向关键词命中数</td>
+              <td>按 <code>((positiveCount-negativeCount)/rows)*12</code> 修正，范围 -8 到 8。</td>
+            </tr>
+            <tr>
+              <td><code>emotionLengthWeight</code></td>
+              <td>用户平均长度、assistant 平均长度</td>
+              <td>用户表达充分略加分，过短扣分；assistant 过长或过短扣分。</td>
+            </tr>
+            <tr>
+              <td><code>emotionStyleWeight</code></td>
+              <td>共情命中数、说教命中数</td>
+              <td><code>empathyCount*1.5 - preachyCount*3</code>，范围 -8 到 8。</td>
+            </tr>
+            <tr>
+              <td><code>emotionGapWeight</code></td>
+              <td>segment 内平均时间间隔</td>
+              <td>快响应小幅加分，45s/90s 以上扣分。</td>
+            </tr>
+            <tr>
+              <td><code>emotionRecoveryWeight</code></td>
+              <td>首尾用户情绪、assistant 支持表达</td>
+              <td>首负尾正或 assistant 支持会加分；负向且无支持扣分。</td>
+            </tr>
+            <tr>
+              <td><code>emotionRiskPenalty</code></td>
+              <td>最后角色、负向高强度、用户短负向</td>
+              <td>高风险 segment 的额外惩罚项。</td>
+            </tr>
+            <tr>
+              <td><code>emotionScore</code></td>
+              <td>以上所有节点</td>
+              <td><code>base + valence + length + style + gap + recovery - riskPenalty</code>，clamp 到 0-100。</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>统一 Registry 与 Gate</h2>
+        <p class="muted">
+          <code>metricRegistry</code> 会把部分指标转换为 0-1 的 gate score，用于统一通过率、失败原因和场景模板映射。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Registry 指标</th>
+              <th>来源</th>
+              <th>归一化方式</th>
+              <th>默认阈值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>avgResponseGapSec</code></td>
+              <td>客观 <code>avgResponseGapSec</code></td>
+              <td><code>1 - avgResponseGapSec / 120</code></td>
+              <td>0.78</td>
+            </tr>
+            <tr>
+              <td><code>topicSwitchRate</code></td>
+              <td>客观 <code>topicSwitchRate</code></td>
+              <td><code>1 - topicSwitchRate / 3</code></td>
+              <td>0.72</td>
+            </tr>
+            <tr>
+              <td><code>agentResolutionSignalRate</code></td>
+              <td>客观 <code>agentResolutionSignalRate</code></td>
+              <td>直接使用 0-1 rate</td>
+              <td>0.68</td>
+            </tr>
+            <tr>
+              <td><code>goalCompletion</code></td>
+              <td>主观 <code>goalCompletions</code></td>
+              <td>session <code>score / 5</code> 后求均值</td>
+              <td>0.70</td>
+            </tr>
+            <tr>
+              <td><code>empathy</code></td>
+              <td>主观维度“共情程度”</td>
+              <td><code>dimension.score / 5</code></td>
+              <td>0.68</td>
+            </tr>
+            <tr>
+              <td><code>offTopicRisk</code></td>
+              <td>主观维度“答非所问/无视风险”</td>
+              <td><code>dimension.score / 5</code></td>
+              <td>0.68</td>
+            </tr>
+            <tr>
+              <td><code>serviceCallGrounding</code></td>
+              <td>结构化标注</td>
+              <td>service_call 参数可追溯到 dialogue state 的比例</td>
+              <td>0.85</td>
+            </tr>
+            <tr>
+              <td><code>serviceResultAvailability</code></td>
+              <td>结构化标注</td>
+              <td>service_call 有同 turn/service 结果的比例</td>
+              <td>0.95</td>
+            </tr>
+            <tr>
+              <td><code>schemaSlotCompliance</code></td>
+              <td>结构化标注</td>
+              <td>schema slot 覆盖率</td>
+              <td>0.95</td>
+            </tr>
+            <tr>
+              <td><code>traceStepEfficiency</code></td>
+              <td>真实 agent trace</td>
+              <td>完成 span 比例 - warning penalty</td>
+              <td>0.72</td>
+            </tr>
+            <tr>
+              <td><code>syntheticCoverage</code></td>
+              <td>scenario synthetic seeds</td>
+              <td><code>seedCount / 5</code></td>
+              <td>0.50</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>可选扩展指标</h2>
+        <p class="muted">
+          这些指标不会在普通客服日志里自动出现，只有当 API 请求提供 <code>extendedInputs</code> 时才会输出。
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>指标</th>
+              <th>输入</th>
+              <th>评估方式</th>
+              <th>默认阈值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="kind ext">extended</span> <code>faithfulness</code> 回复忠实度</td>
+              <td><code>retrievalContexts</code></td>
+              <td>LLM judge；降级为 query/response 关键词重合</td>
+              <td>0.70</td>
+            </tr>
+            <tr>
+              <td><span class="kind ext">extended</span> <code>hallucination</code> 幻觉安全度</td>
+              <td><code>retrievalContexts</code></td>
+              <td>LLM judge；分数越高越无幻觉</td>
+              <td>0.50</td>
+            </tr>
+            <tr>
+              <td><span class="kind ext">extended</span> <code>answerRelevancy</code> 回复相关性</td>
+              <td><code>retrievalContexts</code></td>
+              <td>LLM judge 或 query/response 关键词重合</td>
+              <td>0.70</td>
+            </tr>
+            <tr>
+              <td><span class="kind ext">extended</span> <code>contextualRelevancy</code> 检索相关性</td>
+              <td><code>retrievalContexts</code></td>
+              <td>LLM judge 或 query/context 关键词重合</td>
+              <td>0.70</td>
+            </tr>
+            <tr>
+              <td><span class="kind ext">extended</span> <code>toolCorrectness</code> 工具调用正确率</td>
+              <td><code>toolCalls</code></td>
+              <td>工具名 0.5 + 参数 0.3 + 执行成功 0.2</td>
+              <td>0.80</td>
+            </tr>
+            <tr>
+              <td><span class="kind ext">extended</span> <code>knowledgeRetention</code> 知识保持率</td>
+              <td><code>retentionFacts</code>, optionally <code>retrievalContexts</code></td>
+              <td>LLM judge 或事实片段是否在后续 response 出现</td>
+              <td>0.70</td>
+            </tr>
+            <tr>
+              <td><span class="kind ext">extended</span> <code>toxicity</code> 无毒度</td>
+              <td><code>retrievalContexts.response</code></td>
+              <td>规则关键词先扫，必要时 LLM 二次校验</td>
+              <td>0.50</td>
+            </tr>
+            <tr>
+              <td><span class="kind ext">extended</span> <code>bias</code> 无偏见度</td>
+              <td><code>retrievalContexts.response</code></td>
+              <td>规则模式先扫，必要时 LLM 二次校验</td>
+              <td>0.50</td>
+            </tr>
+            <tr>
+              <td><span class="kind ext">extended</span> <code>roleAdherence</code> 角色一致性</td>
+              <td><code>roleProfile</code>, <code>retrievalContexts</code></td>
+              <td>需要 LLM judge；未启用 LLM 时 skipped</td>
+              <td>0.70</td>
+            </tr>
+            <tr>
+              <td><span class="kind ext">extended</span> <code>taskCompletion</code> 任务完成度</td>
+              <td><code>toolCalls</code> 或 <code>retrievalContexts</code></td>
+              <td>LLM 60% + 工具成功率 40%；降级为工具成功率</td>
+              <td>0.70</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>下游产物依赖</h2>
+        <details open>
+          <summary>Charts / Summary / Suggestions</summary>
+          <div class="details-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>产物</th>
+                  <th>依赖</th>
+                  <th>说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>charts.emotionCurve</code></td>
+                  <td><code>enrichedRows.emotionScore</code></td>
+                  <td>按 session + turnIndex 画情绪曲线。</td>
+                </tr>
+                <tr>
+                  <td><code>charts.dropoffDistribution</code></td>
+                  <td><code>isDropoffTurn</code>, <code>turnIndex</code></td>
+                  <td>定位对话在哪些轮次停止。</td>
+                </tr>
+                <tr>
+                  <td><code>charts.activeHourDistribution</code></td>
+                  <td><code>activeHour</code>, <code>role</code></td>
+                  <td>看用户/assistant 在各时段消息量。</td>
+                </tr>
+                <tr>
+                  <td><code>charts.topicSwitchFrequency</code></td>
+                  <td><code>isTopicSwitch</code>, <code>sessionId</code></td>
+                  <td>每个 session 的切换次数。</td>
+                </tr>
+                <tr>
+                  <td><code>summaryCards</code></td>
+                  <td>客观指标 + 主观指标 + badcaseCount + optional structured metrics</td>
+                  <td>产品首页指标卡片。</td>
+                </tr>
+                <tr>
+                  <td><code>suggestions</code></td>
+                  <td>低情绪轮次、平均情绪、目标达成率、响应间隔、topic switch、风险信号</td>
+                  <td>输出 P0/P1/P2 优化建议。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+
+        <details>
+          <summary>Badcase / Remediation / Validation</summary>
+          <div class="details-body">
+            <table>
+              <thead>
+                <tr>
+                  <th>节点</th>
+                  <th>依赖</th>
+                  <th>生成逻辑</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>badCaseAssets</code></td>
+                  <td><code>goalCompletions</code>, <code>recoveryTraces</code>, repeated questions, escalation keywords, emotion drop, topic shift, long gap</td>
+                  <td>按 session 抽取 tags、severityScore、evidence、transcript。</td>
+                </tr>
+                <tr>
+                  <td><code>severityScore</code></td>
+                  <td>badcase tags</td>
+                  <td>goal_failed +0.34，recovery_failed +0.24，escalation +0.22，question_repeat +0.18 等。</td>
+                </tr>
+                <tr>
+                  <td><code>remediation target metrics</code></td>
+                  <td>badcase tags + objectiveMetrics + subjectiveMetrics</td>
+                  <td>把失败模式转为目标：提升目标达成/恢复/共情，降低重复提问/升级/响应间隔。</td>
+                </tr>
+                <tr>
+                  <td><code>validation gates</code></td>
+                  <td>target metrics + replay/offline evaluation</td>
+                  <td>对比 baseline/current，判断修复是否达到 acceptance gate。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <section>
+        <h2>目前 DAG 的工程含义</h2>
+        <div class="note">
+          当前 Zeval 的真正核心不是“打几个分”，而是把同一批对话先变成可追溯的 enriched rows，然后所有客观指标、主观 judge、风险信号、badcase 和调优包都从这个中间层派生。后续做生产化时，应优先固定 enriched schema 和 metric registry version，否则评测结果很难长期可比。
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

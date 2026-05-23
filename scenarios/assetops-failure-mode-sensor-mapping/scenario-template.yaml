@@ -1,0 +1,117 @@
+scenarioId: assetops-failure-mode-sensor-mapping
+displayName: AssetOps 故障模式-传感器映射
+version: 1
+description: 面向 AssetOpsBench FMSR 任务，评估 failure modes、sensor mapping 与诊断知识解释质量。
+
+applicability:
+  domains:
+    - industrial-asset-operations
+    - failure-mode-analysis
+  taskTypes:
+    - Failure Mode Query
+    - Sensor Relevance Mapping
+    - Diagnostic Knowledge Query
+  assetOpsBenchTools:
+    - get_failure_modes
+    - get_failure_mode_sensor_mapping
+  notSuitableFor:
+    - raw-time-series-forecasting
+    - work-order-counting
+
+dataRequirements:
+  requiredFields:
+    - sessionId
+    - role
+    - content
+  recommendedFields:
+    - assetName
+    - sensors
+    - failureModes
+    - expectedAnswer
+    - trace
+  degradation:
+    missingToolTrace: use_answer_vs_characteristic_form_judge
+
+metricProfile:
+  enabledCoreMetrics:
+    - sessionDepthDistribution
+    - topicSwitchRate
+    - userQuestionRepeatRate
+  customMetrics:
+    - taskCompletion
+    - failureModeCoverage
+    - sensorRelevanceMapping
+    - bidirectionalMappingConsistency
+    - domainJustificationQuality
+    - unsupportedAssetFallbackHandling
+    - hallucinationControl
+
+judgeRubrics:
+  subjectiveDimensions:
+    - id: failureModeCoverage
+      displayName: 故障模式覆盖率
+      scale: 1-5
+      weight: 0.25
+      llmRequired: true
+    - id: sensorRelevanceMapping
+      displayName: 传感器相关性映射
+      scale: 1-5
+      weight: 0.3
+      llmRequired: true
+    - id: domainJustificationQuality
+      displayName: 诊断依据解释质量
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: hallucinationControl
+      displayName: 幻觉控制
+      scale: 1-5
+      weight: 0.25
+      llmRequired: true
+
+businessKpis:
+  - id: diagnostic_knowledge_completeness
+    displayName: 诊断知识完整性
+    description: 是否覆盖关键故障模式，并能解释与传感器之间的诊断关系。
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: failureModeCoverage
+          weight: 0.4
+        - source: subjective
+          metricId: sensorRelevanceMapping
+          weight: 0.35
+        - source: subjective
+          metricId: domainJustificationQuality
+          weight: 0.25
+      secondary: []
+    successThreshold: 0.8
+    degradedThreshold: 0.58
+  - id: mapping_precision
+    displayName: 映射精确性
+    description: 是否避免把无关传感器和故障模式强行关联。
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: sensorRelevanceMapping
+          weight: 0.55
+        - source: subjective
+          metricId: hallucinationControl
+          weight: 0.35
+      secondary:
+        - source: subjective
+          metricId: bidirectionalMappingConsistency
+          weight: 0.1
+    successThreshold: 0.78
+    degradedThreshold: 0.55
+
+onboardingQuestions:
+  - id: asset_classes
+    question: 本批样本覆盖哪些资产类别，例如 chiller、AHU、pump、motor？
+  - id: curated_or_llm
+    question: failure mode 来源是 curated YAML 还是 LLM fallback？
+  - id: mapping_expected_form
+    question: 标准答案要求输出 fm->sensors、sensor->fms，还是只要自然语言解释？
+

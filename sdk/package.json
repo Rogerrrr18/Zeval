@@ -1,0 +1,31 @@
+{
+  "name": "@zerore/sdk",
+  "version": "0.1.0",
+  "description": "ZERORE evaluation SDK — evaluate, ingest traces, synthesize datasets from any TypeScript / Node.js app.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "zerore": "./bin/zerore.mjs"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./adapters/langchain": {
+      "import": "./dist/adapters/langchain.js",
+      "types": "./dist/adapters/langchain.d.ts"
+    },
+    "./adapters/openai": {
+      "import": "./dist/adapters/openai.js",
+      "types": "./dist/adapters/openai.d.ts"
+    }
+  },
+  "files": ["dist", "bin", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "keywords": ["llm", "evaluation", "deepeval", "openai", "langchain", "observability", "agent", "rag"],
+  "license": "MIT"
+}

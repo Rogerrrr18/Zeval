@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "validationRunId": "val_offline_20260424_79f54d",
+  "packageId": "rem_20260424_359998",
+  "mode": "offline_eval",
+  "status": "failed",
+  "createdAt": "2026-04-24T09:37:32.579Z",
+  "artifactDir": "artifacts/validation-runs/val_offline_20260424_79f54d",
+  "summary": {
+    "type": "offline_eval",
+    "sampleBatchId": null,
+    "suiteSource": "package_badcases",
+    "totalCases": 1,
+    "executedCases": 1,
+    "skippedCases": 0,
+    "improvedCases": 0,
+    "regressedCases": 1,
+    "maxRegressions": 0,
+    "averageScoreDelta": -0.0345,
+    "caseResults": [
+      {
+        "caseId": "sess_ec_angry_01_76d6c691fb",
+        "label": "开场连接 · sess_ec_angry_01_76d6c691fb",
+        "baselineCaseScore": 0.44,
+        "currentCaseScore": 0.4055,
+        "scoreDelta": -0.0345,
+        "isImproved": false,
+        "isRegressed": true,
+        "skipped": false,
+        "reason": "current=0.4055，delta=-0.0345，goal_completion=0.0000，worst_severity=0.6600。"
+      }
+    ],
+    "warnings": [
+      "未指定 sample batch，offline validation 将退化为 package badcases regression suite。"
+    ]
+  },
+  "files": [
+    {
+      "fileName": "report.md",
+      "relativePath": "artifacts/validation-runs/val_offline_20260424_79f54d/report.md",
+      "content": "# val_offline_20260424_79f54d\n\n## 概览\n- packageId: rem_20260424_359998\n- mode: offline_eval\n- status: failed\n- createdAt: 2026-04-24T09:37:32.579Z\n\n## Offline Gate\n- sampleBatchId: 未指定\n- suiteSource: package_badcases\n- totalCases: 1\n- executedCases: 1\n- skippedCases: 0\n- improvedCases: 0\n- regressedCases: 1\n- maxRegressions: 0\n- averageScoreDelta: -0.0345\n\n## Case Results\n- 开场连接 · sess_ec_angry_01_76d6c691fb: baseline=0.4400, current=0.4055, delta=-0.0345, improved=false, regressed=true, skipped=false\n\n## Warnings\n- 未指定 sample batch，offline validation 将退化为 package badcases regression suite。"
+    }
+  ]
+}

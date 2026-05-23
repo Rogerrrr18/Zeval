@@ -1,0 +1,2 @@
+caseId,caseSetType,topicLabel,baselineCaseScore,baselineVersion,duplicateGroupKey,createdAt
+bc_1776997463483_fd433c,badcase,开场连接,0.34,smoke_remediation_001,toB-customer-support:开场连接:escalation_keyword+goal_failed+long_response_gap,2026-04-24T02:24:23.483Z

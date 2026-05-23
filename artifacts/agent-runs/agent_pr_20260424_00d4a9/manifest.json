@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "agentRunId": "agent_pr_20260424_00d4a9",
+  "packageId": "rem_20260423_80eadd",
+  "channel": "pr",
+  "status": "completed",
+  "title": "Validation Link Smoke",
+  "summary": "agent run linked to validations",
+  "content": "# smoke",
+  "notes": "linked validation smoke ok",
+  "validationLinks": {
+    "replayValidationRunId": "val_replay_20260424_1e06ce",
+    "offlineValidationRunId": null
+  },
+  "createdAt": "2026-04-24T03:01:40.736Z",
+  "updatedAt": "2026-04-24T03:01:40.737Z"
+}

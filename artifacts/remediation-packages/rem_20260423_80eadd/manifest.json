@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "packageId": "rem_20260423_80eadd",
+  "createdAt": "2026-04-23T14:05:01.509Z",
+  "runId": "smoke_remediation_001",
+  "title": "ToB 客服 Agent · 升级风险 调优包",
+  "priority": "P0",
+  "scenarioId": "toB-customer-support",
+  "sourceFileName": "ecommerce-angry-escalation.csv",
+  "selectedCaseKeys": [
+    "sess_ec_angry_01_76d6c691fb"
+  ],
+  "selectedCaseCount": 1,
+  "dominantTags": [
+    "escalation_keyword",
+    "goal_failed"
+  ],
+  "problemSummary": [
+    "会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。",
+    "用户主任务没有完成，session 结束在失败态。",
+    "一次解决率 已跌到 at_risk（47%）。"
+  ],
+  "editScope": [
+    "prompt",
+    "policy"
+  ],
+  "constraints": [
+    "不要降低现有安全拒答质量。",
+    "不要让平均响应时延恶化超过 20%。",
+    "不要破坏当前已支持的业务场景与回放链路。",
+    "投诉与转人工路径要保留可追踪的 SLA 与兜底话术。",
+    "优先保证用户主任务闭环，不要用冗长解释替代动作完成。"
+  ],
+  "targetMetrics": [
+    {
+      "metricId": "goal_completion_rate",
+      "displayName": "目标达成率",
+      "currentValue": 0,
+      "targetValue": 0.7,
+      "direction": "increase",
+      "reason": "失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。"
+    },
+    {
+      "metricId": "escalation_keyword_hit_rate",
+      "displayName": "升级触发率",
+      "currentValue": 1,
+      "targetValue": 0.9,
+      "direction": "decrease",
+      "reason": "用户已进入投诉/转人工语境，需先降低升级触发。"
+    },
+    {
+      "metricId": "scenario_average_score",
+      "displayName": "ToB 客服 Agent KPI 均分",
+      "currentValue": 0.5456,
+      "targetValue": 0.75,
+      "direction": "increase",
+      "reason": "业务 KPI 已经进入低位，需要同时关注业务侧结果而不是只看通用对话分。"
+    }
+  ],
+  "acceptanceGate": {
+    "replay": {
+      "required": true,
+      "baselineRunId": "smoke_remediation_001",
+      "minWinRate": 0.65,
+      "baselineCustomerId": "validation_smoke"
+    },
+    "offlineEval": {
+      "required": true,
+      "sampleBatchId": "sample_1776997463487_6d53f9d4",
+      "maxRegressions": 0
+    },
+    "sandbox": {
+      "required": false,
+      "scenarios": []
+    },
+    "guards": {
+      "dangerous_reply_count": 0,
+      "max_regressions": 0,
+      "goal_completion_rate_min": 0.7,
+      "escalation_keyword_hit_rate_max": 0.9,
+      "scenario_average_score_min": 0.75
+    }
+  },
+  "artifactDir": "artifacts/remediation-packages/rem_20260423_80eadd",
+  "files": [
+    {
+      "fileName": "issue-brief.md",
+      "relativePath": "artifacts/remediation-packages/rem_20260423_80eadd/issue-brief.md",
+      "content": "# rem_20260423_80eadd\n\n## 概览\n- 生成时间：2026-04-23T14:05:01.509Z\n- 来源 Run：smoke_remediation_001\n- 场景：ToB 客服 Agent\n- 优先级：P0\n- 选中 bad case：1\n- 建议优先修改层：prompt, policy\n\n## 问题摘要\n- 会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\n- 用户主任务没有完成，session 结束在失败态。\n- 一次解决率 已跌到 at_risk（47%）。\n\n## 目标指标\n- 目标达成率: 0 -> 0.7 (提高)。失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。\n- 升级触发率: 1 -> 0.9 (降低)。用户已进入投诉/转人工语境，需先降低升级触发。\n- ToB 客服 Agent KPI 均分: 0.5456 -> 0.75 (提高)。业务 KPI 已经进入低位，需要同时关注业务侧结果而不是只看通用对话分。\n\n## 关键证据\n### 第 7 轮后目标未达成：如果又出问题我会投诉到底\n- tags: escalation_keyword, goal_failed\n- severity: 0.56\n- suggested_action: 优先把失败 session 编译为 remediation spec，并补一键回放验证。\n- [turn 7] [user] 如果又出问题我会投诉到底\n\n## 约束条件\n- 不要降低现有安全拒答质量。\n- 不要让平均响应时延恶化超过 20%。\n- 不要破坏当前已支持的业务场景与回放链路。\n- 投诉与转人工路径要保留可追踪的 SLA 与兜底话术。\n- 优先保证用户主任务闭环，不要用冗长解释替代动作完成。\n\n## Agent Handoff\n- 将本目录下的 `remediation-spec.yaml`、`badcases.jsonl`、`acceptance-gate.yaml` 一起交给 Claude Code / Codex。\n- 优先从 edit_scope 指定的层开始改，不要无关重构。\n- 完成后必须先跑 replay，再跑固定 sample batch；任何 guard 退化都不算通过。\n\n## 验收摘要\n- replay.min_win_rate = 0.65\n- offline_eval.max_regressions = 0"
+    },
+    {
+      "fileName": "remediation-spec.yaml",
+      "relativePath": "artifacts/remediation-packages/rem_20260423_80eadd/remediation-spec.yaml",
+      "content": "package_id: \"rem_20260423_80eadd\"\ncreated_at: \"2026-04-23T14:05:01.509Z\"\nsource_run_id: \"smoke_remediation_001\"\nscenario_id: \"toB-customer-support\"\npriority: \"P0\"\ngoal: \"会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\"\nproblem_summary:\n  - \"会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\"\n  - \"用户主任务没有完成，session 结束在失败态。\"\n  - \"一次解决率 已跌到 at_risk（47%）。\"\nselected_case_keys:\n  - \"sess_ec_angry_01_76d6c691fb\"\nedit_scope:\n  - \"prompt\"\n  - \"policy\"\nconstraints:\n  - \"不要降低现有安全拒答质量。\"\n  - \"不要让平均响应时延恶化超过 20%。\"\n  - \"不要破坏当前已支持的业务场景与回放链路。\"\n  - \"投诉与转人工路径要保留可追踪的 SLA 与兜底话术。\"\n  - \"优先保证用户主任务闭环，不要用冗长解释替代动作完成。\"\ntarget_metrics:\n  - metric_id: \"goal_completion_rate\"\n    display_name: \"目标达成率\"\n    current_value: 0\n    target_value: 0.7\n    direction: \"increase\"\n    reason: \"失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。\"\n  - metric_id: \"escalation_keyword_hit_rate\"\n    display_name: \"升级触发率\"\n    current_value: 1\n    target_value: 0.9\n    direction: \"decrease\"\n    reason: \"用户已进入投诉/转人工语境，需先降低升级触发。\"\n  - metric_id: \"scenario_average_score\"\n    display_name: \"ToB 客服 Agent KPI 均分\"\n    current_value: 0.5456\n    target_value: 0.75\n    direction: \"increase\"\n    reason: \"业务 KPI 已经进入低位，需要同时关注业务侧结果而不是只看通用对话分。\"\nexecution_notes:\n  - \"优先处理 P0/P1 失败标签最多的 case。\"\n  - \"如需改 prompt，请同步说明 why 与 expected behavior。\"\n  - \"如需改代码或 orchestration，保持回放输入兼容。\"\n"
+    },
+    {
+      "fileName": "badcases.jsonl",
+      "relativePath": "artifacts/remediation-packages/rem_20260423_80eadd/badcases.jsonl",
+      "content": "{\"case_id\":\"sess_ec_angry_01_76d6c691fb\",\"session_id\":\"sess_ec_angry_01\",\"topic_label\":\"开场连接\",\"severity_score\":0.56,\"turn_range\":\"7-7\",\"current_output\":\"[turn 8] [assistant] 理解你的担心我会把升级专员电话一并给你方便你随时跟进\",\"problem_tags\":[\"escalation_keyword\",\"goal_failed\"],\"expected_behavior\":\"明确重述用户主任务，给出完成态或清晰的下一步动作。 在升级前给出兜底动作、SLA 承诺和明确升级路径。\",\"evidence\":[{\"turnIndex\":7,\"role\":\"user\",\"content\":\"如果又出问题我会投诉到底\"}],\"transcript\":\"[turn 1] [user] 你们物流显示签收了我根本没收到货\\n[turn 2] [assistant] 非常抱歉给你带来困扰我先核对快递柜代收与签收人信息\\n[turn 3] [user] 别套话我就问今天能不能解决\\n[turn 4] [assistant] 可以今天内处理若确认丢件我们启动补发或退款你更倾向哪一种\\n[turn 5] [user] 补发但要保证别再丢\\n[turn 6] [assistant] 明白我会备注改送货上门并加急单号预计今晚前发出\\n[turn 7] [user] 如果又出问题我会投诉到底\\n[turn 8] [assistant] 理解你的担心我会把升级专员电话一并给你方便你随时跟进\",\"suggested_action\":\"优先把失败 session 编译为 remediation spec，并补一键回放验证。\",\"source_run_id\":\"smoke_remediation_001\"}\n"
+    },
+    {
+      "fileName": "acceptance-gate.yaml",
+      "relativePath": "artifacts/remediation-packages/rem_20260423_80eadd/acceptance-gate.yaml",
+      "content": "replay:\n  required: true\n  baselineRunId: \"smoke_remediation_001\"\n  minWinRate: 0.65\nofflineEval:\n  required: true\n  sampleBatchId: null\n  maxRegressions: 0\nsandbox:\n  required: false\n  scenarios: []\nguards:\n  dangerous_reply_count: 0\n  max_regressions: 0\n  goal_completion_rate_min: 0.7\n  escalation_keyword_hit_rate_max: 0.9\n  scenario_average_score_min: 0.75\n"
+    }
+  ]
+}

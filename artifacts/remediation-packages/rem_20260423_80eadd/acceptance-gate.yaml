@@ -1,0 +1,17 @@
+replay:
+  required: true
+  baselineRunId: "smoke_remediation_001"
+  minWinRate: 0.65
+offlineEval:
+  required: true
+  sampleBatchId: null
+  maxRegressions: 0
+sandbox:
+  required: false
+  scenarios: []
+guards:
+  dangerous_reply_count: 0
+  max_regressions: 0
+  goal_completion_rate_min: 0.7
+  escalation_keyword_hit_rate_max: 0.9
+  scenario_average_score_min: 0.75

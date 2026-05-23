@@ -1,0 +1,138 @@
+scenarioId: assetops-work-order-maintenance
+displayName: AssetOps 工单与维护分析
+version: 1
+description: 面向 AssetOpsBench WO 任务，评估工单检索、故障码分析、下一工单预测和告警到维护关系分析。
+
+applicability:
+  domains:
+    - industrial-asset-operations
+    - work-order-management
+    - maintenance-analytics
+  taskTypes:
+    - Work Order Retrieval
+    - Failure Code Analysis
+    - Maintenance Event Analytics
+    - Alert-to-Failure Analysis
+  assetOpsBenchTools:
+    - get_work_orders
+    - get_preventive_work_orders
+    - get_corrective_work_orders
+    - get_events
+    - get_failure_codes
+    - get_work_order_distribution
+    - predict_next_work_order
+    - analyze_alert_to_failure
+  notSuitableFor:
+    - sensor-history-only
+    - raw-signal-diagnostics
+
+dataRequirements:
+  requiredFields:
+    - sessionId
+    - role
+    - content
+  recommendedFields:
+    - equipmentId
+    - startDate
+    - endDate
+    - workOrderType
+    - ruleId
+    - expectedAnswer
+    - trace
+  degradation:
+    missingToolTrace: judge_final_answer_and_expected_answer
+
+metricProfile:
+  enabledCoreMetrics:
+    - sessionDepthDistribution
+    - avgResponseGapSec
+    - userQuestionRepeatRate
+    - topicSwitchRate
+  customMetrics:
+    - taskCompletion
+    - workOrderRecordAccuracy
+    - equipmentTimeFilterCorrectness
+    - maintenanceEventReasoning
+    - failureCodeInterpretation
+    - nextWorkOrderPredictionJustification
+    - alertToFailureAnalysisQuality
+    - actionability
+    - hallucinationControl
+
+judgeRubrics:
+  subjectiveDimensions:
+    - id: workOrderRecordAccuracy
+      displayName: 工单记录准确性
+      scale: 1-5
+      weight: 0.3
+      llmRequired: true
+    - id: equipmentTimeFilterCorrectness
+      displayName: 设备与时间过滤准确性
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: maintenanceEventReasoning
+      displayName: 维护事件推理质量
+      scale: 1-5
+      weight: 0.2
+      llmRequired: true
+    - id: actionability
+      displayName: 行动建议可执行性
+      scale: 1-5
+      weight: 0.15
+      llmRequired: true
+    - id: hallucinationControl
+      displayName: 幻觉控制
+      scale: 1-5
+      weight: 0.15
+      llmRequired: true
+
+businessKpis:
+  - id: maintenance_retrieval_accuracy
+    displayName: 维护记录检索准确性
+    description: 是否正确检索目标设备、时间范围与工单类型。
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: workOrderRecordAccuracy
+          weight: 0.5
+        - source: subjective
+          metricId: equipmentTimeFilterCorrectness
+          weight: 0.3
+      secondary:
+        - source: subjective
+          metricId: hallucinationControl
+          weight: 0.2
+    successThreshold: 0.82
+    degradedThreshold: 0.6
+  - id: maintenance_decision_support
+    displayName: 维护决策支持
+    description: 是否能把工单、故障码、告警关系转化为维护判断。
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: maintenanceEventReasoning
+          weight: 0.35
+        - source: subjective
+          metricId: failureCodeInterpretation
+          weight: 0.25
+        - source: subjective
+          metricId: actionability
+          weight: 0.25
+      secondary:
+        - source: subjective
+          metricId: alertToFailureAnalysisQuality
+          weight: 0.15
+    successThreshold: 0.76
+    degradedThreshold: 0.52
+
+onboardingQuestions:
+  - id: wo_types
+    question: 本批样本是否区分 PM/CM 工单？是否包含 failure code？
+  - id: expected_count
+    question: deterministic 样本是否有精确工单数量作为标准答案？
+  - id: recommendation_scope
+    question: 非确定性样本是否要求给出维护建议，还是只做统计分析？
+

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "agentRunId": "agent_issue_20260424_823b27",
+  "packageId": "rem_20260423_80eadd",
+  "channel": "issue",
+  "status": "running",
+  "title": "Smoke Agent Run",
+  "summary": "route smoke",
+  "content": "# smoke",
+  "notes": "manual smoke ok",
+  "createdAt": "2026-04-24T02:56:05.753Z",
+  "updatedAt": "2026-04-24T02:56:05.754Z"
+}

@@ -1,0 +1,79 @@
+scenarioId: toB-customer-support
+displayName: ToB 客服 Agent
+businessKpis:
+  - id: resolution_rate
+    displayName: 一次解决率
+    description: 用户问题是否在当次会话内被承接并进入解决态
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: subjective
+          metricId: goalCompletion
+          weight: 0.5
+        - source: objective
+          metricId: agentResolutionSignalRate
+          weight: 0.3
+        - source: objective
+          metricId: userQuestionRepeatRate
+          weight: -0.2
+      secondary:
+        - source: signal
+          metricId: understandingBarrierRisk
+          weight: -0.2
+    successThreshold: 0.75
+    degradedThreshold: 0.5
+
+  - id: escalation_control
+    displayName: 升级控制力
+    description: 用户是否被及时接住，避免投诉、转人工或对话失控
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: objective
+          metricId: escalationKeywordHitRate
+          weight: -0.45
+        - source: subjective
+          metricId: offTopicRisk
+          weight: 0.35
+        - source: signal
+          metricId: emotionRecoveryFailureRisk
+          weight: -0.2
+      secondary:
+        - source: objective
+          metricId: avgResponseGapSec
+          weight: -0.1
+    successThreshold: 0.72
+    degradedThreshold: 0.48
+
+  - id: service_efficiency
+    displayName: 服务效率
+    description: 回复节奏、主题连贯性与收敛效率是否达到业务可接受水平
+    direction: higher-is-better
+    mappedTo:
+      primary:
+        - source: objective
+          metricId: avgResponseGapSec
+          weight: -0.35
+        - source: objective
+          metricId: topicSwitchRate
+          weight: -0.25
+        - source: objective
+          metricId: agentResolutionSignalRate
+          weight: 0.2
+      secondary:
+        - source: signal
+          metricId: understandingBarrierRisk
+          weight: -0.1
+        - source: subjective
+          metricId: empathy
+          weight: 0.1
+    successThreshold: 0.7
+    degradedThreshold: 0.45
+
+onboardingQuestions:
+  - id: primary_channel
+    question: 这批数据来自 Web / App / 电话哪种渠道？
+  - id: has_human_handoff
+    question: 对话流里是否存在转人工分支？若有，标记字段名是什么？
+  - id: resolution_field
+    question: 原始数据里是否已有“问题是否解决”的字段？字段名是什么？

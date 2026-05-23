@@ -1,0 +1,920 @@
+{
+  "schemaVersion": 1,
+  "customerId": "smoke_e2e",
+  "runId": "smoke_e2e_support-refund-short_1777023737898_4477",
+  "createdAt": "2026-04-24T09:42:18.027Z",
+  "label": "smoke e2e baseline",
+  "sourceFileName": "support-refund-short.csv",
+  "evaluate": {
+    "runId": "smoke_e2e_support-refund-short_1777023737898_4477",
+    "meta": {
+      "sessions": 1,
+      "messages": 8,
+      "hasTimestamp": true,
+      "generatedAt": "2026-04-24T09:42:17.960Z",
+      "warnings": [
+        "主观评估当前为降级模式（LLM judge 调用失败或未启用）。"
+      ],
+      "scenarioContext": {
+        "scenarioId": "toB-customer-support",
+        "onboardingAnswers": {
+          "primary_channel": "Web chat",
+          "has_human_handoff": "yes, escalation_keyword indicates handoff risk",
+          "resolution_field": "not present in raw CSV"
+        }
+      }
+    },
+    "summaryCards": [
+      {
+        "key": "sessionCount",
+        "label": "会话规模",
+        "value": "1",
+        "hint": "8 条消息进入本次评估"
+      },
+      {
+        "key": "responseGap",
+        "label": "平均响应间隔",
+        "value": "32s",
+        "hint": "越低通常意味着更平顺的交互节奏"
+      },
+      {
+        "key": "topicSwitch",
+        "label": "话题切换率",
+        "value": "0.00",
+        "hint": "这里按每个 session 的平均 segment 切换次数统计"
+      },
+      {
+        "key": "emotion",
+        "label": "平均情绪分",
+        "value": "54.1",
+        "hint": "当前为规则近似 + 局部校正结果"
+      },
+      {
+        "key": "empathy",
+        "label": "共情得分",
+        "value": "1/5",
+        "hint": "情绪分与共情分联合反映体验质量"
+      },
+      {
+        "key": "goalCompletion",
+        "label": "目标达成率",
+        "value": "100%",
+        "hint": "1/1 个 session 明确达成用户初始目标"
+      },
+      {
+        "key": "businessKpi",
+        "label": "业务 KPI",
+        "value": "74%",
+        "hint": "ToB 客服 Agent 的业务映射均分"
+      },
+      {
+        "key": "recoveryTrace",
+        "label": "恢复轨迹",
+        "value": "0",
+        "hint": "当前尚未识别到明显的失败后恢复弧线"
+      },
+      {
+        "key": "signals",
+        "label": "高风险信号",
+        "value": "1",
+        "hint": "来自隐式推断信号层的高风险项数量"
+      }
+    ],
+    "topicSegments": [
+      {
+        "sessionId": "sess_sup_01",
+        "topicSegmentId": "sess_sup_01_topic_1",
+        "topicSegmentIndex": 1,
+        "topicLabel": "开场连接",
+        "topicSummary": "开场连接：你好我想申请退款订单号 SF882910",
+        "topicSource": "rule",
+        "topicConfidence": 0.54,
+        "startTurn": 1,
+        "endTurn": 8,
+        "messageCount": 8,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 54.1,
+        "emotionEvidence": "你好我想申请退款订单号 SF882910",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 3.3,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 0,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2
+      }
+    ],
+    "enrichedRows": [
+      {
+        "sessionId": "sess_sup_01",
+        "timestamp": "2026-04-18T10:00:00+08:00",
+        "role": "user",
+        "content": "你好我想申请退款订单号 SF882910",
+        "turnIndex": 1,
+        "timestampMs": 1776477600000,
+        "activeHour": 10,
+        "topic": "开场连接",
+        "topicSegmentId": "sess_sup_01_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：你好我想申请退款订单号 SF882910",
+        "topicStartTurn": 1,
+        "topicEndTurn": 8,
+        "topicSource": "rule",
+        "topicConfidence": 0.54,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 54.1,
+        "emotionEvidence": "你好我想申请退款订单号 SF882910",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 3.3,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 0,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": null,
+        "isDropoffTurn": false,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 13
+      },
+      {
+        "sessionId": "sess_sup_01",
+        "timestamp": "2026-04-18T10:00:18+08:00",
+        "role": "assistant",
+        "content": "你好我可以协助你先告诉我下单渠道和退款原因吗",
+        "turnIndex": 2,
+        "timestampMs": 1776477618000,
+        "activeHour": 10,
+        "topic": "开场连接",
+        "topicSegmentId": "sess_sup_01_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：你好我想申请退款订单号 SF882910",
+        "topicStartTurn": 1,
+        "topicEndTurn": 8,
+        "topicSource": "rule",
+        "topicConfidence": 0.54,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 54.1,
+        "emotionEvidence": "你好我想申请退款订单号 SF882910",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 3.3,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 0,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": 18,
+        "isDropoffTurn": false,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 14
+      },
+      {
+        "sessionId": "sess_sup_01",
+        "timestamp": "2026-04-18T10:01:02+08:00",
+        "role": "user",
+        "content": "在官网买的尺寸选错了想换大一码",
+        "turnIndex": 3,
+        "timestampMs": 1776477662000,
+        "activeHour": 10,
+        "topic": "开场连接",
+        "topicSegmentId": "sess_sup_01_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：你好我想申请退款订单号 SF882910",
+        "topicStartTurn": 1,
+        "topicEndTurn": 8,
+        "topicSource": "rule",
+        "topicConfidence": 0.54,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 54.1,
+        "emotionEvidence": "你好我想申请退款订单号 SF882910",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 3.3,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 0,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": 44,
+        "isDropoffTurn": false,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 10
+      },
+      {
+        "sessionId": "sess_sup_01",
+        "timestamp": "2026-04-18T10:01:25+08:00",
+        "role": "assistant",
+        "content": "了解未拆封且签收七天内可直接发起换货我先把换货入口发你",
+        "turnIndex": 4,
+        "timestampMs": 1776477685000,
+        "activeHour": 10,
+        "topic": "开场连接",
+        "topicSegmentId": "sess_sup_01_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：你好我想申请退款订单号 SF882910",
+        "topicStartTurn": 1,
+        "topicEndTurn": 8,
+        "topicSource": "rule",
+        "topicConfidence": 0.54,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 54.1,
+        "emotionEvidence": "你好我想申请退款订单号 SF882910",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 3.3,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 0,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": 23,
+        "isDropoffTurn": false,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 17
+      },
+      {
+        "sessionId": "sess_sup_01",
+        "timestamp": "2026-04-18T10:02:10+08:00",
+        "role": "user",
+        "content": "已经拆了包装还能换吗",
+        "turnIndex": 5,
+        "timestampMs": 1776477730000,
+        "activeHour": 10,
+        "topic": "开场连接",
+        "topicSegmentId": "sess_sup_01_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：你好我想申请退款订单号 SF882910",
+        "topicStartTurn": 1,
+        "topicEndTurn": 8,
+        "topicSource": "rule",
+        "topicConfidence": 0.54,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 54.1,
+        "emotionEvidence": "你好我想申请退款订单号 SF882910",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 3.3,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 0,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": 45,
+        "isDropoffTurn": false,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 7
+      },
+      {
+        "sessionId": "sess_sup_01",
+        "timestamp": "2026-04-18T10:02:33+08:00",
+        "role": "assistant",
+        "content": "拆封后需质检外观与功能我可以先帮你登记人工复核预计一个工作日回复",
+        "turnIndex": 6,
+        "timestampMs": 1776477753000,
+        "activeHour": 10,
+        "topic": "开场连接",
+        "topicSegmentId": "sess_sup_01_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：你好我想申请退款订单号 SF882910",
+        "topicStartTurn": 1,
+        "topicEndTurn": 8,
+        "topicSource": "rule",
+        "topicConfidence": 0.54,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 54.1,
+        "emotionEvidence": "你好我想申请退款订单号 SF882910",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 3.3,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 0,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": 23,
+        "isDropoffTurn": false,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 20
+      },
+      {
+        "sessionId": "sess_sup_01",
+        "timestamp": "2026-04-18T10:03:20+08:00",
+        "role": "user",
+        "content": "好的那我等结果别让我反复填表就行",
+        "turnIndex": 7,
+        "timestampMs": 1776477800000,
+        "activeHour": 10,
+        "topic": "开场连接",
+        "topicSegmentId": "sess_sup_01_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：你好我想申请退款订单号 SF882910",
+        "topicStartTurn": 1,
+        "topicEndTurn": 8,
+        "topicSource": "rule",
+        "topicConfidence": 0.54,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 54.1,
+        "emotionEvidence": "你好我想申请退款订单号 SF882910",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 3.3,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 0,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": 47,
+        "isDropoffTurn": false,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 10
+      },
+      {
+        "sessionId": "sess_sup_01",
+        "timestamp": "2026-04-18T10:03:41+08:00",
+        "role": "assistant",
+        "content": "我会把工单号同步给你后续只需回复工单号即可不用重复填写资料",
+        "turnIndex": 8,
+        "timestampMs": 1776477821000,
+        "activeHour": 10,
+        "topic": "开场连接",
+        "topicSegmentId": "sess_sup_01_topic_1",
+        "topicSegmentIndex": 1,
+        "topicSummary": "开场连接：你好我想申请退款订单号 SF882910",
+        "topicStartTurn": 1,
+        "topicEndTurn": 8,
+        "topicSource": "rule",
+        "topicConfidence": 0.54,
+        "emotionPolarity": "neutral",
+        "emotionIntensity": "low",
+        "emotionLabel": "中性-低强度",
+        "emotionBaseScore": 52,
+        "emotionScore": 54.1,
+        "emotionEvidence": "你好我想申请退款订单号 SF882910",
+        "emotionSource": "rule",
+        "emotionConfidence": 0.63,
+        "emotionValenceWeight": 0,
+        "emotionLengthWeight": 3.3,
+        "emotionStyleWeight": 0,
+        "emotionGapWeight": 0,
+        "emotionRecoveryWeight": 0,
+        "emotionRiskPenalty": 1.2,
+        "responseGapSec": 21,
+        "isDropoffTurn": true,
+        "isQuestion": false,
+        "isTopicSwitch": false,
+        "tokenCountEstimate": 19
+      }
+    ],
+    "enrichedCsv": "sessionId,timestamp,role,content,turnIndex,topic,topicSegmentId,topicSegmentIndex,topicSummary,topicStartTurn,topicEndTurn,topicSource,topicConfidence,emotionPolarity,emotionIntensity,emotionLabel,emotionBaseScore,emotionScore,emotionEvidence,emotionSource,emotionConfidence,emotionValenceWeight,emotionLengthWeight,emotionStyleWeight,emotionGapWeight,emotionRecoveryWeight,emotionRiskPenalty,responseGapSec,isDropoffTurn,isQuestion,isTopicSwitch,activeHour,tokenCountEstimate\nsess_sup_01,2026-04-18T10:00:00+08:00,user,你好我想申请退款订单号 SF882910,1,开场连接,sess_sup_01_topic_1,1,开场连接：你好我想申请退款订单号 SF882910,1,8,rule,0.54,neutral,low,中性-低强度,52,54.1,你好我想申请退款订单号 SF882910,rule,0.63,0,3.3,0,0,0,1.2,,false,false,false,10,13\nsess_sup_01,2026-04-18T10:00:18+08:00,assistant,你好我可以协助你先告诉我下单渠道和退款原因吗,2,开场连接,sess_sup_01_topic_1,1,开场连接：你好我想申请退款订单号 SF882910,1,8,rule,0.54,neutral,low,中性-低强度,52,54.1,你好我想申请退款订单号 SF882910,rule,0.63,0,3.3,0,0,0,1.2,18,false,false,false,10,14\nsess_sup_01,2026-04-18T10:01:02+08:00,user,在官网买的尺寸选错了想换大一码,3,开场连接,sess_sup_01_topic_1,1,开场连接：你好我想申请退款订单号 SF882910,1,8,rule,0.54,neutral,low,中性-低强度,52,54.1,你好我想申请退款订单号 SF882910,rule,0.63,0,3.3,0,0,0,1.2,44,false,false,false,10,10\nsess_sup_01,2026-04-18T10:01:25+08:00,assistant,了解未拆封且签收七天内可直接发起换货我先把换货入口发你,4,开场连接,sess_sup_01_topic_1,1,开场连接：你好我想申请退款订单号 SF882910,1,8,rule,0.54,neutral,low,中性-低强度,52,54.1,你好我想申请退款订单号 SF882910,rule,0.63,0,3.3,0,0,0,1.2,23,false,false,false,10,17\nsess_sup_01,2026-04-18T10:02:10+08:00,user,已经拆了包装还能换吗,5,开场连接,sess_sup_01_topic_1,1,开场连接：你好我想申请退款订单号 SF882910,1,8,rule,0.54,neutral,low,中性-低强度,52,54.1,你好我想申请退款订单号 SF882910,rule,0.63,0,3.3,0,0,0,1.2,45,false,false,false,10,7\nsess_sup_01,2026-04-18T10:02:33+08:00,assistant,拆封后需质检外观与功能我可以先帮你登记人工复核预计一个工作日回复,6,开场连接,sess_sup_01_topic_1,1,开场连接：你好我想申请退款订单号 SF882910,1,8,rule,0.54,neutral,low,中性-低强度,52,54.1,你好我想申请退款订单号 SF882910,rule,0.63,0,3.3,0,0,0,1.2,23,false,false,false,10,20\nsess_sup_01,2026-04-18T10:03:20+08:00,user,好的那我等结果别让我反复填表就行,7,开场连接,sess_sup_01_topic_1,1,开场连接：你好我想申请退款订单号 SF882910,1,8,rule,0.54,neutral,low,中性-低强度,52,54.1,你好我想申请退款订单号 SF882910,rule,0.63,0,3.3,0,0,0,1.2,47,false,false,false,10,10\nsess_sup_01,2026-04-18T10:03:41+08:00,assistant,我会把工单号同步给你后续只需回复工单号即可不用重复填写资料,8,开场连接,sess_sup_01_topic_1,1,开场连接：你好我想申请退款订单号 SF882910,1,8,rule,0.54,neutral,low,中性-低强度,52,54.1,你好我想申请退款订单号 SF882910,rule,0.63,0,3.3,0,0,0,1.2,21,true,false,false,10,19",
+    "objectiveMetrics": {
+      "sessionDepthDistribution": {
+        "4-8": 1
+      },
+      "dropoffTurnDistribution": {
+        "8": 1
+      },
+      "avgResponseGapSec": 31.57,
+      "topicSwitchRate": 0,
+      "userQuestionRepeatRate": 0,
+      "agentResolutionSignalRate": 1,
+      "escalationKeywordHitRate": 1,
+      "activeHourDistribution": {
+        "10": 8
+      },
+      "userQuestionRate": 0,
+      "avgUserMessageLength": 15.25,
+      "userMessageLengthTrend": -1.7,
+      "avgAssistantMessageLength": 27.5
+    },
+    "subjectiveMetrics": {
+      "status": "degraded",
+      "emotionCurve": [
+        {
+          "sessionId": "sess_sup_01",
+          "topicSegmentId": "sess_sup_01_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 1,
+          "emotionScore": 54.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        },
+        {
+          "sessionId": "sess_sup_01",
+          "topicSegmentId": "sess_sup_01_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 2,
+          "emotionScore": 54.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        },
+        {
+          "sessionId": "sess_sup_01",
+          "topicSegmentId": "sess_sup_01_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 3,
+          "emotionScore": 54.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        },
+        {
+          "sessionId": "sess_sup_01",
+          "topicSegmentId": "sess_sup_01_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 4,
+          "emotionScore": 54.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        },
+        {
+          "sessionId": "sess_sup_01",
+          "topicSegmentId": "sess_sup_01_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 5,
+          "emotionScore": 54.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        },
+        {
+          "sessionId": "sess_sup_01",
+          "topicSegmentId": "sess_sup_01_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 6,
+          "emotionScore": 54.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        },
+        {
+          "sessionId": "sess_sup_01",
+          "topicSegmentId": "sess_sup_01_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 7,
+          "emotionScore": 54.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        },
+        {
+          "sessionId": "sess_sup_01",
+          "topicSegmentId": "sess_sup_01_topic_1",
+          "topicSegmentIndex": 1,
+          "turnIndex": 8,
+          "emotionScore": 54.1,
+          "emotionBaseScore": 52,
+          "emotionLabel": "中性-低强度"
+        }
+      ],
+      "emotionTurningPoints": [],
+      "dimensions": [
+        {
+          "dimension": "共情程度",
+          "score": 1,
+          "reason": "共情语句密度与安抚表达",
+          "evidence": "当前结果为规则降级模式，证据来自关键词与对话结构近似推断。",
+          "confidence": 0.58
+        },
+        {
+          "dimension": "答非所问/无视风险",
+          "score": 5,
+          "reason": "topic 切换、提问后偏移与理解障碍信号",
+          "evidence": "当前结果为规则降级模式，证据来自关键词与对话结构近似推断。",
+          "confidence": 0.58
+        },
+        {
+          "dimension": "说教感/压迫感",
+          "score": 5,
+          "reason": "强指导词与命令式语气",
+          "evidence": "当前结果为规则降级模式，证据来自关键词与对话结构近似推断。",
+          "confidence": 0.58
+        },
+        {
+          "dimension": "情绪恢复能力",
+          "score": 4,
+          "reason": "情绪低谷后的恢复速度与恢复失败风险",
+          "evidence": "当前结果为规则降级模式，证据来自关键词与对话结构近似推断。",
+          "confidence": 0.58
+        }
+      ],
+      "signals": [
+        {
+          "signalKey": "interestDeclineRisk",
+          "score": 0.76,
+          "severity": "high",
+          "triggeredRules": [
+            "连续短回复",
+            "回复间隔拉长"
+          ],
+          "reason": "后半段用户回复更短且互动欲望下降，存在兴趣衰减迹象。",
+          "evidence": "[turn 7] 好的那我等结果别让我反复填表就行",
+          "evidenceTurnRange": "sess_sup_01:5-7",
+          "confidence": 0.78
+        },
+        {
+          "signalKey": "understandingBarrierRisk",
+          "score": 0.2,
+          "severity": "low",
+          "triggeredRules": [],
+          "reason": "当前没有显著的理解障碍信号。",
+          "evidence": "[turn 1] 你好我想申请退款订单号 SF882910",
+          "evidenceTurnRange": "sess_sup_01:1-1",
+          "confidence": 0.6
+        },
+        {
+          "signalKey": "emotionRecoveryFailureRisk",
+          "score": 0.22,
+          "severity": "low",
+          "triggeredRules": [],
+          "reason": "低谷情绪在后续轮次中出现恢复，当前恢复风险较低。",
+          "evidence": "[turn 1] 你好我想申请退款订单号 SF882910",
+          "evidenceTurnRange": "sess_sup_01:1-5",
+          "confidence": 0.64
+        }
+      ],
+      "goalCompletions": [
+        {
+          "sessionId": "sess_sup_01",
+          "status": "achieved",
+          "score": 4,
+          "userIntent": "你好我想申请退款订单号 SF882910",
+          "intentSource": "rule",
+          "achievementEvidence": [
+            "用户末轮致谢或确认：好的那我等结果别让我反复填表就行"
+          ],
+          "failureReasons": [],
+          "triggeredRules": [
+            "user-appreciation-close"
+          ],
+          "confidence": 0.76,
+          "source": "rule"
+        }
+      ],
+      "recoveryTraces": [
+        {
+          "sessionId": "sess_sup_01",
+          "status": "none",
+          "failureTurn": null,
+          "recoveryTurn": null,
+          "spanTurns": null,
+          "failureType": "unknown",
+          "repairStrategy": null,
+          "repairStrategySource": "fallback",
+          "qualityScore": 0,
+          "evidence": [],
+          "triggeredRules": [],
+          "confidence": 0.45
+        }
+      ]
+    },
+    "scenarioEvaluation": {
+      "scenarioId": "toB-customer-support",
+      "displayName": "ToB 客服 Agent",
+      "averageScore": 0.7394,
+      "generatedAt": "2026-04-24T09:42:17.960Z",
+      "kpis": [
+        {
+          "id": "resolution_rate",
+          "displayName": "一次解决率",
+          "description": "用户问题是否在当次会话内被承接并进入解决态。",
+          "score": 0.8833,
+          "status": "healthy",
+          "successThreshold": 0.75,
+          "degradedThreshold": 0.5,
+          "topEvidence": [
+            "goal completion 均值 0.8。证据：用户末轮致谢或确认：好的那我等结果别让我反复填表就行",
+            "understandingBarrierRisk=0.20。证据：[turn 1] 你好我想申请退款订单号 SF882910"
+          ],
+          "contributions": [
+            {
+              "source": "subjective",
+              "metricId": "goalCompletion",
+              "weight": 0.5,
+              "rawValue": 0.8,
+              "alignedScore": 0.8,
+              "evidence": "goal completion 均值 0.8。证据：用户末轮致谢或确认：好的那我等结果别让我反复填表就行"
+            },
+            {
+              "source": "objective",
+              "metricId": "agentResolutionSignalRate",
+              "weight": 0.3,
+              "rawValue": 1,
+              "alignedScore": 1,
+              "evidence": "解决态信号覆盖 100%，表示末轮 assistant 是否给出明确处理承诺。"
+            },
+            {
+              "source": "objective",
+              "metricId": "userQuestionRepeatRate",
+              "weight": -0.2,
+              "rawValue": 0,
+              "alignedScore": 1,
+              "evidence": "重复提问率 0%，来自 1 个 session 的用户问题去重统计。"
+            },
+            {
+              "source": "signal",
+              "metricId": "understandingBarrierRisk",
+              "weight": -0.2,
+              "rawValue": 0.2,
+              "alignedScore": 0.8,
+              "evidence": "understandingBarrierRisk=0.20。证据：[turn 1] 你好我想申请退款订单号 SF882910"
+            }
+          ]
+        },
+        {
+          "id": "escalation_control",
+          "displayName": "升级控制力",
+          "description": "用户是否被及时接住，避免投诉、转人工或对话失控。",
+          "score": 0.527,
+          "status": "degraded",
+          "successThreshold": 0.72,
+          "degradedThreshold": 0.48,
+          "topEvidence": [
+            "升级关键词命中率 100%，命中“转人工 / 投诉 / 主管”等表达。",
+            "平均响应间隔 31.57s，按 120s 尺度归一化。"
+          ],
+          "contributions": [
+            {
+              "source": "objective",
+              "metricId": "escalationKeywordHitRate",
+              "weight": -0.45,
+              "rawValue": 1,
+              "alignedScore": 0,
+              "evidence": "升级关键词命中率 100%，命中“转人工 / 投诉 / 主管”等表达。"
+            },
+            {
+              "source": "subjective",
+              "metricId": "offTopicRisk",
+              "weight": 0.35,
+              "rawValue": 1,
+              "alignedScore": 1,
+              "evidence": "答非所问/无视风险=5/5。证据：当前结果为规则降级模式，证据来自关键词与对话结构近似推断。"
+            },
+            {
+              "source": "signal",
+              "metricId": "emotionRecoveryFailureRisk",
+              "weight": -0.2,
+              "rawValue": 0.22,
+              "alignedScore": 0.78,
+              "evidence": "emotionRecoveryFailureRisk=0.22。证据：[turn 1] 你好我想申请退款订单号 SF882910"
+            },
+            {
+              "source": "objective",
+              "metricId": "avgResponseGapSec",
+              "weight": -0.1,
+              "rawValue": 0.2631,
+              "alignedScore": 0.7369,
+              "evidence": "平均响应间隔 31.57s，按 120s 尺度归一化。"
+            }
+          ]
+        },
+        {
+          "id": "service_efficiency",
+          "displayName": "服务效率",
+          "description": "回复节奏、主题连贯性与收敛效率是否达到业务可接受水平。",
+          "score": 0.8079,
+          "status": "healthy",
+          "successThreshold": 0.7,
+          "degradedThreshold": 0.45,
+          "topEvidence": [
+            "共情程度=1/5。证据：当前结果为规则降级模式，证据来自关键词与对话结构近似推断。",
+            "平均响应间隔 31.57s，按 120s 尺度归一化。"
+          ],
+          "contributions": [
+            {
+              "source": "objective",
+              "metricId": "avgResponseGapSec",
+              "weight": -0.35,
+              "rawValue": 0.2631,
+              "alignedScore": 0.7369,
+              "evidence": "平均响应间隔 31.57s，按 120s 尺度归一化。"
+            },
+            {
+              "source": "objective",
+              "metricId": "topicSwitchRate",
+              "weight": -0.25,
+              "rawValue": 0,
+              "alignedScore": 1,
+              "evidence": "平均 topic 切换 0.00 次/会话，切换越多越容易削弱处理效率。"
+            },
+            {
+              "source": "objective",
+              "metricId": "agentResolutionSignalRate",
+              "weight": 0.2,
+              "rawValue": 1,
+              "alignedScore": 1,
+              "evidence": "解决态信号覆盖 100%，表示末轮 assistant 是否给出明确处理承诺。"
+            },
+            {
+              "source": "signal",
+              "metricId": "understandingBarrierRisk",
+              "weight": -0.1,
+              "rawValue": 0.2,
+              "alignedScore": 0.8,
+              "evidence": "understandingBarrierRisk=0.20。证据：[turn 1] 你好我想申请退款订单号 SF882910"
+            },
+            {
+              "source": "subjective",
+              "metricId": "empathy",
+              "weight": 0.1,
+              "rawValue": 0.2,
+              "alignedScore": 0.2,
+              "evidence": "共情程度=1/5。证据：当前结果为规则降级模式，证据来自关键词与对话结构近似推断。"
+            }
+          ]
+        }
+      ]
+    },
+    "badCaseAssets": [],
+    "charts": [
+      {
+        "chartKey": "emotionCurve",
+        "title": "情绪轨迹",
+        "description": "按会话与轮次呈现 100 分制情绪分，用于判断波动、恢复与 segment 质量。",
+        "chartType": "line",
+        "xField": "turnIndex",
+        "yField": "emotionScore",
+        "seriesField": "sessionId",
+        "data": [
+          {
+            "sessionId": "sess_sup_01",
+            "turnIndex": 1,
+            "emotionScore": 54.1
+          },
+          {
+            "sessionId": "sess_sup_01",
+            "turnIndex": 2,
+            "emotionScore": 54.1
+          },
+          {
+            "sessionId": "sess_sup_01",
+            "turnIndex": 3,
+            "emotionScore": 54.1
+          },
+          {
+            "sessionId": "sess_sup_01",
+            "turnIndex": 4,
+            "emotionScore": 54.1
+          },
+          {
+            "sessionId": "sess_sup_01",
+            "turnIndex": 5,
+            "emotionScore": 54.1
+          },
+          {
+            "sessionId": "sess_sup_01",
+            "turnIndex": 6,
+            "emotionScore": 54.1
+          },
+          {
+            "sessionId": "sess_sup_01",
+            "turnIndex": 7,
+            "emotionScore": 54.1
+          },
+          {
+            "sessionId": "sess_sup_01",
+            "turnIndex": 8,
+            "emotionScore": 54.1
+          }
+        ]
+      },
+      {
+        "chartKey": "dropoffDistribution",
+        "title": "流失断点",
+        "description": "识别用户流失出现在哪些轮次，用于定位关键断点。",
+        "chartType": "bar",
+        "xField": "turnIndex",
+        "yField": "dropoffCount",
+        "data": [
+          {
+            "turnIndex": 8,
+            "dropoffCount": 1
+          }
+        ]
+      },
+      {
+        "chartKey": "activeHourDistribution",
+        "title": "活跃时段",
+        "description": "查看不同时段与角色消息量，判断交互发生高峰。",
+        "chartType": "bar",
+        "xField": "activeHour",
+        "yField": "messageCount",
+        "seriesField": "role",
+        "data": [
+          {
+            "activeHour": "10",
+            "role": "user",
+            "messageCount": 4
+          },
+          {
+            "activeHour": "10",
+            "role": "assistant",
+            "messageCount": 4
+          }
+        ]
+      },
+      {
+        "chartKey": "topicSwitchFrequency",
+        "title": "话题切换",
+        "description": "统计每个会话中的话题跳转次数，判断对话连贯度。",
+        "chartType": "bar",
+        "xField": "sessionId",
+        "yField": "topicSwitchCount",
+        "data": [
+          {
+            "sessionId": "sess_sup_01",
+            "topicSwitchCount": 0
+          }
+        ]
+      }
+    ],
+    "suggestions": [
+      "P0：当前平均情绪分为 54.1，其中 0 个轮次低于 40 分，建议在低谷后两轮内强制触发共情确认与恢复性追问。",
+      "P0：当前目标达成率为 100% ，共有 0 个 session 明确未达成，建议优先把这些 bad case 编译为调优包并加入回放回归。",
+      "P0：平均响应间隔为 32 秒，建议首轮确认性回复压缩到 20 秒内，并监控长间隔后的 topic 延续判断。",
+      "P1：当前 topic segment 切换共 0 次，建议在切段前加入“主题确认句”，减少无意跳转。",
+      "P1：用户主动提问 0 次；理解障碍风险为 low，建议执行“先回答、再扩展”的固定顺序。",
+      "P1：当前识别到 0 条成功恢复轨迹、0 条失败恢复轨迹，建议沉淀成功修复话术并对失败片段生成 remediation spec。",
+      "P1：兴趣衰减风险为 high、情绪恢复失败风险为 low，建议把信号层直接接入策略触发器。",
+      "P2：当前共情维度得分 1/5，建议继续沉淀 segment 级证据片段，提升主观评估的可解释性。"
+    ]
+  },
+  "rawRows": [
+    {
+      "sessionId": "sess_sup_01",
+      "timestamp": "2026-04-18T10:00:00+08:00",
+      "role": "user",
+      "content": "你好我想申请退款订单号 SF882910"
+    },
+    {
+      "sessionId": "sess_sup_01",
+      "timestamp": "2026-04-18T10:00:18+08:00",
+      "role": "assistant",
+      "content": "你好我可以协助你先告诉我下单渠道和退款原因吗"
+    },
+    {
+      "sessionId": "sess_sup_01",
+      "timestamp": "2026-04-18T10:01:02+08:00",
+      "role": "user",
+      "content": "在官网买的尺寸选错了想换大一码"
+    },
+    {
+      "sessionId": "sess_sup_01",
+      "timestamp": "2026-04-18T10:01:25+08:00",
+      "role": "assistant",
+      "content": "了解未拆封且签收七天内可直接发起换货我先把换货入口发你"
+    },
+    {
+      "sessionId": "sess_sup_01",
+      "timestamp": "2026-04-18T10:02:10+08:00",
+      "role": "user",
+      "content": "已经拆了包装还能换吗"
+    },
+    {
+      "sessionId": "sess_sup_01",
+      "timestamp": "2026-04-18T10:02:33+08:00",
+      "role": "assistant",
+      "content": "拆封后需质检外观与功能我可以先帮你登记人工复核预计一个工作日回复"
+    },
+    {
+      "sessionId": "sess_sup_01",
+      "timestamp": "2026-04-18T10:03:20+08:00",
+      "role": "user",
+      "content": "好的那我等结果别让我反复填表就行"
+    },
+    {
+      "sessionId": "sess_sup_01",
+      "timestamp": "2026-04-18T10:03:41+08:00",
+      "role": "assistant",
+      "content": "我会把工单号同步给你后续只需回复工单号即可不用重复填写资料"
+    }
+  ]
+}

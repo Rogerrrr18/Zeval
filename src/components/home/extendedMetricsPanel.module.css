@@ -1,0 +1,152 @@
+.wrap { display: flex; flex-direction: column; gap: 16px; }
+
+.empty {
+  text-align: center;
+  padding: 28px 16px;
+  border: 1px dashed rgba(148,163,184,0.4);
+  border-radius: 8px;
+  color: #64748b;
+}
+.empty strong { font-size: 14px; color: #334155; display: block; margin-bottom: 6px; }
+.empty p { margin: 0; font-size: 12px; }
+.empty code {
+  background: rgba(148,163,184,0.18);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.empty a { color: #0ea5e9; }
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #475569;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.legend { display: flex; gap: 12px; align-items: center; font-size: 11px; }
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+.dotPass { background: #22c55e; }
+.dotFail { background: #ef4444; }
+.dotSkip { background: #cbd5e1; }
+
+.group { display: flex; flex-direction: column; gap: 8px; }
+.groupTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid rgba(148,163,184,0.25);
+  border-radius: 10px;
+  padding: 12px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardPass { border-left: 4px solid #22c55e; }
+.cardFail { border-left: 4px solid #ef4444; background: rgba(239,68,68,0.03); }
+.cardSkip { border-left: 4px solid #cbd5e1; opacity: 0.7; }
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.cardLabel { font-size: 13px; font-weight: 600; }
+
+.scorePill {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.scorePill small { font-size: 10px; color: #94a3b8; font-weight: 400; }
+
+.skipBadge {
+  font-size: 10px;
+  background: rgba(148,163,184,0.2);
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #64748b;
+}
+
+.bar {
+  height: 4px;
+  background: rgba(148,163,184,0.18);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.barFill {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #a855f7);
+  transition: width 200ms ease;
+}
+
+.cardMeta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  align-items: center;
+}
+.passText { color: #16a34a; font-weight: 600; }
+.failText { color: #dc2626; font-weight: 600; }
+.threshold, .source { color: #94a3b8; }
+.source { text-transform: uppercase; letter-spacing: 0.4px; }
+
+.needs { font-size: 11px; color: #94a3b8; margin: 0; }
+
+.expandLink {
+  background: none;
+  border: none;
+  color: #0ea5e9;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.detail { margin-top: 4px; padding-top: 8px; border-top: 1px dashed rgba(148,163,184,0.3); }
+.reason { font-size: 12px; color: #334155; margin: 0 0 6px; line-height: 1.5; }
+.evidenceList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.evidenceList li {
+  font-size: 11px;
+  color: #475569;
+  background: rgba(148,163,184,0.08);
+  padding: 4px 6px;
+  border-radius: 3px;
+}

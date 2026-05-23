@@ -1,0 +1,6 @@
+{
+  "caseSetType": "badcase",
+  "description": "低质量案例集合，用于修复率和风险下降验证。",
+  "caseCount": 1,
+  "updatedAt": "2026-04-24T09:16:25.000Z"
+}

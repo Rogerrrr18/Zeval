@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DatasetBaselineRecord",
+  "type": "object",
+  "required": [
+    "caseId",
+    "baselineCaseScore",
+    "baselineObjectiveScore",
+    "baselineSubjectiveScore",
+    "baselineRiskPenaltyScore",
+    "baselineSignals",
+    "baselineGeneratedAt",
+    "baselineProductVersion"
+  ],
+  "properties": {
+    "caseId": { "type": "string" },
+    "baselineCaseScore": { "type": "number" },
+    "baselineObjectiveScore": { "type": "number" },
+    "baselineSubjectiveScore": { "type": "number" },
+    "baselineRiskPenaltyScore": { "type": "number" },
+    "baselineSignals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["signalKey", "score", "severity"],
+        "properties": {
+          "signalKey": { "type": "string" },
+          "score": { "type": "number" },
+          "severity": { "type": "string" }
+        }
+      }
+    },
+    "baselineGeneratedAt": { "type": "string" },
+    "baselineProductVersion": { "type": "string" }
+  }
+}

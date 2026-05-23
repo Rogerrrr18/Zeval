@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DatasetRunResultRecord",
+  "type": "object",
+  "required": [
+    "runId",
+    "sampleBatchId",
+    "caseId",
+    "baselineCaseScore",
+    "currentCaseScore",
+    "scoreDelta",
+    "isImproved",
+    "isRegressed",
+    "judgeReason",
+    "createdAt"
+  ],
+  "properties": {
+    "runId": { "type": "string" },
+    "sampleBatchId": { "type": "string" },
+    "caseId": { "type": "string" },
+    "baselineCaseScore": { "type": "number" },
+    "currentCaseScore": { "type": "number" },
+    "scoreDelta": { "type": "number" },
+    "isImproved": { "type": "boolean" },
+    "isRegressed": { "type": "boolean" },
+    "judgeReason": { "type": "string" },
+    "createdAt": { "type": "string" }
+  }
+}

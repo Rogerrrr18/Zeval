@@ -1,0 +1,48 @@
+{
+  "name": "zeval-eval-system",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "smoke:e2e": "node scripts/smoke-end-to-end.mjs",
+    "smoke:e2e:clean": "SMOKE_RAW_CSV=mock-chatlog/raw-data/support-refund-short.csv node scripts/smoke-end-to-end.mjs",
+    "smoke:e2e:bad": "SMOKE_RAW_CSV=mock-chatlog/raw-data/ecommerce-angry-escalation.csv node scripts/smoke-end-to-end.mjs",
+    "db:smoke": "node --import tsx scripts/smoke-database-adapter.mts",
+    "db:smoke:evaluate-projection": "node --import tsx scripts/smoke-evaluate-projection.mts",
+    "db:smoke:stores": "node --import tsx scripts/smoke-database-stores.mts",
+    "jobs:work": "node --import tsx scripts/run-job-worker.mts",
+    "jobs:work:once": "node --import tsx scripts/run-job-worker.mts --once",
+    "db:supabase:link": "supabase link --project-ref rukjxsykowetriaxifon",
+    "db:supabase:push": "supabase db push",
+    "calibration:judge": "node --import tsx calibration/scripts/run-judge-on-gold.mts",
+    "calibration:agreement": "node --import tsx calibration/scripts/compute-agreement.mts",
+    "calibration:drift": "node --import tsx calibration/scripts/detect-drift.mts",
+    "calibration:ci": "node --import tsx calibration/scripts/ci-gate.mts",
+    "gold:v2:scaffold": "node --import tsx calibration/scripts/scaffold-gold-set-v2.mts",
+    "gold:v2:import": "node --import tsx calibration/scripts/import-gold-labels.mts",
+    "gold:v2:expand": "node --import tsx calibration/scripts/expand-gold-from-fixtures.mts",
+    "gold:v2:coverage": "node --import tsx calibration/scripts/report-gold-coverage.mts",
+    "datasets:sgd:package": "node scripts/package-sgd-dataset.mjs"
+  },
+  "dependencies": {
+    "next": "16.2.3",
+    "pg": "^8.20.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "^3.8.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.3",
+    "tsx": "^4.20.6",
+    "typescript": "^5"
+  }
+}

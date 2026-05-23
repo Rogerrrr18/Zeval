@@ -1,0 +1,14 @@
+{
+  "sampleBatchId": "sample_1776772663489_cd5c7cfd",
+  "caseIds": [],
+  "requestedGoodcaseCount": 10,
+  "requestedBadcaseCount": 10,
+  "strategy": "stratified_random_v1_temp_eval",
+  "createdAt": "2026-04-21T11:57:43.489Z",
+  "actualGoodcaseCount": 0,
+  "actualBadcaseCount": 0,
+  "warnings": [
+    "goodcase 请求 10 条，实际仅可取 0 条（池子 0 条，可能因哈希去重后不足）。",
+    "badcase 请求 10 条，实际仅可取 0 条（池子 0 条，可能因哈希去重后不足）。"
+  ]
+}

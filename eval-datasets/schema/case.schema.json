@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DatasetCaseRecord",
+  "type": "object",
+  "required": [
+    "caseId",
+    "caseSetType",
+    "sessionId",
+    "topicSegmentId",
+    "topicLabel",
+    "topicSummary",
+    "normalizedTranscriptHash",
+    "baselineVersion",
+    "baselineCaseScore",
+    "tags",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "caseId": { "type": "string" },
+    "caseSetType": { "type": "string", "enum": ["goodcase", "badcase"] },
+    "sessionId": { "type": "string" },
+    "topicSegmentId": { "type": "string" },
+    "topicLabel": { "type": "string" },
+    "topicSummary": { "type": "string" },
+    "normalizedTranscriptHash": { "type": "string" },
+    "duplicateGroupKey": { "type": "string" },
+    "baselineVersion": { "type": "string" },
+    "baselineCaseScore": { "type": "number" },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "createdAt": { "type": "string" },
+    "updatedAt": { "type": "string" }
+  }
+}

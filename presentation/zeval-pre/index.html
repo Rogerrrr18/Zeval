@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zeval Pre - AI Agent 体验进化闭环</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="deck" aria-live="polite">
+      <section class="slide cover active" data-notes="开场先不要讲功能。先讲判断：AI Agent 产品正在从 demo 进入真实交付阶段，团队需要从真实对话里持续提炼体验改进方向。bad case 告诉我们哪里有风险，golden case 告诉我们什么样的交互值得复制和增强。">
+        <div class="brand-row">
+          <span class="brand-mark">Z</span>
+          <span>Zeval</span>
+        </div>
+        <div class="cover-grid">
+          <div>
+            <p class="eyebrow">AI Agent Quality Loop</p>
+            <h1>把真实对话变成 AI Agent 持续进化的样本</h1>
+            <p class="lead">
+              Zeval 是一套面向 AI Agent 产品团队的体验进化闭环：从 bad case 里定位风险，从 golden case 里提炼高质量交互模式，再把它们变成证据、优化任务和回归验证。
+            </p>
+          </div>
+          <figure class="screenshot cover-shot">
+            <img src="./assets/workbench.png" alt="Zeval workbench screenshot" />
+          </figure>
+        </div>
+        <p class="footer-note">Founder / Builder briefing</p>
+      </section>
+
+      <section class="slide" data-notes="这一页建立时代背景。过去很多 AI 产品还在 demo 阶段，失败可以靠人解释；现在 Agent 进入客服、运营、内部工具和陪伴场景，失败会真实影响留存、成本和信任。">
+        <p class="eyebrow">Context</p>
+        <h2>AI Agent 正在进入真实业务，但质量方法还没有跟上。</h2>
+        <div class="three-col">
+          <article>
+            <strong>产品形态变了</strong>
+            <p>用户不再只看一次回答，而是在多轮对话里完成任务、表达情绪、不断试探边界。</p>
+          </article>
+          <article>
+            <strong>失败形态变了</strong>
+            <p>失败不一定是报错。它可能是答非所问、说教、情绪没有恢复、用户逐渐停止追问。</p>
+          </article>
+          <article>
+            <strong>发版风险变了</strong>
+            <p>Prompt、模型、工具链和策略一改，局部变好也可能让另一批场景回退。</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="slide" data-notes="这一页讲 founder 的痛。Founder 关心的是团队速度和确定性：到底哪里坏了，谁来修，修完能不能证明。强调现在很多团队其实在用很低效的方法管理 AI 质量。">
+        <p class="eyebrow">Pain / Founder</p>
+        <h2>现在很多团队还在靠感觉管理 AI 质量。</h2>
+        <div class="pain-board">
+          <div class="pain-item"><span>01</span><p>上线后每天看一堆 chatlog，但问题很难系统沉淀。</p></div>
+          <div class="pain-item"><span>02</span><p>用户流失了，但团队说不清是第几轮、哪个行为导致的。</p></div>
+          <div class="pain-item"><span>03</span><p>修 prompt 像调参，改完只能凭几条样例判断“好像变好了”。</p></div>
+          <div class="pain-item"><span>04</span><p>失败没有变成资产，下一次发版还会踩类似的坑。</p></div>
+        </div>
+      </section>
+
+      <section class="slide" data-notes="这一页讲技术朋友会共鸣的痛点。不是否定 eval，而是指出传统 eval 常常停在 score 层，没有进入产品修复闭环。">
+        <p class="eyebrow">Pain / Engineering</p>
+        <h2>传统 eval 给了分数，但没有把问题送到修复链路。</h2>
+        <div class="split">
+          <div class="quote-card">
+            <p>“这版平均分 82，但用户为什么还是掉线？”</p>
+          </div>
+          <ul class="check-list">
+            <li>缺少对话轮次级证据：哪一句触发了风险？</li>
+            <li>缺少主观维度结构：情绪、共情、追问、说教风险如何解释？</li>
+            <li>缺少可执行出口：应该改 prompt、policy、orchestration 还是代码？</li>
+            <li>缺少回归验证：修完是否真的赢过 baseline？</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="slide" data-notes="这里用一个坏对话样例让大家感知问题。重点不是这段对话本身，而是指出坏体验常常隐藏在多轮互动里。">
+        <p class="eyebrow">Example</p>
+        <h2>真实失败经常不是一次答错，而是一段对话逐步失控。</h2>
+        <div class="chat-example">
+          <div class="bubble user">我有点焦虑，最近一直睡不着。</div>
+          <div class="bubble bot">睡眠问题一般需要规律作息，建议你保持运动。</div>
+          <div class="bubble user">我知道，但我现在就是停不下来地想事情。</div>
+          <div class="bubble bot warning">你应该减少负面思考，建立积极心态。</div>
+          <div class="bubble user muted">算了。</div>
+        </div>
+        <div class="signal-row">
+          <span>情绪未恢复</span>
+          <span>说教风险</span>
+          <span>追问失败</span>
+          <span>用户提前退出</span>
+        </div>
+      </section>
+
+      <section class="slide thesis" data-notes="这一页给出我们的核心判断。不要把 Zeval 定义成 dashboard，而是定义成 loop。让大家记住这个对比。">
+        <p class="eyebrow">Our Thesis</p>
+        <h2>AI Agent 产品需要的不是另一个 dashboard，而是质量闭环。</h2>
+        <div class="loop-line">
+          <span>Upload</span>
+          <span>Evaluate</span>
+          <span>Evidence</span>
+          <span>Package</span>
+          <span>Replay</span>
+        </div>
+        <p class="big-claim">每一段真实对话，都应该成为下一版体验进化的样本。</p>
+      </section>
+
+      <section class="slide" data-notes="这里讲 Zeval 的系统图。用最少技术词说明它怎么工作：输入、解析、评估、证据、调优包、回放。Founder 能听懂，技术朋友也知道我们不是只做前端页面。">
+        <p class="eyebrow">Solution</p>
+        <h2>Zeval 把 chatlog 编译成证据、修复任务和回归验证。</h2>
+        <div class="pipeline">
+          <div><strong>原始对话</strong><small>CSV / JSON / TXT / MD</small></div>
+          <div><strong>解析标准化</strong><small>parser / normalizer / segmenter</small></div>
+          <div><strong>质量评估</strong><small>客观指标 + LLM Judge</small></div>
+          <div><strong>证据与建议</strong><small>score / reason / evidence</small></div>
+          <div><strong>调优包</strong><small>issue brief / acceptance gate</small></div>
+          <div><strong>回放验证</strong><small>baseline / replay / offline validation</small></div>
+        </div>
+      </section>
+
+      <section class="slide product-slide" data-notes="第一张产品截图。讲工作台是最低门槛入口：不用复杂接入，先上传历史对话，就能开始看问题、指标和建议。">
+        <div class="slide-copy">
+          <p class="eyebrow">Product / Workbench</p>
+          <h2>第一步：让任何团队先把真实对话跑起来。</h2>
+          <p>工作台负责上传、字段识别、标准化、流式评估、图表和建议输出，是 Zeval 当前最适合演示和客户验证的入口。</p>
+        </div>
+        <figure class="screenshot">
+          <img src="./assets/workbench.png" alt="Zeval workbench screenshot" />
+        </figure>
+      </section>
+
+      <section class="slide product-slide" data-notes="第二张产品截图。讲 bad case pool：我们不是生成一次性报告，而是把失败会话沉淀为可复用资产。">
+        <div class="slide-copy">
+          <p class="eyebrow">Product / Bad Case Pool</p>
+          <h2>第二步：把坏体验沉淀成可复用 case pool。</h2>
+          <p>失败会话会带着风险信号、证据片段和人工 override 入口沉淀下来，后续可以抽样、去重、复盘和回归验证。</p>
+        </div>
+        <figure class="screenshot">
+          <img src="./assets/datasets.png" alt="Zeval bad case pool screenshot" />
+        </figure>
+      </section>
+
+      <section class="slide product-slide" data-notes="第三张产品截图。讲调优包是 Zeval 和 Coding Agent 结合的关键：它把问题编译成工程可执行任务。">
+        <div class="slide-copy">
+          <p class="eyebrow">Product / Remediation</p>
+          <h2>第三步：把问题编译成 Agent 可执行调优包。</h2>
+          <p>调优包包含 issue brief、badcases、remediation spec 和 acceptance gate，可以交给 Codex / Claude Code 修改 prompt、policy、orchestration 或代码。</p>
+        </div>
+        <figure class="screenshot">
+          <img src="./assets/remediation.png" alt="Zeval remediation package screenshot" />
+        </figure>
+      </section>
+
+      <section class="slide" data-notes="这一页明确展示目前支持的接入方式。Founder 会关心落地成本，技术朋友会关心接口边界。讲清楚：从文件到 API 到 trace 再到 SDK/CLI。">
+        <p class="eyebrow">Integration</p>
+        <h2>当前支持 4 种接入方式，从演示到持续回归。</h2>
+        <div class="integration-grid">
+          <article><strong>文件上传</strong><p>CSV / JSON / TXT / MD 对话日志直接进工作台。</p><code>/workbench</code></article>
+          <article><strong>评估 API</strong><p>标准 rawRows 输入，返回指标、图表、证据和建议。</p><code>POST /api/evaluate</code></article>
+          <article><strong>Trace ingest</strong><p>线上 Agent 运行轨迹进入系统，用于后续归档和回放。</p><code>POST /api/traces/ingest</code></article>
+          <article><strong>SDK / CLI / Agent 包</strong><p>把评估结果接入工程流程和 Coding Agent 修复链路。</p><code>SDK / CLI → package → replay</code></article>
+        </div>
+        <figure class="screenshot inline-shot">
+          <img src="./assets/online-eval.png" alt="Zeval online evaluation screenshot" />
+        </figure>
+      </section>
+
+      <section class="slide closing" data-notes="收尾要回到意义。Zeval 想帮助 AI 产品团队用更工程化的方式沉淀真实对话。bad case 用来发现风险，golden case 用来提炼更好的交互方式。最后可以邀请大家给真实数据、场景、接入建议。">
+        <p class="eyebrow">Meaning</p>
+        <h2>我们正在定义 Agent 时代的质量标准。</h2>
+        <p class="lead">
+          当 Agent 成为产品核心体验，每一段真实对话都值得沉淀。坏案例暴露风险，好案例提供可复用的交互模式，Zeval 把它们变成证据、优化任务和回归验证。
+        </p>
+        <div class="closing-card">
+          <strong>Zeval 的一句话</strong>
+          <p>把 bad case 和 golden case，对齐到产品、工程和发版验证的同一条体验进化闭环里。</p>
+        </div>
+      </section>
+
+      <section class="slide contact-slide" data-notes="最后停在这一页。可以说：如果大家想继续了解 Zeval，可以扫码进种子群；如果想单独聊自己的 Agent 场景，也可以加我微信。">
+        <p class="eyebrow">Contact</p>
+        <h2>欢迎继续交流 Zeval。</h2>
+        <p class="lead">如果你正在做 Agent 产品、手里有真实 chatlog，或者想聊 AI 产品质量闭环，可以扫码加入群聊或直接加我。</p>
+        <div class="contact-grid">
+          <article class="contact-card primary-contact">
+            <div>
+              <span>群聊</span>
+              <strong>Zeval 评测种子群</strong>
+              <p>适合继续讨论产品、评测方法、真实场景和早期试用。</p>
+              <small>二维码有效期至 2026-05-14 前</small>
+            </div>
+            <img src="./assets/contact-group.jpg" alt="Zeval 评测种子群二维码" />
+          </article>
+          <article class="contact-card">
+            <div>
+              <span>微信</span>
+              <strong>Roger#</strong>
+              <p>想单独交流 Agent 场景、接入方式或合作，可以直接加我。</p>
+            </div>
+            <img src="./assets/contact-roger.jpg" alt="Roger 微信二维码" />
+          </article>
+          <article class="contact-card compact-contact">
+            <div>
+              <span>公众号</span>
+              <strong>Zeval 微信公众号</strong>
+              <p>扫码关注公众号，后续查看产品进展和内容更新。</p>
+            </div>
+            <img src="./assets/contact-project.jpg" alt="Zeval 微信公众号二维码" />
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <aside class="notes" aria-hidden="true">
+      <div class="notes-head">
+        <strong>Speaker Notes</strong>
+        <span>按 S 隐藏 / 显示</span>
+      </div>
+      <p id="noteText"></p>
+    </aside>
+
+    <nav class="controls" aria-label="Slide controls">
+      <button type="button" id="prevBtn">上一页</button>
+      <span id="counter">1 / 13</span>
+      <button type="button" id="nextBtn">下一页</button>
+    </nav>
+
+    <script src="./script.js"></script>
+  </body>
+</html>

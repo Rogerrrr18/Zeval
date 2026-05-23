@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SampleBatchRecord",
+  "type": "object",
+  "required": [
+    "sampleBatchId",
+    "caseIds",
+    "requestedGoodcaseCount",
+    "requestedBadcaseCount",
+    "strategy",
+    "createdAt"
+  ],
+  "properties": {
+    "sampleBatchId": { "type": "string" },
+    "caseIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "requestedGoodcaseCount": { "type": "number" },
+    "requestedBadcaseCount": { "type": "number" },
+    "strategy": { "type": "string" },
+    "targetVersion": { "type": "string" },
+    "createdAt": { "type": "string" },
+    "actualGoodcaseCount": { "type": "number" },
+    "actualBadcaseCount": { "type": "number" },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

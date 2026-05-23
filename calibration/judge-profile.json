@@ -1,0 +1,33 @@
+{
+  "profileVersion": "zeval-judge-v1.0.0",
+  "provider": "siliconflow",
+  "modelEnvPriority": [
+    "ZEVAL_JUDGE_MODEL",
+    "ZEVAL_LLM_MODEL",
+    "SILICONFLOW_MODEL"
+  ],
+  "defaultModel": "Qwen/Qwen3.5-27B",
+  "generation": {
+    "temperature": 0.2,
+    "topP": 0.7,
+    "maxTokens": 1200,
+    "responseFormat": "json_object"
+  },
+  "promptVersions": {
+    "topic_continuity_review": "topic-continuity-v1.0.0",
+    "segment_emotion_baseline": "segment-emotion-baseline-v1.0.0",
+    "subjective_dimension_judge": "subjective-dimension-v1.0.0",
+    "goal_completion_judge": "goal-completion-v1.0.0",
+    "recovery_trace_strategy": "recovery-trace-strategy-v1.0.0",
+    "extended_metric_judge": "extended-metric-v1.0.0"
+  },
+  "ciGate": {
+    "minGoldCases": 4,
+    "maxJudgeRunErrorRate": 0,
+    "maxOverallMae": 1.8,
+    "minGoalStatusAccuracy": 0.25,
+    "maxDimensionAverageDrift": 0.4,
+    "maxGoalAverageDrift": 0.4,
+    "maxRecoveryAverageDrift": 0.4
+  }
+}

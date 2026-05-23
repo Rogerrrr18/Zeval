@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "validationRunId": "val_replay_20260424_c85d1b",
+  "packageId": "rem_20260424_8200cb",
+  "mode": "replay",
+  "status": "failed",
+  "createdAt": "2026-04-24T09:42:02.747Z",
+  "artifactDir": "artifacts/validation-runs/val_replay_20260424_c85d1b",
+  "summary": {
+    "type": "replay",
+    "baselineRunId": "smoke_e2e_1777023721777",
+    "baselineCustomerId": "smoke_e2e",
+    "currentRunId": "val_replay_20260424_c85d1b_eval",
+    "replyEndpoint": "http://127.0.0.1:4100/reply",
+    "replayedRowCount": 8,
+    "minWinRate": 0.65,
+    "winRate": 0,
+    "improvedMetricCount": 0,
+    "regressedMetricCount": 3,
+    "totalTargetMetricCount": 3,
+    "targetMetricResults": [
+      {
+        "metricId": "goal_completion_rate",
+        "displayName": "目标达成率",
+        "direction": "increase",
+        "baselineValue": 0,
+        "currentValue": 0,
+        "targetValue": 0.7,
+        "improved": false,
+        "passed": false,
+        "detail": "相对 baseline 尚未改善。"
+      },
+      {
+        "metricId": "escalation_keyword_hit_rate",
+        "displayName": "升级触发率",
+        "direction": "decrease",
+        "baselineValue": 1,
+        "currentValue": 1,
+        "targetValue": 0.9,
+        "improved": false,
+        "passed": false,
+        "detail": "相对 baseline 尚未改善。"
+      },
+      {
+        "metricId": "scenario_average_score",
+        "displayName": "ToB 客服 Agent KPI 均分",
+        "direction": "increase",
+        "baselineValue": 0.6956,
+        "currentValue": 0.5323,
+        "targetValue": 0.7956,
+        "improved": false,
+        "passed": false,
+        "detail": "相对 baseline 尚未改善。"
+      }
+    ],
+    "guardResults": [
+      {
+        "guardKey": "dangerous_reply_count",
+        "comparator": "lte",
+        "threshold": 0,
+        "currentValue": 0,
+        "passed": true,
+        "detail": "暂无显式 dangerous reply 检测器，当前按 0 处理。"
+      },
+      {
+        "guardKey": "max_regressions",
+        "comparator": "lte",
+        "threshold": 0,
+        "currentValue": 3,
+        "passed": false,
+        "detail": "target metric 反向退化 3 项。"
+      },
+      {
+        "guardKey": "goal_completion_rate_min",
+        "comparator": "gte",
+        "threshold": 0.7,
+        "currentValue": 0,
+        "passed": false,
+        "detail": "达到最小阈值校验。"
+      },
+      {
+        "guardKey": "escalation_keyword_hit_rate_max",
+        "comparator": "lte",
+        "threshold": 0.9,
+        "currentValue": 1,
+        "passed": false,
+        "detail": "达到最大阈值校验。"
+      },
+      {
+        "guardKey": "scenario_average_score_min",
+        "comparator": "gte",
+        "threshold": 0.7956,
+        "currentValue": 0.5323,
+        "passed": false,
+        "detail": "达到最小阈值校验。"
+      }
+    ],
+    "warnings": [
+      "当前 pipeline 暂无危险回复计数，dangerous_reply_count 按 0 降级处理。"
+    ]
+  },
+  "files": [
+    {
+      "fileName": "report.md",
+      "relativePath": "artifacts/validation-runs/val_replay_20260424_c85d1b/report.md",
+      "content": "# val_replay_20260424_c85d1b\n\n## 概览\n- packageId: rem_20260424_8200cb\n- mode: replay\n- status: failed\n- createdAt: 2026-04-24T09:42:02.747Z\n\n## Replay Gate\n- baselineRunId: smoke_e2e_1777023721777\n- baselineCustomerId: smoke_e2e\n- currentRunId: val_replay_20260424_c85d1b_eval\n- replyEndpoint: http://127.0.0.1:4100/reply\n- minWinRate: 0.65\n- winRate: 0\n- replayedRowCount: 8\n\n## Target Metrics\n- 目标达成率: baseline=0.0000, current=0.0000, target=0.7000, improved=false, passed=false\n- 升级触发率: baseline=1.0000, current=1.0000, target=0.9000, improved=false, passed=false\n- ToB 客服 Agent KPI 均分: baseline=0.6956, current=0.5323, target=0.7956, improved=false, passed=false\n\n## Guards\n- dangerous_reply_count: lte 0, current=0, passed=true\n- max_regressions: lte 0, current=3, passed=false\n- goal_completion_rate_min: gte 0.7, current=0, passed=false\n- escalation_keyword_hit_rate_max: lte 0.9, current=1, passed=false\n- scenario_average_score_min: gte 0.7956, current=0.5323, passed=false\n\n## Warnings\n- 当前 pipeline 暂无危险回复计数，dangerous_reply_count 按 0 降级处理。"
+    }
+  ]
+}

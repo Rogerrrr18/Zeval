@@ -1,0 +1,246 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---- Scale hero (sessionCount) ---- */
+.scaleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.scaleHero {
+  flex: 1 1 240px;
+  min-width: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(8, 145, 178, 0.04));
+  border: 1px solid rgba(37, 99, 235, 0.18);
+}
+
+.scaleLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scaleLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.scaleValue {
+  font-size: 28px;
+  font-weight: 720;
+  color: #0f172a;
+  line-height: 1.05;
+}
+
+.scaleHint {
+  font-size: 12px;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-align: right;
+  max-width: 50%;
+}
+
+/* ---- Groups grid ---- */
+.groupGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.groupCard {
+  background: white;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: box-shadow 160ms ease, transform 160ms ease;
+}
+
+.groupCard:hover {
+  box-shadow: 0 12px 28px -16px rgba(15, 23, 42, 0.18);
+  transform: translateY(-1px);
+}
+
+.groupHeader h3 {
+  font-size: 15px;
+  font-weight: 680;
+  margin: 0 0 2px;
+  color: #0f172a;
+  letter-spacing: 0;
+}
+
+.groupHeader small {
+  font-size: 11.5px;
+  color: #667085;
+}
+
+/* ---- Metric rows ---- */
+.metricList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metricRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.025);
+  border: 1px solid transparent;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.metricRow:hover {
+  background: rgba(37, 99, 235, 0.05);
+  border-color: rgba(37, 99, 235, 0.16);
+}
+
+.metricLabelCol {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.metricLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metricValue {
+  font-size: 16px;
+  font-weight: 720;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ---- Tooltip ---- */
+.tooltipWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.infoIcon {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 11px;
+  color: #94a3b8;
+  cursor: help;
+  transition: color 120ms ease, background-color 120ms ease;
+  line-height: 1;
+}
+
+.infoIcon:hover,
+.infoIcon[aria-expanded="true"] {
+  color: #2563eb;
+  background-color: rgba(37, 99, 235, 0.1);
+}
+
+.tooltipPopover {
+  position: absolute;
+  z-index: 30;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 320px;
+  padding: 12px 14px;
+  background: #0f172a;
+  color: white;
+  border-radius: 10px;
+  box-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.45);
+  pointer-events: none;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.tooltipPopover::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #0f172a;
+}
+
+.tooltipBody {
+  margin: 0 0 8px;
+  font-weight: 540;
+  color: white;
+}
+
+.tooltipMeta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+}
+
+.tooltipMeta dt {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tooltipMeta dd {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* ---- Mobile ---- */
+@media (max-width: 720px) {
+  .groupGrid {
+    grid-template-columns: 1fr;
+  }
+  .scaleHero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .scaleHint {
+    text-align: left;
+    max-width: 100%;
+  }
+  .tooltipPopover {
+    max-width: 240px;
+  }
+}
