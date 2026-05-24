@@ -93,6 +93,7 @@ export function DatasetConsole() {
   const [error, setError]                     = useState("");
   const [notice, setNotice]                   = useState("");
   const [selectedScenarioId, setSelectedScenarioId] = useState("");
+  const [selectedCapabilityDimension, setSelectedCapabilityDimension] = useState("");
   const [activeTab, setActiveTab]             = useState<Tab>("pool");
   // Locally dismissed pending cases (session-only, not persisted).
   const [dismissedIds, setDismissedIds]       = useState<Set<string>>(new Set());
@@ -196,10 +197,23 @@ export function DatasetConsole() {
     [poolCases],
   );
 
-  const filteredClusters = useMemo(
-    () => (selectedScenarioId ? clusters.filter((c) => c.scenarioId === selectedScenarioId) : clusters),
-    [clusters, selectedScenarioId],
+  const capabilityOptions = useMemo(
+    () =>
+      [...new Set(poolCases.map((c) => c.capabilityDimension).filter((v): v is string => Boolean(v)))].sort(),
+    [poolCases],
   );
+
+  const filteredClusters = useMemo(() => {
+    let result = clusters;
+    if (selectedScenarioId) result = result.filter((c) => c.scenarioId === selectedScenarioId);
+    if (selectedCapabilityDimension) {
+      const matchingCaseIds = new Set(
+        poolCases.filter((c) => c.capabilityDimension === selectedCapabilityDimension).map((c) => c.caseId),
+      );
+      result = result.filter((c) => c.items.some((item) => matchingCaseIds.has(item.caseId)));
+    }
+    return result;
+  }, [clusters, selectedScenarioId, selectedCapabilityDimension, poolCases]);
 
   const poolCaseById = useMemo(() => new Map(poolCases.map((c) => [c.caseId, c])), [poolCases]);
 
@@ -378,6 +392,21 @@ export function DatasetConsole() {
                         ))}
                       </select>
                     </label>
+                    {capabilityOptions.length > 0 && (
+                      <label className={styles.label}>
+                        能力维度
+                        <select
+                          className={styles.select}
+                          value={selectedCapabilityDimension}
+                          onChange={(e) => setSelectedCapabilityDimension(e.target.value)}
+                        >
+                          <option value="">全部维度</option>
+                          {capabilityOptions.map((dim) => (
+                            <option key={dim} value={dim}>{dim}</option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                   </div>
                 </div>
                 <div className={styles.tagStrip}>

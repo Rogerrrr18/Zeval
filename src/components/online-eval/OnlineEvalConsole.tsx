@@ -53,6 +53,25 @@ type SampleBatchListResponse = {
   detail?: string;
 };
 
+/** Mirror of OnlineEvalRunSummary from onlineEvalRunStore (no evaluate payload). */
+type RunHistorySummary = {
+  runId: string;
+  createdAt: string;
+  replyEndpoint: string;
+  replayedRowCount: number;
+  baselineRunId?: string;
+  sampleBatchId?: string;
+};
+
+type RunHistoryListResponse = {
+  runs: RunHistorySummary[];
+  count: number;
+};
+
+type RunHistoryFullResponse = RunHistorySummary & {
+  evaluate: EvaluateResponse;
+};
+
 const STEPS: StepperStep[] = [
   { key: "baseline", title: "1 · 选基线", hint: "客户 ID + 历史 run" },
   { key: "replay", title: "2 · 跑回放", hint: "新版本回复 API" },
@@ -77,6 +96,9 @@ export function OnlineEvalConsole() {
   const [replayResult, setReplayResult] = useState<ReplayApiResponse | null>(null);
   const [sampleBatchJson, setSampleBatchJson] = useState("");
   const [currentStep, setCurrentStep] = useState(0);
+  const [recentRuns, setRecentRuns] = useState<RunHistorySummary[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     const stored =
@@ -123,6 +145,47 @@ export function OnlineEvalConsole() {
       setLoadingList(false);
     }
   }, []);
+
+  async function loadHistory() {
+    setLoadingHistory(true);
+    setError("");
+    try {
+      const response = await fetch("/api/online-eval/history");
+      const data = (await response.json()) as RunHistoryListResponse & { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "加载历史失败");
+      setRecentRuns(data.runs ?? []);
+      setHistoryOpen(true);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "加载历史失败");
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
+
+  async function loadHistoryRun(runId: string) {
+    setLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(`/api/online-eval/history/${encodeURIComponent(runId)}`);
+      const data = (await response.json()) as RunHistoryFullResponse & { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "加载历史记录失败");
+      const historyRecord = data as RunHistoryFullResponse;
+      setReplayResult({
+        runId: historyRecord.runId,
+        replyEndpoint: historyRecord.replyEndpoint,
+        replayedRowCount: historyRecord.replayedRowCount,
+        evaluate: historyRecord.evaluate,
+        baselineRunId: historyRecord.baselineRunId,
+      });
+      setNotice(`已加载历史回放 ${runId}。`);
+      setCurrentStep(2);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "加载历史记录失败");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleReplay() {
     if (sourceMode === "baseline" && !selectedRunId) {
@@ -345,7 +408,63 @@ export function OnlineEvalConsole() {
                   </button>
                 </div>
               </section>
-            </>
+
+            {/* ── 历史回放记录 ─────────────────────────────────── */}
+            <section className={styles.panel}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h2 style={{ margin: 0 }}>历史回放记录</h2>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  disabled={loadingHistory}
+                  onClick={() => void loadHistory()}
+                >
+                  {loadingHistory ? "加载中…" : historyOpen ? "刷新历史" : "查看历史"}
+                </button>
+              </div>
+              {historyOpen ? (
+                recentRuns.length === 0 ? (
+                  <p style={{ marginTop: 12, color: "#888", fontSize: 13 }}>暂无历史回放记录。</p>
+                ) : (
+                  <table className={styles.historyTable}>
+                    <thead>
+                      <tr>
+                        <th>Run ID</th>
+                        <th>时间</th>
+                        <th>端点</th>
+                        <th>行数</th>
+                        <th>基线</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentRuns.slice(0, 15).map((run) => (
+                        <tr key={run.runId}>
+                          <td className={styles.historyRunId}>{run.runId}</td>
+                          <td>{run.createdAt.slice(0, 19).replace("T", " ")}</td>
+                          <td className={styles.historyEndpoint}>{run.replyEndpoint}</td>
+                          <td>{run.replayedRowCount}</td>
+                          <td>{run.baselineRunId ?? run.sampleBatchId ?? "—"}</td>
+                          <td>
+                            <button
+                              type="button"
+                              className={styles.secondaryButton}
+                              disabled={loading}
+                              onClick={() => void loadHistoryRun(run.runId)}
+                            >
+                              加载
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              ) : (
+                <p style={{ marginTop: 10, color: "#888", fontSize: 13 }}>点击「查看历史」加载已保存的回放记录。</p>
+              )}
+            </section>
+          </>
           ) : null}
 
           {currentStep === 1 ? (

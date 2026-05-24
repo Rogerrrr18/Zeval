@@ -334,7 +334,11 @@ export function evaluateTNRules(
 
 /**
  * Determine whether a session should enter the uncertainty channel.
- * Fires when any subjective judge confidence falls in [0.4, 0.6].
+ * Fires when any subjective judge confidence falls in [lo, hi].
+ *
+ * Bounds are configurable via:
+ *   ZEVAL_UNCERTAINTY_CONF_LO  (default 0.4)
+ *   ZEVAL_UNCERTAINTY_CONF_HI  (default 0.6)
  *
  * @param goalCompletion Per-session goal completion result (or undefined).
  * @param dimensions Aggregated dimension results.
@@ -346,8 +350,11 @@ export function evaluateUncertaintyRule(
 ): boolean {
   if (!DEFAULT_ADMISSION_RULES.judge_uncertainty.enabled) return false;
 
-  const gcConf = goalCompletion?.confidence ?? 1;
-  if (gcConf >= 0.4 && gcConf <= 0.6) return true;
+  const lo = parseFloat(process.env.ZEVAL_UNCERTAINTY_CONF_LO ?? "0.4");
+  const hi = parseFloat(process.env.ZEVAL_UNCERTAINTY_CONF_HI ?? "0.6");
 
-  return dimensions.some((d) => d.confidence >= 0.4 && d.confidence <= 0.6);
+  const gcConf = goalCompletion?.confidence ?? 1;
+  if (gcConf >= lo && gcConf <= hi) return true;
+
+  return dimensions.some((d) => d.confidence >= lo && d.confidence <= hi);
 }

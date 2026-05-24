@@ -84,6 +84,12 @@ export type DatasetCaseRecord = {
   reviewedAt?: string;
   reviewStatus?: DatasetCaseReviewStatus;
   scenarioId?: string;
+  /**
+   * Capability dimension this case exercises (e.g. "multi_turn_coherence",
+   * "instruction_following"). Optional at MVP — when present enables
+   * dimension-filtered browsing and targeted sample-batch extraction.
+   */
+  capabilityDimension?: string;
   sourceRunId?: string;
   harvestedAt?: string;
   failureSeverityScore?: number;

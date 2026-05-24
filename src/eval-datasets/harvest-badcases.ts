@@ -33,6 +33,8 @@ export async function harvestBadCasesToDataset(params: {
    * Defaults to 1.0 when omitted.
    */
   humanSamplingRate?: number;
+  /** Capability dimension tag to stamp on all admitted cases in this batch. */
+  capabilityDimension?: string;
 }): Promise<AdmissionResult> {
   return runAdmissionPipeline({
     store: params.store,
@@ -41,5 +43,6 @@ export async function harvestBadCasesToDataset(params: {
     allowNearDuplicate: params.allowNearDuplicate,
     tnSampleRate: params.tnSampleRate,
     humanSamplingRate: params.humanSamplingRate,
+    capabilityDimension: params.capabilityDimension,
   });
 }

@@ -4,6 +4,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { appendJudgeLog } from "@/lib/judgeLog";
 import {
   ZEVAL_JUDGE_MAX_TOKENS,
   ZEVAL_JUDGE_TEMPERATURE,
@@ -150,13 +151,36 @@ export async function requestSiliconFlowChatCompletion(
         );
       }
 
-      console.info(`${logPrefix} SUCCESS attempt=${attempt}/${maxAttempts} durationMs=${Date.now() - startedAt}`);
+      const durationMs = Date.now() - startedAt;
+      console.info(`${logPrefix} SUCCESS attempt=${attempt}/${maxAttempts} durationMs=${durationMs}`);
+      void appendJudgeLog({
+        ts: new Date().toISOString(),
+        stage: context.stage,
+        runId: context.runId,
+        sessionId: context.sessionId,
+        model: providerVariant.model,
+        durationMs,
+        attempt,
+        success: true,
+      });
       return content;
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown";
+      const durationMs = Date.now() - startedAt;
       console.error(
-        `${logPrefix} ERROR attempt=${attempt}/${maxAttempts} durationMs=${Date.now() - startedAt} message=${message}`,
+        `${logPrefix} ERROR attempt=${attempt}/${maxAttempts} durationMs=${durationMs} message=${message}`,
       );
+      void appendJudgeLog({
+        ts: new Date().toISOString(),
+        stage: context.stage,
+        runId: context.runId,
+        sessionId: context.sessionId,
+        model: providerVariant.model,
+        durationMs,
+        attempt,
+        success: false,
+        errorMessage: message,
+      });
       if (attempt >= maxAttempts || !isRetryableLlmError(error)) {
         throw error;
       }

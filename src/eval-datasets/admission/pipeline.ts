@@ -117,7 +117,8 @@ export async function runAdmissionPipeline(params: {
   baselineVersion?: string;
   /**
    * Fraction of TP / TN (auto-admitted) cases that must pass human review
-   * before becoming pool-active. Range [0, 1]. Default: 1.0 (all require review).
+   * before becoming pool-active. Range [0, 1]. Default from env
+   * `ZEVAL_ADMISSION_HUMAN_SAMPLING_RATE`, falling back to 1.0.
    *
    * FN and uncertainty cases are **always** flagged for review regardless of
    * this value — they represent uncertain signals that need human confirmation.
@@ -125,14 +126,27 @@ export async function runAdmissionPipeline(params: {
    * Set to 0.0 only in tests / local development where human review is skipped.
    */
   humanSamplingRate?: number;
+  /**
+   * Capability dimension tag to stamp on every admitted case in this batch
+   * (e.g. "multi_turn_coherence"). When provided, all cases get the same
+   * dimension; per-case overrides are not yet supported.
+   */
+  capabilityDimension?: string;
 }): Promise<AdmissionResult> {
+  const tnSampleRateDefault = Number(
+    process.env.ZEVAL_ADMISSION_TN_SAMPLE_RATE ?? "",
+  ) || 0.05;
+  const humanSamplingRateDefault = Number(
+    process.env.ZEVAL_ADMISSION_HUMAN_SAMPLING_RATE ?? "",
+  ) || 1.0;
   const {
     store,
     evaluate,
-    tnSampleRate = 0.05,
+    tnSampleRate = tnSampleRateDefault,
     allowNearDuplicate = false,
     baselineVersion = evaluate.runId,
-    humanSamplingRate = 1.0,
+    humanSamplingRate = humanSamplingRateDefault,
+    capabilityDimension,
   } = params;
 
   // Load existing cases once — used for all dedup checks.
@@ -225,6 +239,7 @@ export async function runAdmissionPipeline(params: {
       // humanReviewRequired in metadata is the authoritative flag for the UI
       // review queue — it gates whether the case can advance to human_reviewed.
       reviewStatus: "auto_captured",
+      ...(capabilityDimension ? { capabilityDimension } : {}),
       metadata: {
         humanReviewRequired,
         // Record the queue timestamp so the UI can sort / alert on stale cases.

@@ -41,6 +41,7 @@ import type {
   EvaluateResponse,
   IngestResponse,
   RawChatlogRow,
+  SubjectiveMetrics,
   SummaryCard,
   UploadFormat,
 } from "@/types/pipeline";
@@ -1313,6 +1314,28 @@ function formatRate(value: number): string {
 }
 
 /**
+ * Pick a CSS pill class for the subjective metrics evaluation status.
+ * @param status SubjectiveMetrics status.
+ * @returns CSS module class name.
+ */
+function getSubjectiveStatusClass(status: SubjectiveMetrics["status"]): string {
+  if (status === "ready") return styles.metricStatusReady;
+  if (status === "degraded") return styles.metricStatusDegraded;
+  return styles.metricStatusSkipped;
+}
+
+/**
+ * Human-readable label for the subjective metrics evaluation mode.
+ * @param status SubjectiveMetrics status.
+ * @returns Display label.
+ */
+function formatSubjectiveStatusLabel(status: SubjectiveMetrics["status"]): string {
+  if (status === "ready") return "LLM 评审";
+  if (status === "degraded") return "规则降级";
+  return "待集成";
+}
+
+/**
  * Format metric gate status.
  * @param value Gate status.
  * @returns Human-readable label.
@@ -1544,9 +1567,16 @@ function StepEvaluate(props: StepEvaluateProps) {
                   <h2>目标达成</h2>
                   <p>按 session 判断用户初始意图是否达成，附达成证据与未达成原因。</p>
                 </div>
-                <span className={styles.panelMeta}>
-                  {props.evaluateResult.subjectiveMetrics.goalCompletions.length} 条
-                </span>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span
+                    className={`${styles.metricStatusPill} ${getSubjectiveStatusClass(props.evaluateResult.subjectiveMetrics.status)}`}
+                  >
+                    {formatSubjectiveStatusLabel(props.evaluateResult.subjectiveMetrics.status)}
+                  </span>
+                  <span className={styles.panelMeta}>
+                    {props.evaluateResult.subjectiveMetrics.goalCompletions.length} 条
+                  </span>
+                </div>
               </div>
               <GoalCompletionPanel items={props.evaluateResult.subjectiveMetrics.goalCompletions} />
             </section>
@@ -1559,12 +1589,16 @@ function StepEvaluate(props: StepEvaluateProps) {
                   <h2>恢复轨迹</h2>
                   <p>识别失败后是否被及时修复，并沉淀可复用的恢复策略。</p>
                 </div>
-                <span className={styles.panelMeta}>
-                  {
-                    props.evaluateResult.subjectiveMetrics.recoveryTraces.filter((item) => item.status !== "none")
-                      .length
-                  } 条
-                </span>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span
+                    className={`${styles.metricStatusPill} ${getSubjectiveStatusClass(props.evaluateResult.subjectiveMetrics.status)}`}
+                  >
+                    {formatSubjectiveStatusLabel(props.evaluateResult.subjectiveMetrics.status)}
+                  </span>
+                  <span className={styles.panelMeta}>
+                    {props.evaluateResult.subjectiveMetrics.recoveryTraces.filter((item) => item.status !== "none").length} 条
+                  </span>
+                </div>
               </div>
               <RecoveryTracePanel items={props.evaluateResult.subjectiveMetrics.recoveryTraces} />
             </section>

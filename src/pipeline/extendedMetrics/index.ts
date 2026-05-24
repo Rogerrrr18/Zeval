@@ -14,6 +14,7 @@
  *  - taskCompletion      : agentic 场景的任务完成度
  */
 
+import { mapWithConcurrency, resolveJudgeConcurrency } from "@/lib/concurrency";
 import { callJudge } from "./llmJudge";
 import {
   DEFAULT_METRIC_THRESHOLDS,
@@ -47,6 +48,21 @@ const BIAS_PATTERNS = [
 export async function buildExtendedMetrics(input: ExtendedMetricsInput): Promise<ExtendedMetricsBundle> {
   const thresholds = { ...DEFAULT_METRIC_THRESHOLDS, ...(input.thresholds ?? {}) };
 
+  // Use bounded concurrency so a burst of 10 LLM calls doesn't overwhelm the
+  // provider rate-limit. Falls back to ZEVAL_JUDGE_SESSION_CONCURRENCY (default 4).
+  const metricFns: Array<() => Promise<ExtendedMetricResult | null>> = [
+    () => runFaithfulness(input.retrievalContexts, input.useLlm, thresholds.faithfulness, input.runId),
+    () => runHallucination(input.retrievalContexts, input.useLlm, thresholds.hallucination, input.runId),
+    () => runAnswerRelevancy(input.retrievalContexts, input.useLlm, thresholds.answerRelevancy, input.runId),
+    () => runContextualRelevancy(input.retrievalContexts, input.useLlm, thresholds.contextualRelevancy, input.runId),
+    () => runToolCorrectness(input.toolCalls, thresholds.toolCorrectness),
+    () => runKnowledgeRetention(input.retentionFacts, input.retrievalContexts, input.useLlm, thresholds.knowledgeRetention, input.runId),
+    () => runToxicity(input.retrievalContexts, input.useLlm, thresholds.toxicity, input.runId),
+    () => runBias(input.retrievalContexts, input.useLlm, thresholds.bias, input.runId),
+    () => runRoleAdherence(input.roleProfile, input.retrievalContexts, input.useLlm, thresholds.roleAdherence, input.runId),
+    () => runTaskCompletion(input.toolCalls, input.retrievalContexts, input.useLlm, thresholds.taskCompletion, input.runId),
+  ];
+
   const [
     faithfulness,
     hallucination,
@@ -58,18 +74,7 @@ export async function buildExtendedMetrics(input: ExtendedMetricsInput): Promise
     bias,
     roleAdherence,
     taskCompletion,
-  ] = await Promise.all([
-    runFaithfulness(input.retrievalContexts, input.useLlm, thresholds.faithfulness, input.runId),
-    runHallucination(input.retrievalContexts, input.useLlm, thresholds.hallucination, input.runId),
-    runAnswerRelevancy(input.retrievalContexts, input.useLlm, thresholds.answerRelevancy, input.runId),
-    runContextualRelevancy(input.retrievalContexts, input.useLlm, thresholds.contextualRelevancy, input.runId),
-    runToolCorrectness(input.toolCalls, thresholds.toolCorrectness),
-    runKnowledgeRetention(input.retentionFacts, input.retrievalContexts, input.useLlm, thresholds.knowledgeRetention, input.runId),
-    runToxicity(input.retrievalContexts, input.useLlm, thresholds.toxicity, input.runId),
-    runBias(input.retrievalContexts, input.useLlm, thresholds.bias, input.runId),
-    runRoleAdherence(input.roleProfile, input.retrievalContexts, input.useLlm, thresholds.roleAdherence, input.runId),
-    runTaskCompletion(input.toolCalls, input.retrievalContexts, input.useLlm, thresholds.taskCompletion, input.runId),
-  ]);
+  ] = await mapWithConcurrency(metricFns, resolveJudgeConcurrency(), (fn) => fn());
 
   return {
     faithfulness,

@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       allowNearDuplicate: parsedBody.data.allowNearDuplicate,
       tnSampleRate: parsedBody.data.tnSampleRate,
       humanSamplingRate: parsedBody.data.humanSamplingRate,
+      capabilityDimension: parsedBody.data.capabilityDimension,
     });
 
     return NextResponse.json({

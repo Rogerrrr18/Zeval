@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getZeroreRequestContext } from "@/auth/context";
 import { createDatasetStore } from "@/eval-datasets/storage";
 import { readZevalEnvValue } from "@/lib/siliconflow";
+import { saveOnlineEvalRun } from "@/lib/onlineEvalRunStore";
 import { runEvaluatePipeline } from "@/pipeline/evaluateRun";
 import {
   DEMO_MOCK_REPLY_API,
@@ -80,6 +81,17 @@ export async function POST(request: Request) {
       scenarioId,
     });
     evaluate.meta.workspaceId = context.workspaceId;
+
+    // Fire-and-forget: persist run to .zeval-db/online-eval-runs/{runId}.json
+    void saveOnlineEvalRun({
+      runId: evaluate.runId,
+      createdAt: new Date().toISOString(),
+      replyEndpoint,
+      replayedRowCount: replayedRows.length,
+      ...(body.baselineRef?.runId ? { baselineRunId: body.baselineRef.runId } : {}),
+      ...(body.sampleBatchId ? { sampleBatchId: body.sampleBatchId } : {}),
+      evaluate,
+    });
 
     return NextResponse.json({
       runId: evaluate.runId,

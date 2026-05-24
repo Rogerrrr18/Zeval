@@ -108,6 +108,8 @@ export const evalDatasetHarvestBadcasesBodySchema = z.object({
    * Defaults to 1.0 (full review) when omitted.
    */
   humanSamplingRate: z.number().min(0).max(1).optional(),
+  /** Capability dimension tag applied to all admitted cases in this batch. */
+  capabilityDimension: z.string().max(120).optional(),
   evaluate: z.object({
     runId: z.string().min(1),
     subjectiveMetrics: z.object({
