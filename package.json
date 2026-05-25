@@ -10,6 +10,7 @@
     "smoke:e2e": "node scripts/smoke-end-to-end.mjs",
     "smoke:e2e:clean": "SMOKE_RAW_CSV=mock-chatlog/raw-data/support-refund-short.csv node scripts/smoke-end-to-end.mjs",
     "smoke:e2e:bad": "SMOKE_RAW_CSV=mock-chatlog/raw-data/ecommerce-angry-escalation.csv node scripts/smoke-end-to-end.mjs",
+    "smoke:admission": "node --import tsx scripts/smoke-admission-pipeline.mts",
     "db:smoke": "node --import tsx scripts/smoke-database-adapter.mts",
     "db:smoke:evaluate-projection": "node --import tsx scripts/smoke-evaluate-projection.mts",
     "db:smoke:stores": "node --import tsx scripts/smoke-database-stores.mts",
