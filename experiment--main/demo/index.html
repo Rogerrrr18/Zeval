@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>动态回放评测对比台</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <h1>动态回放评测对比台</h1>
+      <p>一次点击，同时比较多个 Agent / 真实模型；并把<strong>模拟用户工作过程</strong>、<strong>评审工作过程</strong>、<strong>原始输出</strong>都完整可视化。</p>
+    </header>
+
+    <section class="panel controls">
+      <div class="grid">
+        <label>
+          <span>会话样本</span>
+          <select id="sessionSelect"></select>
+        </label>
+        <label>
+          <span>预算放大系数</span>
+          <input id="alpha" type="number" step="0.1" value="1.5" />
+        </label>
+        <label>
+          <span>单意图最小预算</span>
+          <input id="bMin" type="number" step="1" value="2" />
+        </label>
+        <label>
+          <span>全局预算上限</span>
+          <input id="globalCap" type="number" step="1" value="12" />
+        </label>
+        <label>
+          <span>困难模式</span>
+          <select id="challengeMode">
+            <option value="normal">正常</option>
+            <option value="missing_info">缺信息施压</option>
+            <option value="intent_shift">中途改意图</option>
+            <option value="constraint_conflict">冲突约束</option>
+            <option value="strict_recovery">严格补救</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="chooser">
+        <div class="chooser-title">对比对象（可多选）</div>
+        <label class="check"><input type="checkbox" id="agentWeak" checked /> 弱基线（只会复述）</label>
+        <label class="check"><input type="checkbox" id="agentScripted" checked /> 中等基线（会利用已知事实）</label>
+      </div>
+
+      <label class="models-box">
+        <span>真实模型列表（每行一个，例如：gpt-5.5）</span>
+        <textarea id="realModels" rows="4" placeholder="gpt-5.5
+Qwen/Qwen3.5-32B"></textarea>
+      </label>
+
+      <div class="actions">
+        <button id="runBtn">一键运行多模型对比</button>
+        <button id="playBtn" disabled>逐轮展开最左侧动态回放</button>
+      </div>
+      <div id="status" class="status">正在加载会话列表…</div>
+    </section>
+
+    <section id="summaryPanel" class="panel hidden"></section>
+    <section id="assetPanel" class="panel hidden"></section>
+    <section id="diagnosisPanel" class="panel hidden"></section>
+    <section id="tracePanel" class="panel hidden"></section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

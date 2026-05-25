@@ -1,0 +1,9 @@
+session_id,turn_index,role,content
+demo-001,1,user,你好，我想查订单12345的状态
+demo-001,2,assistant,好的，订单12345当前状态为进行中，预计1-2个工作日完成。
+demo-001,3,user,如果我要改地址呢？
+demo-001,4,assistant,改地址需要在发货前联系客服修改收货信息。
+demo-002,1,user,退款怎么申请
+demo-002,2,assistant,您可以在APP「我的订单」里找到对应订单，点击申请退款。
+demo-002,3,user,多久能到账
+demo-002,4,assistant,原路退回一般3-7个工作日到账。

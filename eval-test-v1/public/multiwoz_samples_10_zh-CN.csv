@@ -1,0 +1,139 @@
+dialogue_id,services,turn_num,speaker,utterance,active_intents,slot_values
+PMUL3969.json,酒店,0,USER,我是新来的，想找个带免费 Wi‑Fi 的住处。,hotel:find_hotel,hotel.hotel-internet=yes
+PMUL3969.json,酒店,1,SYSTEM,好的！您希望什么价位？,,
+PMUL3969.json,酒店,2,USER,越便宜越好，也要有免费 Wi‑Fi。,hotel:find_hotel,hotel.hotel-internet=yes|hotel.hotel-pricerange=cheap
+PMUL3969.json,酒店,3,SYSTEM,平价且带免费 Wi‑Fi 的我这儿有 10 处可选。您有没有偏好的区域？,,
+PMUL3969.json,酒店,4,USER,"没有特定区域，你推荐就行。",hotel:find_hotel,hotel.hotel-area=dontcare|hotel.hotel-internet=yes|hotel.hotel-pricerange=cheap
+PMUL3969.json,酒店,5,SYSTEM,那我推荐市中心附近的亚历山大民宿（Alexander Bed and Breakfast）。需要我帮您预订吗？,,
+PMUL3969.json,酒店,6,USER,"好的，请帮我订 2 晚，5 个人，从周六开始入住。",hotel:book_hotel,hotel.hotel-area=dontcare|hotel.hotel-bookday=saturday|hotel.hotel-bookpeople=5|hotel.hotel-bookstay=2|hotel.hotel-internet=yes|hotel.hotel-name=alexander bed and breakfast|hotel.hotel-pricerange=cheap
+PMUL3969.json,酒店,7,SYSTEM,已为您预订亚历山大民宿：周六起 2 晚、5 人。确认号 UCIOWNWV。还需要别的帮助吗？,,
+PMUL3969.json,酒店,8,USER,"就这些，谢谢，再见！",,hotel.hotel-area=dontcare|hotel.hotel-bookday=saturday|hotel.hotel-bookpeople=5|hotel.hotel-bookstay=2|hotel.hotel-internet=yes|hotel.hotel-name=alexander bed and breakfast|hotel.hotel-pricerange=cheap
+PMUL3969.json,酒店,9,SYSTEM,祝您愉快！,,
+PMUL3071.json,景点|酒店,0,USER,我在找 ADC 剧院（adc theatre）。,attraction:find_attraction,attraction.attraction-name=adc theatre
+PMUL3071.json,景点|酒店,1,SYSTEM,"您要去剑桥市中心一带，在公园街（park street），邮编 cb58as。还需要别的吗？",,
+PMUL3071.json,景点|酒店,2,USER,"我想了解 ADC 剧院的更多信息，包括景点类型。",attraction:find_attraction,attraction.attraction-name=adc theatre
+PMUL3071.json,景点|酒店,3,SYSTEM,ADC 剧院是位于市中心一带的剧院，电话 01223300085。还需要别的吗？,,
+PMUL3071.json,景点|酒店,4,USER,"是的，我还想了解冈维尔酒店（Gonville Hotel）。",hotel:find_hotel,hotel.hotel-name=gonville hotel|attraction.attraction-name=adc theatre
+PMUL3071.json,景点|酒店,5,SYSTEM,那是市中心一家较贵的酒店，带免费 Wi‑Fi 和停车位。需要联系方式吗？,,
+PMUL3071.json,景点|酒店,6,USER,"我想订一间房，5 个人，从周五开始住 5 天，能帮我吗？",hotel:book_hotel,hotel.hotel-bookday=friday|hotel.hotel-bookpeople=5|hotel.hotel-bookstay=5|hotel.hotel-name=gonville hotel|attraction.attraction-name=adc theatre
+PMUL3071.json,景点|酒店,7,SYSTEM,当然！已为您订好：周五起共 5 晚。确认号 7WB751AK。还有别的需要吗？,,
+PMUL3071.json,景点|酒店,8,USER,"非常感谢，我想就这些了！",,hotel.hotel-bookday=friday|hotel.hotel-bookpeople=5|hotel.hotel-bookstay=5|hotel.hotel-name=gonville hotel|attraction.attraction-name=adc theatre
+PMUL3071.json,景点|酒店,9,SYSTEM,感谢使用剑桥城镇信息中心，祝您今天愉快！,,
+MUL0161.json,餐厅|出租车|酒店,0,USER,我想在市中心找一家比较贵的餐厅。,restaurant:find_restaurant|hotel:find_hotel,restaurant.restaurant-area=centre|restaurant.restaurant-pricerange=expensive
+MUL0161.json,餐厅|出租车|酒店,1,SYSTEM,您对剑桥切肉屋餐厅（The Cambridge Chop House）感兴趣吗？那是位于市中心的英式餐厅。,,
+MUL0161.json,餐厅|出租车|酒店,2,USER,"谢谢，希望确实是偏贵的价位。另外能给我电话号码就太好了。",restaurant:find_restaurant|taxi:find_taxi|hotel:find_hotel,restaurant.restaurant-area=centre|restaurant.restaurant-pricerange=expensive
+MUL0161.json,餐厅|出租车|酒店,3,SYSTEM,"是的，属于偏贵价位。电话是 01223359506。",,
+MUL0161.json,餐厅|出租车|酒店,4,USER,我想订周五晚上 16:45、1 个人的位子。,restaurant:book_restaurant|hotel:find_hotel,restaurant.restaurant-area=centre|restaurant.restaurant-bookday=friday|restaurant.restaurant-bookpeople=1|restaurant.restaurant-booktime=16:45|restaurant.restaurant-name=cambridge chop house|restaurant.restaurant-pricerange=expensive
+MUL0161.json,餐厅|出租车|酒店,5,SYSTEM,这个时段预订未成功。换个时间或日期可以吗？,,
+MUL0161.json,餐厅|出租车|酒店,6,USER,可以。那改成周五 15:45 呢？,restaurant:book_restaurant|taxi:find_taxi|hotel:find_hotel,restaurant.restaurant-area=centre|restaurant.restaurant-bookday=friday|restaurant.restaurant-bookpeople=1|restaurant.restaurant-booktime=15:45|restaurant.restaurant-name=cambridge chop house|restaurant.restaurant-pricerange=expensive
+MUL0161.json,餐厅|出租车|酒店,7,SYSTEM,预订成功。桌位将保留 15 分钟。确认号：10P0LEVH。今天还有别的需要吗？,,
+MUL0161.json,餐厅|出租车|酒店,8,USER,我还想找住处。最好是带免费 Wi‑Fi 和停车位、也比较贵的酒店。,restaurant:book_restaurant|hotel:find_hotel,restaurant.restaurant-area=centre|restaurant.restaurant-bookday=friday|restaurant.restaurant-bookpeople=1|restaurant.restaurant-booktime=15:45|restaurant.restaurant-name=cambridge chop house|restaurant.restaurant-pricerange=expensive|hotel.hotel-internet=yes|hotel.hotel-parking=yes|hotel.hotel-pricerange=expensive|hotel.hotel-type=hotel
+MUL0161.json,餐厅|出租车|酒店,9,SYSTEM,"若您想住在镇中心一带，有冈维尔酒店（gonville hotel）：免费停车与上网，三星。需要帮您预订吗？",,
+MUL0161.json,餐厅|出租车|酒店,10,USER,"太好了，能帮我订 1 个人、从周五起住 4 晚吗？",restaurant:book_restaurant|hotel:book_hotel,restaurant.restaurant-area=centre|restaurant.restaurant-bookday=friday|restaurant.restaurant-bookpeople=1|restaurant.restaurant-booktime=15:45|restaurant.restaurant-name=cambridge chop house|restaurant.restaurant-pricerange=expensive|hotel.hotel-bookday=friday|hotel.hotel-bookpeople=1|hotel.hotel-bookstay=4|hotel.hotel-internet=yes|hotel.hotel-name=gonville hotel|hotel.hotel-parking=yes|hotel.hotel-pricerange=expensive|hotel.hotel-type=hotel
+MUL0161.json,餐厅|出租车|酒店,11,SYSTEM,预订成功：周五起共四晚。确认号 DRW9QM8S。还需要别的吗？,,
+MUL0161.json,餐厅|出租车|酒店,12,USER,我还需要订一辆出租车往返这两处，希望能在 15:45 之前到达。,taxi:find_taxi|restaurant:book_restaurant,taxi.taxi-arriveby=15:45|taxi.taxi-departure=gonville hotel|taxi.taxi-destination=cambridge chop house|restaurant.restaurant-area=centre|restaurant.restaurant-bookday=friday|restaurant.restaurant-bookpeople=1|restaurant.restaurant-booktime=15:45|restaurant.restaurant-name=cambridge chop house|restaurant.restaurant-pricerange=expensive|hotel.hotel-bookday=friday|hotel.hotel-bookpeople=1|hotel.hotel-bookstay=4|hotel.hotel-internet=yes|hotel.hotel-name=gonville hotel|hotel.hotel-parking=yes|hotel.hotel-pricerange=expensive|hotel.hotel-type=hotel
+MUL0161.json,餐厅|出租车|酒店,13,SYSTEM,"预订完成：灰色宝马来接您，联系电话 07034136573。今天还有别的需要吗？",,
+MUL0161.json,餐厅|出租车|酒店,14,USER,"不用了，谢谢你的帮助。",,taxi.taxi-arriveby=15:45|taxi.taxi-departure=gonville hotel|taxi.taxi-destination=cambridge chop house|restaurant.restaurant-area=centre|restaurant.restaurant-bookday=friday|restaurant.restaurant-bookpeople=1|restaurant.restaurant-booktime=15:45|restaurant.restaurant-name=cambridge chop house|restaurant.restaurant-pricerange=expensive|hotel.hotel-bookday=friday|hotel.hotel-bookpeople=1|hotel.hotel-bookstay=4|hotel.hotel-internet=yes|hotel.hotel-name=gonville hotel|hotel.hotel-parking=yes|hotel.hotel-pricerange=expensive|hotel.hotel-type=hotel
+MUL0161.json,餐厅|出租车|酒店,15,SYSTEM,不客气，再见！,,
+PMUL4369.json,巴士|酒店,0,USER,在剑桥坐巴士大概多少钱？,bus:find_bus|train:find_train,bus.bus-departure=cambridge
+PMUL4369.json,巴士|酒店,1,SYSTEM,您要前往哪里？,,
+PMUL4369.json,巴士|酒店,2,USER,我要去伦敦。,bus:find_bus|train:find_train,"bus.bus-departure=cambridge|bus.bus-destination=london kings cross,london"
+PMUL4369.json,巴士|酒店,3,SYSTEM,从剑桥到伦敦国王十字车站（london kings cross）的票价约在 18.88 镑到 23.60 镑之间，视出行日期而定。,,
+PMUL4369.json,巴士|酒店,4,USER,我还想在剑桥西边找一家酒店，能帮我吗？,hotel:find_hotel|train:find_train,"bus.bus-departure=cambridge|bus.bus-destination=london kings cross,london|hotel.hotel-area=west"
+PMUL4369.json,巴士|酒店,5,SYSTEM,有一些可选。您更偏好酒店还是民宿（guesthouse）？,,
+PMUL4369.json,巴士|酒店,6,USER,"我想要西边的一家酒店，不一定非要带网络。如果没有网络，免费 Wi‑Fi 可以吗？",hotel:find_hotel,"bus.bus-departure=cambridge|bus.bus-destination=london kings cross,london|hotel.hotel-area=west"
+PMUL4369.json,巴士|酒店,7,SYSTEM,很遗憾没有符合您条件的酒店。要不要我帮您看看其他区域？,,
+PMUL4369.json,巴士|酒店,8,USER,你确定西边没有酒店吗？无论有没有网络都可以。,hotel:find_hotel,"bus.bus-departure=cambridge|bus.bus-destination=london kings cross,london|hotel.hotel-area=west"
+PMUL4369.json,巴士|酒店,9,SYSTEM,西边其实有四家。您心里有价位吗？,,
+PMUL4434.json,餐厅|景点|火车|酒店,0,USER,能帮我在市中心找一处地方吗？,restaurant:find_restaurant|hotel:find_hotel|attraction:find_attraction,restaurant.restaurant-area=centre|hotel.hotel-area=centre|attraction.attraction-area=centre
+PMUL4434.json,餐厅|景点|火车|酒店,1,SYSTEM,我们有很多景点可去！您能再说具体一点吗？,,
+PMUL4434.json,餐厅|景点|火车|酒店,2,USER,你有什么推荐？我还需要地址。,attraction:find_attraction,restaurant.restaurant-area=centre|hotel.hotel-area=centre|attraction.attraction-area=centre
+PMUL4434.json,餐厅|景点|火车|酒店,3,SYSTEM,比如诸圣堂（all saints church）？地址是耶稣巷（jesus lane）。,,
+PMUL4434.json,餐厅|景点|火车|酒店,4,USER,很好。我还需要一班从剑桥出发、17:30 前到达的火车。,train:find_train,restaurant.restaurant-area=centre|hotel.hotel-area=centre|attraction.attraction-area=centre|train.train-arriveby=17:30|train.train-departure=cambridge
+PMUL4434.json,餐厅|景点|火车|酒店,5,SYSTEM,符合的车次很多。您想按日期、目的地还是出发时间再缩小范围？,,
+PMUL4434.json,餐厅|景点|火车|酒店,6,USER,"可以，周二去伦敦利物浦街（London Liverpool Street）。",train:find_train,restaurant.restaurant-area=centre|hotel.hotel-area=centre|attraction.attraction-area=centre|train.train-arriveby=17:30|train.train-day=tuesday|train.train-departure=cambridge|train.train-destination=london liverpool street
+PMUL4434.json,餐厅|景点|火车|酒店,7,SYSTEM,有一班 17:27 到达的车次。需要我帮您订吗？,,
+PMUL4434.json,餐厅|景点|火车|酒店,8,USER,"好的，请帮我订 2 个人的票，并把确认号发我。",train:book_train,restaurant.restaurant-area=centre|hotel.hotel-area=centre|attraction.attraction-area=centre|train.train-arriveby=17:30|train.train-bookpeople=2|train.train-day=tuesday|train.train-departure=cambridge|train.train-destination=london liverpool street
+PMUL4434.json,餐厅|景点|火车|酒店,9,SYSTEM,已成功预订：总价 33.2 英镑，到站付款。确认号：VJVYH5LC。还需要我协助吗？,,
+SNG1130.json,景点,0,USER,市中心有什么可去的地方吗？,attraction:find_attraction,attraction.attraction-area=centre
+SNG1130.json,景点,1,SYSTEM,有很多去处，您有没有特别想去的类型？,,
+SNG1130.json,景点,2,USER,"没有特别想去的，就在市中心逛几个小时，想找点事做。",attraction:find_attraction,attraction.attraction-area=centre
+SNG1130.json,景点,3,SYSTEM,确定吗？我们这儿种类很多——您再给点偏好会更好推荐。,,
+SNG1130.json,景点,4,USER,"我就想在市中心找点事做，能说说大概有哪些类型的地方吗？",attraction:find_attraction,attraction.attraction-area=centre
+SNG1130.json,景点,5,SYSTEM,"当然。包括建筑、划船、电影院、学院、音乐厅、博物馆、夜店、公园、游泳池和剧院等。",,
+SNG1130.json,景点,6,USER,能推荐一家夜店吗？,attraction:find_attraction,attraction.attraction-area=centre|attraction.attraction-type=nightclub
+SNG1130.json,景点,7,SYSTEM,Club Salsa 是市中心的一家夜店。需要他们的联系方式吗？,,
+SNG1130.json,景点,8,USER,"需要。门票多少钱、电话和邮编分别是？",attraction:find_attraction,attraction.attraction-area=centre|attraction.attraction-name=club salsa|attraction.attraction-type=nightclub
+SNG1130.json,景点,9,SYSTEM,"Club Salsa 门票 5 英镑，邮编 cb12jb，电话 07782218745。还需要别的吗？",,
+SNG1130.json,景点,10,USER,"就这些了，再见。",,attraction.attraction-area=centre|attraction.attraction-name=club salsa|attraction.attraction-type=nightclub
+SNG1130.json,景点,11,SYSTEM,祝您今天愉快，再见。,,
+SNG1130.json,景点,12,USER,谢谢你的帮助。,,attraction.attraction-area=centre|attraction.attraction-name=club salsa|attraction.attraction-type=nightclub
+SNG1130.json,景点,13,SYSTEM,有需要随时再联系我们。,,
+PMUL3908.json,巴士|火车|酒店,0,USER,我想了解剑桥的一些信息。,bus:find_bus|train:find_train,bus.bus-destination=cambridge
+PMUL3908.json,巴士|火车|酒店,1,SYSTEM,您需要哪方面的信息？,,
+PMUL3908.json,巴士|火车|酒店,2,USER,"我在找一家叫 Archway House 的酒店。",hotel:find_hotel,bus.bus-destination=cambridge|hotel.hotel-name=archway house
+PMUL3908.json,巴士|火车|酒店,3,SYSTEM,它在吉尔伯特路 52 号，属于中等价位。,,
+PMUL3908.json,巴士|火车|酒店,4,USER,好的。我想订周六入住、住 4 晚，2 个人。,hotel:book_hotel|train:find_train,bus.bus-destination=cambridge|hotel.hotel-bookday=saturday|hotel.hotel-bookpeople=2|hotel.hotel-bookstay=4|hotel.hotel-name=archway house
+PMUL3908.json,巴士|火车|酒店,5,SYSTEM,预订成功。确认号：S9V74O1G。还需要别的吗？,,
+PMUL3908.json,巴士|火车|酒店,6,USER,"我还需要周六的一班火车，出发时间在 13:45 之后。",hotel:book_hotel|train:find_train,bus.bus-destination=cambridge|hotel.hotel-bookday=saturday|hotel.hotel-bookpeople=2|hotel.hotel-bookstay=4|hotel.hotel-name=archway house|train.train-leaveat=13:45
+PMUL3908.json,巴士|火车|酒店,7,SYSTEM,"好的。请问您要去哪里？",,
+PMUL3908.json,巴士|火车|酒店,8,USER,去剑桥。,train:find_train,bus.bus-destination=cambridge|hotel.hotel-bookday=saturday|hotel.hotel-bookpeople=2|hotel.hotel-bookstay=4|hotel.hotel-name=archway house|train.train-day=saturday|train.train-destination=cambridge|train.train-leaveat=13:45
+PMUL3908.json,巴士|火车|酒店,9,SYSTEM,从哪里出发？,,
+PMUL3908.json,巴士|火车|酒店,10,USER,从伦敦国王十字车站出发。,train:find_train,bus.bus-destination=cambridge|hotel.hotel-bookday=saturday|hotel.hotel-bookpeople=2|hotel.hotel-bookstay=4|hotel.hotel-name=archway house|train.train-day=saturday|train.train-departure=london kings cross|train.train-destination=cambridge|train.train-leaveat=13:45
+PMUL3908.json,巴士|火车|酒店,11,SYSTEM,几位乘客？,,
+PMUL3908.json,巴士|火车|酒店,12,USER,2 位。,train:book_train,bus.bus-destination=cambridge|hotel.hotel-bookday=saturday|hotel.hotel-bookpeople=2|hotel.hotel-bookstay=4|hotel.hotel-name=archway house|train.train-bookpeople=2|train.train-day=saturday|train.train-departure=london kings cross|train.train-destination=cambridge|train.train-leaveat=13:45
+PMUL3908.json,巴士|火车|酒店,13,SYSTEM,有 TR4101 次列车：15:17 出发、18:08 到达。需要我帮您订吗？,,
+PMUL3908.json,巴士|火车|酒店,14,USER,好的，请订。能把确认号也给我吗？,train:book_train,bus.bus-destination=cambridge|hotel.hotel-bookday=saturday|hotel.hotel-bookpeople=2|hotel.hotel-bookstay=4|hotel.hotel-name=archway house|train.train-bookpeople=2|train.train-day=saturday|train.train-departure=london kings cross|train.train-destination=cambridge|train.train-leaveat=13:45
+PMUL3908.json,巴士|火车|酒店,15,SYSTEM,我这就为您取确认号。,,
+PMUL3908.json,巴士|火车|酒店,16,USER,"好的，谢谢。",train:book_train,bus.bus-destination=cambridge|hotel.hotel-bookday=saturday|hotel.hotel-bookpeople=2|hotel.hotel-bookstay=4|hotel.hotel-name=archway house|train.train-bookpeople=2|train.train-day=saturday|train.train-departure=london kings cross|train.train-destination=cambridge|train.train-leaveat=13:45
+PMUL3908.json,巴士|火车|酒店,17,SYSTEM,"预订成功：总价 37.76 英镑，到站付款。确认号：6BM4QJXX。",,
+PMUL3908.json,巴士|火车|酒店,18,USER,太好了，谢谢！我就需要这些，再见！,,bus.bus-destination=cambridge|hotel.hotel-bookday=saturday|hotel.hotel-bookpeople=2|hotel.hotel-bookstay=4|hotel.hotel-name=archway house|train.train-bookpeople=2|train.train-day=saturday|train.train-departure=london kings cross|train.train-destination=cambridge|train.train-leaveat=13:45
+PMUL3908.json,巴士|火车|酒店,19,SYSTEM,不客气！以后还有需要欢迎再来，再见！,,
+PMUL3000.json,出租车|酒店,0,USER,"你好，我想在剑桥找点娱乐项目？",attraction:find_attraction,
+PMUL3000.json,出租车|酒店,1,SYSTEM,好的！欢乐时光（Whale of a Time）在西边 Viking Way 的 8 号单元，电话 01954781018。,,
+PMUL3000.json,出租车|酒店,2,USER,"太好了，谢谢！还有别的娱乐选择吗？",attraction:find_attraction,
+PMUL3000.json,出租车|酒店,3,SYSTEM,"有的，从公园到夜店都有，还有多所学院和博物馆。圣三一教堂（Holy Trinity Church）也是很棒的建筑景点。",,
+PMUL3000.json,出租车|酒店,4,USER,欢乐时光听起来不错。我还需要住处：要带免费网络，而且在西边。,hotel:find_hotel,hotel.hotel-area=west|hotel.hotel-internet=yes
+PMUL3000.json,出租车|酒店,5,SYSTEM,"好的，西边目前有 4 个可选。您对价位或星级有偏好吗？",,
+PMUL3000.json,出租车|酒店,6,USER,要四星级。,hotel:find_hotel,hotel.hotel-area=west|hotel.hotel-internet=yes|hotel.hotel-stars=4
+PMUL3000.json,出租车|酒店,7,SYSTEM,目前有 3 个选项。对价格有偏好吗？,,
+PMUL3000.json,出租车|酒店,8,USER,我想要中等价位。,hotel:find_hotel|restaurant:find_restaurant,hotel.hotel-area=west|hotel.hotel-internet=yes|hotel.hotel-pricerange=moderate|hotel.hotel-stars=4
+PMUL3000.json,出租车|酒店,9,SYSTEM,抱歉按这些条件暂时没有可用选项。要不要我稍微放宽条件再搜？,,
+PMUL3000.json,出租车|酒店,10,USER,能改到北边找找吗？,hotel:find_hotel,hotel.hotel-area=north|hotel.hotel-internet=yes|hotel.hotel-pricerange=moderate|hotel.hotel-stars=4
+PMUL3000.json,出租车|酒店,11,SYSTEM,比如北边的阿瓦隆酒店（avalon）：四星、中等价位。,,
+PMUL3000.json,出租车|酒店,12,USER,很好。我需要从周三起住 5 晚，6 个人。订好后能把确认号给我吗？,hotel:book_hotel,hotel.hotel-area=north|hotel.hotel-bookday=wednesday|hotel.hotel-bookpeople=6|hotel.hotel-bookstay=5|hotel.hotel-internet=yes|hotel.hotel-name=avalon|hotel.hotel-pricerange=moderate|hotel.hotel-stars=4
+PMUL3000.json,出租车|酒店,13,SYSTEM,预订成功。确认号：BVCGE59G。还有别的吗？,,
+PMUL3000.json,出租车|酒店,14,USER,"是的，我需要一辆出租车，从欢乐时光到酒店，希望 06:00 前出发。",taxi:find_taxi,taxi.taxi-departure=whale of a time|taxi.taxi-destination=avalon|taxi.taxi-leaveat=06:00|hotel.hotel-area=north|hotel.hotel-bookday=wednesday|hotel.hotel-bookpeople=6|hotel.hotel-bookstay=5|hotel.hotel-internet=yes|hotel.hotel-name=avalon|hotel.hotel-pricerange=moderate|hotel.hotel-stars=4
+PMUL3000.json,出租车|酒店,15,SYSTEM,已为您预订白色沃尔沃，联系电话：07201581539。今天还有别的需要吗？,,
+PMUL3000.json,出租车|酒店,16,USER,"不用了，就这些。祝你有美好的一天。",,taxi.taxi-departure=whale of a time|taxi.taxi-destination=avalon|taxi.taxi-leaveat=06:00|hotel.hotel-area=north|hotel.hotel-bookday=wednesday|hotel.hotel-bookpeople=6|hotel.hotel-bookstay=5|hotel.hotel-internet=yes|hotel.hotel-name=avalon|hotel.hotel-pricerange=moderate|hotel.hotel-stars=4
+PMUL3000.json,出租车|酒店,17,SYSTEM,感谢联系我们，祝您愉快。,,
+SNG01177.json,,0,USER,我在找阿登布鲁克医院（Addenbrookes Hospital）。,hospital:find_hospital,
+SNG01177.json,,1,SYSTEM,"好的，这家医院在剑桥 Hills Road。需要电话号码吗？",,
+SNG01177.json,,2,USER,需要电话和邮编。,hospital:find_hospital,
+SNG01177.json,,3,SYSTEM,医院电话是 01223245151，邮编 CB20QQ。,,
+SNG01177.json,,4,USER,谢谢你的帮助。,hospital:find_hospital,
+SNG01177.json,,5,SYSTEM,不客气。您还需要某个科室的信息吗？,,
+SNG01177.json,,6,USER,"不用了，谢谢。今天我要的信息已经够了。",,
+SNG01177.json,,7,SYSTEM,好的，谢谢，祝您有美好的一天！,,
+SNG01177.json,,8,USER,你也是，感谢协助。,,
+SNG01177.json,,9,SYSTEM,不客气，再见。,,
+PMUL3097.json,餐厅|出租车|景点|火车,0,USER,我想在市中心找一家意大利餐厅。,restaurant:find_restaurant,restaurant.restaurant-area=centre|restaurant.restaurant-food=italian
+PMUL3097.json,餐厅|出租车|景点|火车,1,SYSTEM,没问题。您想要什么价位？,,
+PMUL3097.json,餐厅|出租车|景点|火车,2,USER,价位我不太挑。,restaurant:find_restaurant,restaurant.restaurant-area=centre|restaurant.restaurant-food=italian|restaurant.restaurant-pricerange=dontcare
+PMUL3097.json,餐厅|出租车|景点|火车,3,SYSTEM,stazione restaurant and coffee bar 是市中心的一家意大利餐厅。需要我帮您订位吗？,,
+PMUL3097.json,餐厅|出租车|景点|火车,4,USER,"好的，请订周二 18:00，4 个人。",restaurant:book_restaurant|taxi:find_taxi,restaurant.restaurant-area=centre|restaurant.restaurant-bookday=tuesday|restaurant.restaurant-bookpeople=4|restaurant.restaurant-booktime=18:00|restaurant.restaurant-food=italian|restaurant.restaurant-name=stazione restaurant and coffee bar|restaurant.restaurant-pricerange=dontcare
+PMUL3097.json,餐厅|出租车|景点|火车,5,SYSTEM,预订成功。桌位保留 15 分钟。确认号：DL0PXR9G。还需要别的吗？,,
+PMUL3097.json,餐厅|出租车|景点|火车,6,USER,你们城里有没有夜店？,attraction:find_attraction,restaurant.restaurant-area=centre|restaurant.restaurant-bookday=tuesday|restaurant.restaurant-bookpeople=4|restaurant.restaurant-booktime=18:00|restaurant.restaurant-food=italian|restaurant.restaurant-name=stazione restaurant and coffee bar|restaurant.restaurant-pricerange=dontcare|attraction.attraction-type=nightclub
+PMUL3097.json,餐厅|出租车|景点|火车,7,SYSTEM,有的，市中心有 5 家夜店。,,
+PMUL3097.json,餐厅|出租车|景点|火车,8,USER,太好了。能给我其中一家的信息吗？,attraction:find_attraction,restaurant.restaurant-area=centre|restaurant.restaurant-bookday=tuesday|restaurant.restaurant-bookpeople=4|restaurant.restaurant-booktime=18:00|restaurant.restaurant-food=italian|restaurant.restaurant-name=stazione restaurant and coffee bar|restaurant.restaurant-pricerange=dontcare|attraction.attraction-type=nightclub
+PMUL3097.json,餐厅|出租车|景点|火车,9,SYSTEM,"Ballare 夜店门票 5 英镑，位于市中心 Heidelberg Gardens, Lion Yard。",,
+PMUL3097.json,餐厅|出租车|景点|火车,10,USER,那家邮编是多少？,attraction:find_attraction,restaurant.restaurant-area=centre|restaurant.restaurant-bookday=tuesday|restaurant.restaurant-bookpeople=4|restaurant.restaurant-booktime=18:00|restaurant.restaurant-food=italian|restaurant.restaurant-name=stazione restaurant and coffee bar|restaurant.restaurant-pricerange=dontcare|attraction.attraction-name=ballare|attraction.attraction-type=nightclub
+PMUL3097.json,餐厅|出租车|景点|火车,11,SYSTEM,Ballare 的邮编是 cb23na。还需要别的信息吗？,,
+PMUL3097.json,餐厅|出租车|景点|火车,12,USER,我还需要一辆出租车。,taxi:find_taxi,restaurant.restaurant-area=centre|restaurant.restaurant-bookday=tuesday|restaurant.restaurant-bookpeople=4|restaurant.restaurant-booktime=18:00|restaurant.restaurant-food=italian|restaurant.restaurant-name=stazione restaurant and coffee bar|restaurant.restaurant-pricerange=dontcare|attraction.attraction-name=ballare|attraction.attraction-type=nightclub
+PMUL3097.json,餐厅|出租车|景点|火车,13,SYSTEM,"预订出租车需要您提供上下车地点，可以吗？",,
+PMUL3097.json,餐厅|出租车|景点|火车,14,USER,好的，从伊利（Ely）到剑桥，谢谢。,taxi:find_taxi|train:find_train,taxi.taxi-departure=ely|taxi.taxi-destination=cambridge|restaurant.restaurant-area=centre|restaurant.restaurant-bookday=tuesday|restaurant.restaurant-bookpeople=4|restaurant.restaurant-booktime=18:00|restaurant.restaurant-food=italian|restaurant.restaurant-name=stazione restaurant and coffee bar|restaurant.restaurant-pricerange=dontcare|attraction.attraction-name=ballare|attraction.attraction-type=nightclub|train.train-departure=ely|train.train-destination=cambridge
+PMUL3097.json,餐厅|出租车|景点|火车,15,SYSTEM,"您是要从伊利到剑桥的火车对吗？还需要出行日期以及出发或到达时间。",,
+PMUL3097.json,餐厅|出租车|景点|火车,16,USER,"抱歉，这边有人说话把我搞混了。我想要一辆出租车，从夜店到餐厅，要足够早以便赶上我的订位。",taxi:find_taxi|attraction:find_attraction,taxi.taxi-arriveby=18:00|taxi.taxi-departure=ballare|taxi.taxi-destination=stazione restaurant and coffee bar|restaurant.restaurant-area=centre|restaurant.restaurant-bookday=tuesday|restaurant.restaurant-bookpeople=4|restaurant.restaurant-booktime=18:00|restaurant.restaurant-food=italian|restaurant.restaurant-name=stazione restaurant and coffee bar|restaurant.restaurant-pricerange=dontcare|attraction.attraction-name=ballare|attraction.attraction-type=nightclub|train.train-departure=ely|train.train-destination=cambridge
+PMUL3097.json,餐厅|出租车|景点|火车,17,SYSTEM,已为您预订黄色沃尔沃，联系电话 07259480629。,,
+PMUL3097.json,餐厅|出租车|景点|火车,18,USER,今天就这些了，谢谢。,,taxi.taxi-arriveby=18:00|taxi.taxi-departure=ballare|taxi.taxi-destination=stazione restaurant and coffee bar|restaurant.restaurant-area=centre|restaurant.restaurant-bookday=tuesday|restaurant.restaurant-bookpeople=4|restaurant.restaurant-booktime=18:00|restaurant.restaurant-food=italian|restaurant.restaurant-name=stazione restaurant and coffee bar|restaurant.restaurant-pricerange=dontcare|attraction.attraction-type=nightclub|train.train-departure=ely|train.train-destination=cambridge
+PMUL3097.json,餐厅|出租车|景点|火车,19,SYSTEM,不客气。祝您在剑桥玩得开心。感谢联系剑桥城镇信息中心，再见。,,

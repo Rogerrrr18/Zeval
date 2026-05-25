@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>真人用户动态评测方案（RealUser）</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #0b1118;
+        --panel: #141c28;
+        --border: #2d3a4d;
+        --text: #e8eef6;
+        --dim: #8b9cb3;
+        --ru: #c77dff;
+        --ru-soft: rgba(199, 125, 255, 0.14);
+        --fuse: #3aa37a;
+        --agent: #4cb1ff;
+        --warn: #e09b3a;
+        --bad: #e07090;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Noto Sans SC", sans-serif;
+        font-size: 14px;
+        line-height: 1.65;
+      }
+      .wrap { max-width: 920px; margin: 0 auto; padding: 32px 24px 64px; }
+      h1 { font-size: 22px; margin: 0 0 8px; }
+      .sub { color: var(--dim); margin: 0 0 28px; font-size: 13px; }
+      h2 {
+        font-size: 17px;
+        margin: 36px 0 12px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+      }
+      h3 { font-size: 15px; margin: 20px 0 8px; color: #c8d8ec; }
+      p, li { color: #b8c8dc; margin: 8px 0; }
+      ul { padding-left: 1.2em; }
+      .tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .tag { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+      .tru { background: var(--ru-soft); color: #e0b8ff; border: 1px solid rgba(199, 125, 255, 0.4); }
+      .tf { background: rgba(58, 163, 122, 0.12); color: #8fd4b8; border: 1px solid rgba(58, 163, 122, 0.35); }
+      .ta { background: rgba(76, 177, 255, 0.15); color: #93d4ff; border: 1px solid rgba(76, 177, 255, 0.35); }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+      th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+      th { background: #1a2434; }
+      .svg-box {
+        background: #0a1018;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        margin: 14px 0;
+        overflow-x: auto;
+      }
+      .svg-box svg { display: block; max-width: 100%; height: auto; }
+      .cap { font-size: 12px; color: var(--dim); text-align: center; margin-top: 8px; }
+      .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; margin-bottom: 10px; }
+      .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
+      .ok { color: #8fd4b8; }
+      .no { color: #f0a8b8; }
+      .warn-box { border-left: 3px solid var(--warn); padding: 8px 12px; margin: 8px 0; background: rgba(224, 155, 58, 0.06); font-size: 13px; }
+      .risk-box { border-left: 3px solid var(--bad); padding: 8px 12px; margin: 8px 0; background: rgba(224, 112, 144, 0.06); font-size: 13px; }
+      .foot { margin-top: 40px; font-size: 12px; color: var(--dim); }
+      a { color: #93d4ff; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>真人用户动态评测方案（RealUser）</h1>
+      <p class="sub">
+        在动态评测阶段由<strong>真人扮演用户</strong>，侧栏展示<strong>完整意图指针序列</strong>；评审与意图切换由操作员手动完成（按钮），仅<strong>被测 Agent</strong> 走 LLM。
+        与 <a href="动态评测融合方案-方案对比与架构.html">LLM 融合方案</a> 并列，可作为回归测试的「高保真人工臂」。
+      </p>
+
+      <div class="tags">
+        <span class="tag tru">紫 · 真人用户臂</span>
+        <span class="tag ta">蓝 · 被测 Agent（LLM）</span>
+        <span class="tag tf">绿 · 共用资产 / Zeval 指标</span>
+      </div>
+
+      <h2>一、定位与核心价值</h2>
+      <table>
+        <thead><tr><th>目标</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>降本</strong></td>
+            <td>去掉动态环内的「模拟用户 LLM」与「评审 LLM」，单轮仅调用被测 Agent，Token 与延迟显著下降。</td>
+          </tr>
+          <tr>
+            <td><strong>意图精准</strong></td>
+            <td>操作员对照完整意图表切换指针、自行发问，避免 SimUser 漂移或 Judge 误判带来的指针推进错误。</td>
+          </tr>
+          <tr>
+            <td><strong>真人体感</strong></td>
+            <td>回归测试除自动指标外，可记录操作员主观打分（顺畅度、信任感、是否愿继续用等），补足纯 LLM 评测盲区。</td>
+          </tr>
+          <tr>
+            <td><strong>可参与</strong></td>
+            <td>产品、标注、领域专家可进入「真实动态评测」过程，形成可讨论的评测记录而非仅看终局分数。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>二、与 LLM 融合方案对比</h2>
+      <table>
+        <thead>
+          <tr><th>维度</th><th>LLM 融合动态评测</th><th>真人用户动态评测（本方案）</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>用户侧</td>
+            <td>模拟用户（LLM 生成话术）</td>
+            <td class="ok"><strong>真人输入</strong>（键盘/话术参考示例句）</td>
+          </tr>
+          <tr>
+            <td>评审</td>
+            <td>评审模型三分类 + 细项</td>
+            <td class="ok"><strong>人工点选</strong>：满足 / 未满足 / 偏离</td>
+          </tr>
+          <tr>
+            <td>意图指针</td>
+            <td>程序按评审自动推进（有预算上限）</td>
+            <td class="ok"><strong>人工切换</strong>当前指针（可强制跳过/重试）</td>
+          </tr>
+          <tr>
+            <td>意图可见性</td>
+            <td>模拟用户仅看当前意图（融合后）</td>
+            <td class="ok"><strong>侧栏展示完整序列</strong>（达成标准、示例话、依赖关系）</td>
+          </tr>
+          <tr>
+            <td>可回填项</td>
+            <td>按意图注入被测 Agent</td>
+            <td>同左（仍只给 Agent，不给真人侧「泄题」除非设计为操作员参考卡）</td>
+          </tr>
+          <tr>
+            <td>规模化</td>
+            <td class="ok">适合批量、夜间跑分</td>
+            <td class="no">人力密集，适合抽检、关键版本、争议 case</td>
+          </tr>
+          <tr>
+            <td>一致性</td>
+            <td>依赖模型与 prompt 版本</td>
+            <td>依赖操作员培训与 SOP，但<strong>评审更贴近业务直觉</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>三、评测台界面结构（示意）</h2>
+      <div class="legend">
+        <span><i style="background:var(--ru)"></i>真人操作区</span>
+        <span><i style="background:var(--agent)"></i>对话区</span>
+        <span><i style="background:var(--fuse)"></i>意图资产（只读）</span>
+      </div>
+      <div class="svg-box">
+        <svg viewBox="0 0 880 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="真人评测台界面布局">
+          <rect x="8" y="8" width="864" height="384" rx="8" fill="#0c1218" stroke="#2d3a4d"/>
+          <text x="24" y="32" fill="#c8d8ec" font-size="13" font-weight="600">RealUser 动态评测台</text>
+          <!-- 左：意图序列 -->
+          <rect x="16" y="44" width="248" height="336" rx="6" fill="#1a2838" stroke="#3aa37a" stroke-width="1.5"/>
+          <text x="28" y="68" fill="#8fd4b8" font-size="11" font-weight="600">完整意图指针序列（只读）</text>
+          <rect x="28" y="78" width="224" height="36" rx="4" fill="#243548" stroke="#c77dff" stroke-width="2"/>
+          <text x="40" y="96" fill="#e0b8ff" font-size="10">▶ 意图 1 · 找餐厅</text>
+          <text x="40" y="108" fill="#8b9cb3" font-size="9">达成：拿到店名或电话</text>
+          <rect x="28" y="120" width="224" height="32" rx="4" fill="#1a2434" stroke="#2d3a4d"/>
+          <text x="40" y="140" fill="#b8c8dc" font-size="10">意图 2 · 订位</text>
+          <rect x="28" y="158" width="224" height="32" rx="4" fill="#1a2434" stroke="#2d3a4d"/>
+          <text x="40" y="178" fill="#b8c8dc" font-size="10">意图 3 · 找酒店 …</text>
+          <text x="28" y="210" fill="#8b9cb3" font-size="9">可回填项摘要（折叠）</text>
+          <rect x="28" y="320" width="100" height="28" rx="4" fill="#3d2a50" stroke="#c77dff"/>
+          <text x="48" y="338" fill="#e0b8ff" font-size="10" text-anchor="middle">上一意图</text>
+          <rect x="140" y="320" width="112" height="28" rx="4" fill="#5a3080" stroke="#c77dff"/>
+          <text x="196" y="338" fill="#fff" font-size="10" text-anchor="middle">下一意图 ▶</text>
+          <!-- 中：对话 -->
+          <rect x="276" y="44" width="400" height="336" rx="6" fill="#141c28" stroke="#4cb1ff"/>
+          <text x="288" y="68" fill="#93d4ff" font-size="11" font-weight="600">对话区</text>
+          <rect x="292" y="82" width="180" height="40" rx="8" fill="#1e3a5f"/>
+          <text x="308" y="106" fill="#c8d8ec" font-size="10">真人用户气泡</text>
+          <rect x="480" y="130" width="180" height="40" rx="8" fill="#243040"/>
+          <text x="496" y="154" fill="#c8d8ec" font-size="10">被测 Agent 气泡</text>
+          <rect x="292" y="300" width="368" height="36" rx="4" fill="#1a2434" stroke="#2d3a4d"/>
+          <text x="308" y="322" fill="#8b9cb3" font-size="10">输入框：真人编辑后发送 ……　[ 发送 ]</text>
+          <!-- 右：控制 -->
+          <rect x="688" y="44" width="176" height="336" rx="6" fill="#2a1a38" stroke="#c77dff" stroke-width="1.5"/>
+          <text x="700" y="68" fill="#e0b8ff" font-size="11" font-weight="600">本轮回合 · 人工控制</text>
+          <text x="700" y="92" fill="#8b9cb3" font-size="9">评审状态（点选）</text>
+          <rect x="700" y="100" width="48" height="26" rx="4" fill="#1a3d2e" stroke="#3aa37a"/><text x="724" y="117" fill="#8fd4b8" font-size="9" text-anchor="middle">满足</text>
+          <rect x="754" y="100" width="48" height="26" rx="4" fill="#3d3520" stroke="#d4a84b"/><text x="778" y="117" fill="#f0d78a" font-size="9" text-anchor="middle">未满足</text>
+          <rect x="808" y="100" width="48" height="26" rx="4" fill="#3d2830" stroke="#e07090"/><text x="832" y="117" fill="#f0a8b8" font-size="9" text-anchor="middle">偏离</text>
+          <text x="700" y="148" fill="#8b9cb3" font-size="9">备注（可选）</text>
+          <rect x="700" y="156" width="152" height="48" rx="4" fill="#1a2434" stroke="#2d3a4d"/>
+          <text x="712" y="182" fill="#6b7a8f" font-size="9">简短说明 …</text>
+          <rect x="700" y="220" width="152" height="28" rx="4" fill="#3d2a50" stroke="#c77dff"/>
+          <text x="776" y="238" fill="#e0b8ff" font-size="10" text-anchor="middle">确认本轮回合</text>
+          <text x="700" y="268" fill="#8b9cb3" font-size="9">真人体感（1–5）</text>
+          <rect x="700" y="276" width="152" height="24" rx="4" fill="#1a2434"/><text x="712" y="292" fill="#b8c8dc" font-size="9">顺畅 · 可信 · 愿继续</text>
+          <rect x="700" y="312" width="152" height="28" rx="4" fill="#243040" stroke="#4cb1ff"/>
+          <text x="776" y="330" fill="#93d4ff" font-size="10" text-anchor="middle">导出 / 结束会话</text>
+        </svg>
+        <p class="cap">图1 · 三栏：完整意图表 ｜ 真人↔Agent 对话 ｜ 评审按钮 + 指针切换 + 体感打分</p>
+      </div>
+
+      <h2>四、单轮操作流程</h2>
+      <div class="svg-box">
+        <svg viewBox="0 0 880 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="真人单轮流程">
+          <defs>
+            <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#6b8aad"/></marker>
+          </defs>
+          <rect x="24" y="24" width="140" height="48" rx="6" fill="#3d2a50" stroke="#c77dff"/>
+          <text x="94" y="48" fill="#e0b8ff" font-size="11" text-anchor="middle" font-weight="600">选定当前意图</text>
+          <text x="94" y="62" fill="#b8c8dc" font-size="9" text-anchor="middle">侧栏高亮</text>
+          <rect x="200" y="24" width="140" height="48" rx="6" fill="#3d2a50" stroke="#c77dff"/>
+          <text x="270" y="48" fill="#e0b8ff" font-size="11" text-anchor="middle" font-weight="600">真人输入并发送</text>
+          <text x="270" y="62" fill="#b8c8dc" font-size="9" text-anchor="middle">可参考示例话</text>
+          <rect x="376" y="24" width="140" height="48" rx="6" fill="#1e3a5f" stroke="#4cb1ff"/>
+          <text x="446" y="48" fill="#93d4ff" font-size="11" text-anchor="middle" font-weight="600">被测 Agent 回复</text>
+          <text x="446" y="62" fill="#8b9cb3" font-size="9" text-anchor="middle">仅此步调 LLM</text>
+          <rect x="552" y="24" width="160" height="48" rx="6" fill="#3d2a50" stroke="#c77dff"/>
+          <text x="632" y="48" fill="#e0b8ff" font-size="11" text-anchor="middle" font-weight="600">点选评审状态</text>
+          <text x="632" y="62" fill="#b8c8dc" font-size="9" text-anchor="middle">满足/未满足/偏离</text>
+          <rect x="748" y="24" width="108" height="48" rx="6" fill="#2a1a38" stroke="#c77dff"/>
+          <text x="802" y="48" fill="#e0b8ff" font-size="11" text-anchor="middle" font-weight="600">确认回合</text>
+          <text x="802" y="62" fill="#b8c8dc" font-size="9" text-anchor="middle">写入日志</text>
+          <line x1="164" y1="48" x2="200" y2="48" stroke="#6b8aad" marker-end="url(#ar)"/>
+          <line x1="340" y1="48" x2="376" y2="48" stroke="#6b8aad" marker-end="url(#ar)"/>
+          <line x1="516" y1="48" x2="552" y2="48" stroke="#6b8aad" marker-end="url(#ar)"/>
+          <line x1="712" y1="48" x2="748" y2="48" stroke="#6b8aad" marker-end="url(#ar)"/>
+          <polygon points="440,120 520,160 440,200 360,160" fill="#243548" stroke="#c77dff"/>
+          <text x="440" y="158" fill="#e0b8ff" font-size="12" text-anchor="middle">满足？</text>
+          <rect x="280" y="220" width="120" height="36" rx="4" fill="#1a3d2e" stroke="#3aa37a"/>
+          <text x="340" y="242" fill="#8fd4b8" font-size="11" text-anchor="middle">是 → 下一意图</text>
+          <rect x="480" y="220" width="160" height="36" rx="4" fill="#3d2a50" stroke="#c77dff"/>
+          <text x="560" y="242" fill="#e0b8ff" font-size="11" text-anchor="middle">否 → 同意图继续聊</text>
+          <line x1="400" y1="200" x2="340" y2="220" stroke="#3aa37a" marker-end="url(#ar)"/>
+          <line x1="480" y1="200" x2="560" y2="220" stroke="#c77dff" marker-end="url(#ar)"/>
+          <text x="440" y="290" fill="#8b9cb3" font-size="11" text-anchor="middle">也可手动点「上一意图 / 下一意图」覆盖自动推进规则</text>
+        </svg>
+        <p class="cap">图2 · 每轮：选人话 → Agent → 人工评审 → 确认；满足则切指针</p>
+      </div>
+
+      <h2>五、与 Zeval / 融合方案的关系</h2>
+      <div class="svg-box">
+        <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="双臂并存">
+          <defs>
+            <marker id="ar2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#6b8aad"/></marker>
+          </defs>
+          <rect x="300" y="70" width="280" height="56" rx="8" fill="#1a2838" stroke="#3aa37a"/>
+          <text x="440" y="94" fill="#8fd4b8" font-size="12" text-anchor="middle" font-weight="600">共用：会话资产</text>
+          <text x="440" y="112" fill="#b8c8dc" font-size="10" text-anchor="middle">意图序列 + 可回填项 + 基线 B</text>
+          <rect x="80" y="150" width="200" height="52" rx="6" fill="#2a2818" stroke="#d4a84b"/>
+          <text x="180" y="172" fill="#f0d78a" font-size="11" text-anchor="middle">臂 A · LLM 融合动态评测</text>
+          <text x="180" y="188" fill="#8b9cb3" font-size="9" text-anchor="middle">批量、可复现、全自动</text>
+          <rect x="600" y="150" width="200" height="52" rx="6" fill="#2a1a38" stroke="#c77dff"/>
+          <text x="700" y="172" fill="#e0b8ff" font-size="11" text-anchor="middle">臂 B · 真人动态评测</text>
+          <text x="700" y="188" fill="#8b9cb3" font-size="9" text-anchor="middle">抽检、体感、争议复核</text>
+          <line x1="440" y1="126" x2="180" y2="150" stroke="#6b8aad" marker-end="url(#ar2)"/>
+          <line x1="440" y1="126" x2="700" y2="150" stroke="#6b8aad" marker-end="url(#ar2)"/>
+          <text x="440" y="40" fill="#c8d8ec" font-size="13" font-weight="600" text-anchor="middle">同一 Session、同一抽取资产，两种动态评测臂</text>
+        </svg>
+        <p class="cap">图3 · 资产一次抽取；动态评测可选「全自动」或「真人」</p>
+      </div>
+
+      <table>
+        <thead><tr><th>环节</th><th>是否共用融合方案产出</th></tr></thead>
+        <tbody>
+          <tr><td>上传、Baseline、意图+回填抽取</td><td class="ok">是（意图前置，绑定会话 ID）</td></tr>
+          <tr><td>锁版 / 修订资产</td><td class="ok">是</td></tr>
+          <tr><td>被测 Agent 与按意图回填注入</td><td class="ok">是（逻辑同融合方案）</td></tr>
+          <tr><td>模拟用户、评审 LLM</td><td class="no">否（真人替代）</td></tr>
+        </tbody>
+      </table>
+
+      <h2>六、操作员控件清单</h2>
+      <table>
+        <thead><tr><th>控件</th><th>作用</th></tr></thead>
+        <tbody>
+          <tr><td><strong>当前意图高亮</strong></td><td>侧栏展示完整序列，仅高亮正在测的意图</td></tr>
+          <tr><td><strong>上一意图 / 下一意图</strong></td><td>手动切换指针（可配 SOP：未满足是否允许跳过）</td></tr>
+          <tr><td><strong>评审：满足 / 未满足 / 偏离</strong></td><td>替代 LLM Judge，写入与融合方案相同三分类</td></tr>
+          <tr><td><strong>确认本轮回合</strong></td><td>落库一轮日志（用户话、Agent 话、评审、时间戳、操作员 ID）</td></tr>
+          <tr><td><strong>真人体感打分</strong></td><td>可选：顺畅度、可信度、是否愿继续（1–5 或 Likert）</td></tr>
+          <tr><td><strong>备注</strong></td><td>记录歧义、产品直觉，供报告引用</td></tr>
+          <tr><td><strong>结束并导出</strong></td><td>生成与 LLM 臂格式兼容的 TXT/JSON，便于对比</td></tr>
+        </tbody>
+      </table>
+
+      <h2>七、指标：自动 + 真人体感</h2>
+      <table>
+        <thead><tr><th>类型</th><th>指标（中文）</th><th>来源</th></tr></thead>
+        <tbody>
+          <tr><td>自动（与融合共用）</td><td>意图完成率、偏离率、轮次效率、会话深度、结果交付率等</td><td>由人工评审标签聚合，算法同 LLM 臂</td></tr>
+          <tr><td>真人体感（新增）</td><td>操作顺畅度、回复可信度、愿继续对话意愿</td><td>每轮或每意图结束时人工打分</td></tr>
+          <tr><td>真人体感（可选）</td><td>整体会话满意度、是否推荐上线、主观「像真人客服」程度</td><td>会话结束问卷</td></tr>
+          <tr><td>过程质控</td><td>操作员间一致性、单会话耗时、跳过意图次数</td><td>平台审计字段</td></tr>
+        </tbody>
+      </table>
+      <p class="warn-box"><strong>说明：</strong>共情曲线、响应间隔等仍建议只从<strong>基线 B（历史真实对话）</strong>计算；动态真人臂的「情绪」来自操作员，不宜直接套原 chatlog 情绪模型。</p>
+
+      <h2>八、适用场景与难点</h2>
+      <h3>适合</h3>
+      <ul>
+        <li>发版前关键 Session 抽检、新 Agent 版本对比</li>
+        <li>LLM 臂与历史真人体验差异大时的仲裁</li>
+        <li>需要向业务方演示「可参与」的评测过程</li>
+      </ul>
+      <h3>难点</h3>
+      <div class="risk-box"><strong>人力成本：</strong>无法替代大批量夜间回归，宜与 LLM 臂组合使用。</div>
+      <div class="risk-box"><strong>操作员偏差：</strong>需 SOP、双盲或抽样复核，避免「一律点满足」。</div>
+      <div class="risk-box"><strong>完整意图表可见：</strong>真人已知全局目标，与被测 Agent「仅局部回填」不对称——需在报告中标注<strong>评测臂=真人全览</strong>，与生产用户信息不对称。</div>
+      <div class="risk-box"><strong>双轨指标：</strong>同一 Session 的 LLM 臂与真人臂分数不可简单平均，看板应分开展示。</div>
+
+      <h2>九、实施要点（POC 可落地）</h2>
+      <ul class="check" style="list-style:none;padding:0">
+        <li style="margin:6px 0">在 eval-test-v1 增加模式开关：<strong>全自动动态评测</strong> / <strong>真人操作台</strong></li>
+        <li style="margin:6px 0">真人模式：左侧只读意图表 + 右侧控制栏；对话区复用现有气泡组件</li>
+        <li style="margin:6px 0">日志结构扩展：<code>judge_source=human</code>、<code>operator_id</code>、<code>human_scores</code></li>
+        <li style="margin:6px 0">导出格式与融合方案对齐，便于同图对比 B / D-LLM / D-真人</li>
+      </ul>
+
+      <p class="foot">
+        2026-05-15 · 仓库根目录 · 配套文档：
+        <a href="动态评测融合方案-方案对比与架构.html">动态评测融合方案-方案对比与架构.html</a>
+      </p>
+    </div>
+  </body>
+</html>

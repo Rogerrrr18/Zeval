@@ -1,0 +1,65 @@
+{
+  "type": "object",
+  "required": ["schema_version", "session_id", "intent_sequence", "refillables"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
+    "intent_sequence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "intent_index",
+          "intent_text",
+          "turn_span_user_turns",
+          "example_user_queries",
+          "success_criteria",
+          "depends_on"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "intent_index": { "type": "integer", "minimum": 0 },
+          "intent_text": { "type": "string", "minLength": 1 },
+          "turn_span_user_turns": { "type": "integer", "minimum": 0 },
+          "example_user_queries": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          },
+          "success_criteria": { "type": "string", "minLength": 1 },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "integer" }
+          },
+          "historical_span": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "start_turn_index": { "type": "integer" },
+              "end_turn_index": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "refillables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["refill_index", "trigger_condition", "refill_reference"],
+        "additionalProperties": true,
+        "properties": {
+          "refill_index": { "type": "integer", "minimum": 0 },
+          "trigger_condition": { "type": "string", "minLength": 1 },
+          "refill_reference": { "type": "string" },
+          "key": { "type": "string" },
+          "source_turn_index": { "type": "integer" },
+          "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+          "injection_text": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeval 评测 → Benchmark 完整链路图</title>
+<style>
+  :root {
+    --black-box: #e85d3a;
+    --black-box-bg: #fff5f3;
+    --black-box-border: #f4a896;
+    --white-box: #2a9d5c;
+    --white-box-bg: #f2faf6;
+    --white-box-border: #8fd4b0;
+    --mixed-bg: #fffbf0;
+    --mixed-border: #f0c96a;
+    --mixed: #c47d00;
+    --stage-bg: #f8f9fc;
+    --stage-border: #dde2ed;
+    --arrow: #8090b0;
+    --text: #1a2035;
+    --text-light: #5a6480;
+    --accent: #3b5bdb;
+    --accent-bg: #eef2ff;
+    --rule: #6c7a9c;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #f0f2f8;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* ── Header ── */
+  .hero {
+    background: linear-gradient(135deg, #1e3a6e 0%, #2d52a0 50%, #3b6abf 100%);
+    color: white;
+    padding: 40px 48px 36px;
+  }
+  .hero h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px; }
+  .hero p { font-size: 14px; opacity: 0.82; max-width: 680px; }
+  .hero-meta { margin-top: 20px; display: flex; gap: 24px; flex-wrap: wrap; }
+  .hero-badge {
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(255,255,255,0.13); border-radius: 20px;
+    padding: 5px 14px; font-size: 12.5px;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .dot-black { background: #ff8a6a; }
+  .dot-white { background: #5de8a0; }
+  .dot-mixed { background: #ffd060; }
+
+  /* ── Layout ── */
+  .main { max-width: 1100px; margin: 0 auto; padding: 36px 24px 60px; }
+
+  /* ── Pipeline flow ── */
+  .pipeline {
+    display: flex; flex-direction: column; gap: 0;
+    position: relative;
+  }
+
+  .pipeline-connector {
+    display: flex; justify-content: center; align-items: center;
+    height: 36px; position: relative;
+  }
+  .pipeline-connector::before {
+    content: ''; position: absolute; left: 50%; top: 0;
+    width: 2px; height: 100%; background: var(--arrow);
+    transform: translateX(-50%);
+  }
+  .arrow-icon {
+    background: var(--arrow); color: white;
+    border-radius: 50%; width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; z-index: 1; position: relative;
+  }
+
+  .pipeline-connector.parallel {
+    height: 24px;
+  }
+  .parallel-label {
+    font-size: 11px; color: var(--accent); font-weight: 600;
+    background: var(--accent-bg); border-radius: 10px;
+    padding: 2px 10px; z-index: 1; position: relative;
+    border: 1px solid #c5d0f8;
+  }
+
+  /* ── Stage card ── */
+  .stage {
+    background: white; border-radius: 14px;
+    border: 1.5px solid var(--stage-border);
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .stage-header {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 18px 22px 16px;
+    border-bottom: 1px solid var(--stage-border);
+    background: var(--stage-bg);
+  }
+  .stage-number {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent); color: white;
+    font-weight: 700; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .stage-title-wrap { flex: 1; }
+  .stage-title { font-size: 16px; font-weight: 700; color: var(--text); }
+  .stage-subtitle { font-size: 12.5px; color: var(--text-light); margin-top: 2px; }
+  .stage-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .tag {
+    font-size: 11px; font-weight: 600; padding: 2px 9px;
+    border-radius: 10px; letter-spacing: 0.2px;
+  }
+  .tag-rule { background: #f0f2fa; color: #4a5580; border: 1px solid #dde2f0; }
+  .tag-llm  { background: #fff0ec; color: #c04010; border: 1px solid #fac8b8; }
+  .tag-human { background: #f0faf5; color: #1e7a44; border: 1px solid #9ddcba; }
+  .tag-opt  { background: #f8f8f8; color: #888; border: 1px solid #e0e0e0; }
+
+  .stage-body { padding: 18px 22px 20px; }
+
+  /* ── Row grid inside stage ── */
+  .row-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin-top: 14px;
+  }
+  @media (max-width: 680px) { .row-grid { grid-template-columns: 1fr; } }
+
+  .box {
+    border-radius: 10px; padding: 13px 15px;
+    font-size: 13px;
+  }
+  .box-title {
+    font-weight: 700; font-size: 12.5px; margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .box-icon { font-size: 14px; }
+  .box ul { padding-left: 16px; }
+  .box li { margin-bottom: 3px; font-size: 12.5px; color: #3a4460; }
+  .box p { font-size: 12.5px; color: #3a4460; }
+
+  .box-black {
+    background: var(--black-box-bg);
+    border: 1.5px solid var(--black-box-border);
+  }
+  .box-black .box-title { color: var(--black-box); }
+
+  .box-white {
+    background: var(--white-box-bg);
+    border: 1.5px solid var(--white-box-border);
+  }
+  .box-white .box-title { color: var(--white-box); }
+
+  .box-mixed {
+    background: var(--mixed-bg);
+    border: 1.5px solid var(--mixed-border);
+  }
+  .box-mixed .box-title { color: var(--mixed); }
+
+  .box-neutral {
+    background: #f5f6fa;
+    border: 1.5px solid #e0e4f0;
+  }
+  .box-neutral .box-title { color: #4a5580; }
+
+  /* ── Metrics table ── */
+  .metrics-section { margin-top: 14px; }
+  .metrics-label { font-size: 12px; font-weight: 600; color: var(--text-light); margin-bottom: 8px; letter-spacing: 0.3px; text-transform: uppercase; }
+  .metrics-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 11.5px; padding: 3px 10px; border-radius: 8px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .chip-rule { background: #eef0f8; color: #4a5580; border: 1px solid #d8ddf0; }
+  .chip-llm  { background: #fff0ec; color: #b03010; border: 1px solid #f8c0aa; }
+  .chip-human { background: #eefaf4; color: #1a6e3e; border: 1px solid #a0dfc0; }
+  .chip-derived { background: #f5f0ff; color: #5a3d99; border: 1px solid #d0bfff; }
+  .chip-badge {
+    font-size: 9px; font-weight: 700; padding: 1px 5px;
+    border-radius: 4px; text-transform: uppercase;
+  }
+  .cb-rule { background: #d0d6f0; color: #3a4580; }
+  .cb-llm  { background: #ffc0aa; color: #8c2000; }
+  .cb-human { background: #90d8b8; color: #0e4a28; }
+
+  /* ── Admission channels ── */
+  .channels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 14px; }
+  @media (max-width: 780px) { .channels { grid-template-columns: 1fr 1fr; } }
+
+  .channel {
+    border-radius: 10px; padding: 12px 13px;
+    font-size: 12px;
+  }
+  .channel-label { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .channel-desc { color: #5a6480; font-size: 11.5px; line-height: 1.5; }
+  .channel-status {
+    margin-top: 8px; font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border-radius: 6px; display: inline-block;
+  }
+
+  .ch-tp { background: #fff0ec; border: 1.5px solid #f4b0a0; }
+  .ch-tp .channel-label { color: #c04010; }
+  .ch-tp .channel-status { background: #f4c0b0; color: #8c2000; }
+
+  .ch-fn { background: #fff8e8; border: 1.5px solid #f0d090; }
+  .ch-fn .channel-label { color: #a06000; }
+  .ch-fn .channel-status { background: #f0d090; color: #704000; }
+
+  .ch-tn { background: #eefaf4; border: 1.5px solid #90d8b8; }
+  .ch-tn .channel-label { color: #1a6e3e; }
+  .ch-tn .channel-status { background: #90d8b8; color: #0e4a28; }
+
+  .ch-unc { background: #f8f0ff; border: 1.5px solid #d8b8ff; }
+  .ch-unc .channel-label { color: #6028aa; }
+  .ch-unc .channel-status { background: #d8b8ff; color: #3a0880; }
+
+  .ch-human { background: #eef2ff; border: 1.5px solid #b8c8ff; }
+  .ch-human .channel-label { color: #2c4acc; }
+  .ch-human .channel-status { background: #b8c8ff; color: #1a2e88; }
+
+  /* ── Severity scale ── */
+  .severity-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .sev { border-radius: 6px; padding: 4px 12px; font-size: 11.5px; font-weight: 600; }
+  .sev-high { background: #fde8e4; color: #c02010; border: 1px solid #f8b8b0; }
+  .sev-med  { background: #fff3d0; color: #a06000; border: 1px solid #f0d090; }
+  .sev-low  { background: #e8f8ee; color: #1a6e3e; border: 1px solid #90d8a8; }
+
+  /* ── Summary table ── */
+  .summary-section { margin-top: 40px; }
+  .summary-section h2 { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+  .summary-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .summary-table th {
+    background: #eef1fa; color: #3a4580; font-size: 12px; font-weight: 700;
+    padding: 10px 14px; text-align: left; text-transform: uppercase; letter-spacing: 0.4px;
+    border-bottom: 2px solid #dde2f0;
+  }
+  .summary-table td { padding: 10px 14px; border-bottom: 1px solid #eef0f8; vertical-align: top; }
+  .summary-table tr:last-child td { border-bottom: none; }
+  .summary-table tr:hover td { background: #f8f9fc; }
+  .bb-cell { color: var(--black-box); font-weight: 600; }
+  .wb-cell { color: var(--white-box); font-weight: 600; }
+
+  /* ── Notes ── */
+  .note {
+    background: #fafbff; border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0; padding: 10px 14px;
+    font-size: 12.5px; color: var(--text-light); margin-top: 12px;
+  }
+  .note strong { color: var(--text); }
+
+  /* ── Parallel block wrapper ── */
+  .parallel-block {
+    border: 2px dashed #b8c8f0; border-radius: 14px;
+    padding: 14px; background: #f5f8ff;
+  }
+  .parallel-header {
+    font-size: 11.5px; font-weight: 700; color: var(--accent);
+    text-align: center; margin-bottom: 12px; letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+  .parallel-stages { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 780px) { .parallel-stages { grid-template-columns: 1fr; } }
+
+  .mini-stage {
+    background: white; border-radius: 10px;
+    border: 1.5px solid var(--stage-border);
+    padding: 14px;
+  }
+  .mini-stage-title {
+    font-size: 13.5px; font-weight: 700; color: var(--text);
+    margin-bottom: 8px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--stage-border);
+  }
+
+  .section-divider {
+    text-align: center; font-size: 11.5px; font-weight: 700;
+    color: #8090b0; letter-spacing: 1px; text-transform: uppercase;
+    margin: 28px 0 20px; position: relative;
+  }
+  .section-divider::before, .section-divider::after {
+    content: ''; position: absolute; top: 50%;
+    width: 38%; height: 1px; background: #dde2ed;
+  }
+  .section-divider::before { left: 0; }
+  .section-divider::after { right: 0; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Zeval 评测 → Benchmark 完整链路图</h1>
+  <p>从原始 chatlog 到测试集沉淀、回放验证的完整数据流与指标体系，标注每个节点的判断来源与人工接管点。</p>
+  <div class="hero-meta">
+    <div class="hero-badge"><span class="dot dot-black"></span>黑盒节点 — LLM 判断 / 自动编码，需信任模型</div>
+    <div class="hero-badge"><span class="dot dot-white"></span>白盒节点 — 规则透明 / 需人工参与定义</div>
+    <div class="hero-badge"><span class="dot dot-mixed"></span>混合节点 — 规则先行，LLM 兜底</div>
+  </div>
+</div>
+
+<div class="main">
+<div class="pipeline">
+
+  <!-- ── Stage 1 ── -->
+  <div class="stage">
+    <div class="stage-header">
+      <div class="stage-number">1</div>
+      <div class="stage-title-wrap">
+        <div class="stage-title">数据采集与富化</div>
+        <div class="stage-subtitle">rawRows → enrichedRows · 纯规则 · 0 次 LLM</div>
+        <div class="stage-tags">
+          <span class="tag tag-rule">纯规则</span>
+          <span class="tag tag-rule">同步执行</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage-body">
+      <div class="row-grid">
+        <div class="box box-white">
+          <div class="box-title"><span class="box-icon">📥</span>输入字段</div>
+          <ul>
+            <li><code>sessionId</code> — 会话 ID</li>
+            <li><code>role</code> — user / assistant / system</li>
+            <li><code>content</code> — 消息正文</li>
+            <li><code>timestamp</code> — 时间戳（可选）</li>
+          </ul>
+        </div>
+        <div class="box box-white">
+          <div class="box-title"><span class="box-icon">⚙️</span>富化字段（白盒规则）</div>
+          <ul>
+            <li><code>turnIndex</code> — 轮次序号</li>
+            <li><code>isQuestion</code> — 是否问句（正则）</li>
+            <li><code>responseGapSec</code> — 响应间隔（时间戳差）</li>
+            <li><code>isDropoffTurn</code> — 掉线轮检测</li>
+            <li><code>tokenCountEstimate</code> — token 数估算</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pipeline-connector"><div class="arrow-icon">↓</div></div>
+
+  <!-- ── Stage 2 (parallel block) ── -->
+  <div class="stage">
+    <div class="stage-header">
+      <div class="stage-number">2</div>
+      <div class="stage-title-wrap">
+        <div class="stage-title">三路并行指标计算</div>
+        <div class="stage-subtitle">objectiveMetrics ‖ subjectiveMetrics ‖ extendedMetrics（可选）· Promise.all</div>
+        <div class="stage-tags">
+          <span class="tag tag-rule">客观 = 纯规则</span>
+          <span class="tag tag-llm">主观 = LLM Judge</span>
+          <span class="tag tag-opt">扩展 = 可选 LLM</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage-body">
+      <div class="parallel-block">
+        <div class="parallel-header">⇌ 三路同时执行（Promise.all）</div>
+        <div class="parallel-stages">
+
+          <!-- Objective -->
+          <div class="mini-stage">
+            <div class="mini-stage-title">📐 客观指标（11个）</div>
+            <div class="box box-white" style="margin-bottom:0">
+              <div class="box-title"><span class="box-icon">✅</span>全部白盒 · 纯规则</div>
+              <ul>
+                <li>avgResponseGapSec</li>
+                <li>sessionDepthDistribution</li>
+                <li>dropoffTurnDistribution</li>
+                <li>userQuestionRepeatRate</li>
+                <li>agentResolutionSignalRate</li>
+                <li>escalationKeywordHitRate</li>
+                <li>activeHourDistribution</li>
+                <li>userQuestionRate</li>
+                <li>avgUserMessageLength</li>
+                <li>userMessageLengthTrend</li>
+                <li>avgAssistantMessageLength</li>
+              </ul>
+            </div>
+            <div class="note">阈值与正则全部硬编码在源码，可直接审计。</div>
+          </div>
+
+          <!-- Subjective -->
+          <div class="mini-stage">
+            <div class="mini-stage-title">🧠 主观指标（内部三阶段串行）</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div class="box box-mixed">
+                <div class="box-title"><span class="box-icon">①</span>goalCompletions（混合）</div>
+                <p>规则先判 achieved/failed；<br>只有 <code>unclear</code> 才触发 LLM。<br>per-session 并发 = 4</p>
+              </div>
+              <div class="box box-black">
+                <div class="box-title"><span class="box-icon">②</span>recoveryTraces（黑盒）</div>
+                <p>规则检测 failure/recovery point；<br><code>completed</code> trace → LLM 总结 repairStrategy。<br>与 ③ 并行执行</p>
+              </div>
+              <div class="box box-black">
+                <div class="box-title"><span class="box-icon">③</span>sessionDimensionJudge（黑盒）</div>
+                <p>3 个维度打包单次 LLM call：<br>共情程度 / 答非所问 / 说教感<br>per-session 并发 = 4</p>
+              </div>
+              <div class="box box-white">
+                <div class="box-title"><span class="box-icon">⓪</span>implicitSignals（白盒）</div>
+                <p>纯规则信号：understandingBarrierRisk / escalationRisk / interestDeclineRisk 等</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Extended -->
+          <div class="mini-stage">
+            <div class="mini-stage-title">🔬 扩展指标（10个，可选）</div>
+            <div class="box box-black" style="margin-bottom:8px">
+              <div class="box-title"><span class="box-icon">⚠️</span>黑盒 · 无限速 Promise.all</div>
+              <ul>
+                <li>faithfulness（LLM）</li>
+                <li>hallucination（LLM）</li>
+                <li>answerRelevancy（LLM）</li>
+                <li>contextualRelevancy（LLM）</li>
+                <li>knowledgeRetention（LLM）</li>
+                <li>toxicity（LLM）</li>
+                <li>bias（LLM）</li>
+                <li>roleAdherence（LLM）</li>
+                <li>taskCompletion（LLM）</li>
+                <li>toolCorrectness（规则）</li>
+              </ul>
+            </div>
+            <div class="note"><strong>需要显式传入 extendedInputs</strong>（retrievalContexts / toolCalls / retentionFacts / roleProfile）才激活。默认跳过。</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pipeline-connector"><div class="arrow-icon">↓</div></div>
+
+  <!-- ── Stage 3 ── -->
+  <div class="stage">
+    <div class="stage-header">
+      <div class="stage-number">3</div>
+      <div class="stage-title-wrap">
+        <div class="stage-title">Bad Case 抽取</div>
+        <div class="stage-subtitle">buildBadCaseAssets · 规则打分 · LLM 结果作为输入</div>
+        <div class="stage-tags">
+          <span class="tag tag-rule">打分逻辑 = 白盒</span>
+          <span class="tag tag-llm">goal/recovery = 黑盒输入</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage-body">
+      <div class="row-grid">
+        <div class="box box-white">
+          <div class="box-title"><span class="box-icon">🏷️</span>Tag 打标（白盒规则）</div>
+          <ul>
+            <li><b>goal_failed</b> — goalCompletion.status=failed (+0.34)</li>
+            <li><b>goal_partial</b> — goalCompletion.status=partial (+0.20)</li>
+            <li><b>goal_unclear</b> — goalCompletion.status=unclear (+0.12)</li>
+            <li><b>recovery_failed</b> — recoveryTrace.status=failed (+0.24)</li>
+            <li><b>question_repeat</b> — 相同问题出现≥2次 (+0.18)</li>
+            <li><b>understanding_barrier</b> — 正则："什么意思|不懂|再说一遍" (+0.16)</li>
+            <li><b>escalation_keyword</b> — 正则："转人工|投诉|主管|经理" (+0.22)</li>
+            <li><b>long_response_gap</b> — responseGapSec ≥ 60s (+0.10)</li>
+          </ul>
+        </div>
+        <div class="box box-mixed">
+          <div class="box-title"><span class="box-icon">📊</span>severityScore 合成（混合）</div>
+          <p style="margin-bottom:8px">加法叠加：各 tag 对应固定权重，累加后排序。</p>
+          <div class="severity-row">
+            <span class="sev sev-high">high → baselineScore 0.2</span>
+            <span class="sev sev-med">medium → 0.4</span>
+            <span class="sev sev-low">low → 0.6</span>
+          </div>
+          <div class="note" style="margin-top:10px"><strong>⚠ 白盒弱点：</strong>权重固定在代码里，不同业务场景下"升级比目标失败更严重"无法动态调整。</div>
+        </div>
+      </div>
+      <div class="note"><strong>黑盒输入：</strong>goal/recovery 的 status 来自 LLM，权重却是白盒规则。这是整个链路中黑白盒交界最密集的一层，也是当前体系最脆弱的地方——LLM 判错一个 goal_failed 会直接影响 severityScore。</div>
+    </div>
+  </div>
+
+  <div class="pipeline-connector"><div class="arrow-icon">↓</div></div>
+
+  <!-- ── Stage 4 ── -->
+  <div class="stage">
+    <div class="stage-header">
+      <div class="stage-number">4</div>
+      <div class="stage-title-wrap">
+        <div class="stage-title">五通道准入 Pipeline</div>
+        <div class="stage-subtitle">eval-datasets/admission · 自动去重 · 沉淀入 DatasetStore</div>
+        <div class="stage-tags">
+          <span class="tag tag-rule">规则通道 = 白盒</span>
+          <span class="tag tag-llm">置信度阈值 = 黑盒相关</span>
+          <span class="tag tag-human">待审通道 = 人工介入</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage-body">
+      <div class="channels">
+        <div class="channel ch-tp">
+          <div class="channel-label">TP · auto_tp</div>
+          <div class="channel-desc">已被 badCase 抽取器确认为 bad + 准入规则触发</div>
+          <div class="channel-status">auto_admitted</div>
+          <div style="margin-top:8px;font-size:11px;color:#888">规则：goal_failed / low_empathy / off_topic_high / preachy_high / recovery_failure 等 8条</div>
+        </div>
+        <div class="channel ch-fn">
+          <div class="channel-label">FN · auto_fn</div>
+          <div class="channel-desc">检测器未标 bad，但行为信号异常（漏检）</div>
+          <div class="channel-status">pending_review ⚠</div>
+          <div style="margin-top:8px;font-size:11px;color:#888">规则：dropoff_negative_tail / repeated_question / length_collapse / consecutive_short</div>
+        </div>
+        <div class="channel ch-tn">
+          <div class="channel-label">TN · auto_tn</div>
+          <div class="channel-desc">高质量正样本：goal_achieved + 高置信 + 高共情，或随机抽样（5%）</div>
+          <div class="channel-status">auto_admitted ✓</div>
+          <div style="margin-top:8px;font-size:11px;color:#888">进入 goodcase 池，作为 golden positive test set</div>
+        </div>
+        <div class="channel ch-unc">
+          <div class="channel-label">Uncertainty</div>
+          <div class="channel-desc">LLM 置信度落在 [0.4, 0.6] 区间，判断不稳定</div>
+          <div class="channel-status">pending_review ⚠</div>
+          <div style="margin-top:8px;font-size:11px;color:#888">goalCompletion.confidence 或任意维度 confidence ∈ [0.4, 0.6]</div>
+        </div>
+        <div class="channel ch-human">
+          <div class="channel-label">Human</div>
+          <div class="channel-desc">DatasetConsole 手动标注，绕过自动通道直入数据集</div>
+          <div class="channel-status">human_labeled</div>
+          <div style="margin-top:8px;font-size:11px;color:#888">最高可信度来源，用于纠正自动通道的系统性偏差</div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="metrics-label">去重保护层（三重过滤）</div>
+        <div class="metrics-chips">
+          <span class="chip chip-rule">exact_hash — 完全相同 transcript → 永远跳过</span>
+          <span class="chip chip-rule">near_duplicate — 特征向量相似 → 默认跳过</span>
+          <span class="chip chip-rule">false_positive_guard — 已标记 false_positive 的 session → 永远阻断</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pipeline-connector"><div class="arrow-icon">↓</div></div>
+
+  <!-- ── Stage 5 ── -->
+  <div class="stage">
+    <div class="stage-header">
+      <div class="stage-number">5</div>
+      <div class="stage-title-wrap">
+        <div class="stage-title">数据集管理 · 人工审核层</div>
+        <div class="stage-subtitle">DatasetStore · reviewStatus 流转 · DatasetConsole "待确认" tab</div>
+        <div class="stage-tags">
+          <span class="tag tag-human">pending_review = 必须人工参与</span>
+          <span class="tag tag-rule">auto_admitted = 自动流入</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage-body">
+      <div class="row-grid">
+        <div class="box box-white">
+          <div class="box-title"><span class="box-icon">🗃️</span>DatasetCaseRecord 字段</div>
+          <ul>
+            <li><code>caseSetType</code> — badcase / goodcase</li>
+            <li><code>source</code> — 来源通道（auto_tp/fn/tn/uncertainty/human）</li>
+            <li><code>reviewStatus</code> — auto_captured → confirmed / rejected</li>
+            <li><code>normalizedTranscriptHash</code> — 去重键</li>
+            <li><code>baselineCaseScore</code> — 基准分（severity 映射）</li>
+            <li><code>tags[]</code> — 能力标签</li>
+            <li><code>autoSignals[]</code> — 触发规则列表</li>
+          </ul>
+        </div>
+        <div class="box box-white">
+          <div class="box-title"><span class="box-icon">👤</span>人工审核（白盒介入点）</div>
+          <p style="margin-bottom:8px"><b>需要人工操作的两类 case：</b></p>
+          <ul>
+            <li><b>FN 通道</b>：系统认为是漏检，需确认是否真 bad</li>
+            <li><b>Uncertainty 通道</b>：LLM 自信度低，需人工定夺</li>
+          </ul>
+          <div style="margin-top:10px;padding:8px 12px;background:#fff3d0;border-radius:8px;font-size:12px;color:#704000;border:1px solid #f0d090;">
+            <b>⚠ 关键白盒点：</b>如果跳过人工审核，FN 和 Uncertainty 案例直接以 <code>auto_captured</code> 状态留存，不会自动进入 benchmark——需要人工 confirm 才算进测试集。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pipeline-connector"><div class="arrow-icon">↓</div></div>
+
+  <!-- ── Stage 6 ── -->
+  <div class="stage">
+    <div class="stage-header">
+      <div class="stage-number">6</div>
+      <div class="stage-title-wrap">
+        <div class="stage-title">Benchmark 测试集构建</div>
+        <div class="stage-subtitle">badcase pool + goodcase pool → 能力维度测试集</div>
+        <div class="stage-tags">
+          <span class="tag tag-rule">tag 分层 = 白盒</span>
+          <span class="tag tag-human">case 确认 = 人工</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage-body">
+      <div class="row-grid">
+        <div class="box box-white">
+          <div class="box-title"><span class="box-icon">🎯</span>Badcase Pool（失败回归集）</div>
+          <ul>
+            <li>来源：TP（auto_admitted）+ 人工 confirmed FN/Uncertainty</li>
+            <li>按 tag 分层对应能力维度：</li>
+          </ul>
+          <div class="metrics-chips" style="margin-top:8px">
+            <span class="chip chip-rule">goal_failed → 目标达成能力</span>
+            <span class="chip chip-rule">understanding_barrier → 理解能力</span>
+            <span class="chip chip-rule">recovery_failed → 恢复能力</span>
+            <span class="chip chip-rule">escalation_keyword → 情绪管理</span>
+            <span class="chip chip-rule">low_empathy → 共情表达</span>
+            <span class="chip chip-rule">off_topic_high → 话题对齐</span>
+            <span class="chip chip-rule">preachy_high → 语气克制</span>
+          </div>
+        </div>
+        <div class="box box-white">
+          <div class="box-title"><span class="box-icon">✨</span>Goodcase Pool（黄金正例集）</div>
+          <ul>
+            <li>来源：TN（auto_admitted）+ 人工 confirmed 优质 case</li>
+            <li>用途：正样本对比、回归基准</li>
+            <li>baselineCaseScore = 0.9（固定）</li>
+          </ul>
+          <div class="note" style="margin-top:10px"><strong>⚠ 当前限制：</strong>tag taxonomy 固定在代码里（BadCaseTag 枚举），新增能力维度需改代码，无 UI 配置入口——这是一个典型的"白盒但僵硬"问题。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pipeline-connector"><div class="arrow-icon">↓</div></div>
+
+  <!-- ── Stage 7 ── -->
+  <div class="stage">
+    <div class="stage-header">
+      <div class="stage-number">7</div>
+      <div class="stage-title-wrap">
+        <div class="stage-title">动态回放验证</div>
+        <div class="stage-subtitle">intentExtract → SimUser replay → intentMetrics</div>
+        <div class="stage-tags">
+          <span class="tag tag-llm">意图提取 = LLM</span>
+          <span class="tag tag-llm">SimUser = LLM Agent</span>
+          <span class="tag tag-human">agent endpoint = 人工配置</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage-body">
+      <div class="row-grid">
+        <div class="box box-black">
+          <div class="box-title"><span class="box-icon">🔍</span>intentExtract（黑盒）</div>
+          <p style="margin-bottom:8px">LLM 从历史 session 提取意图序列：</p>
+          <ul>
+            <li><code>intentText</code> — 意图描述</li>
+            <li><code>turnSpanUserTurns</code> — 覆盖轮次范围</li>
+            <li><code>exampleUserQueries</code> — 示例追问</li>
+            <li><code>successCriteria</code> — 成功判断标准</li>
+          </ul>
+          <div class="note" style="margin-top:8px">temperature ≤ 0.3，seed=42（确定性），并发 = 4 session</div>
+        </div>
+        <div class="box box-mixed">
+          <div class="box-title"><span class="box-icon">🤖</span>SimUser Replay（混合）</div>
+          <p style="margin-bottom:8px">用提取的意图驱动 SimUser 向真实 Agent 发问，记录对话流程。</p>
+          <ul>
+            <li>agentApiEndpoint — <b>白盒：人工提供</b></li>
+            <li>SimUser 对话策略 — <b>黑盒：LLM 生成</b></li>
+            <li>intentMetrics — 完成率 / 偏差率</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pipeline-connector"><div class="arrow-icon">↓</div></div>
+
+  <!-- ── Stage 8 ── -->
+  <div class="stage">
+    <div class="stage-header">
+      <div class="stage-number">8</div>
+      <div class="stage-title-wrap">
+        <div class="stage-title">修复包与回归验证</div>
+        <div class="stage-subtitle">RemediationPackage → ValidationRun → before/after 对比</div>
+        <div class="stage-tags">
+          <span class="tag tag-rule">指标对比 = 白盒</span>
+          <span class="tag tag-human">修复策略 = 人工决策</span>
+        </div>
+      </div>
+    </div>
+    <div class="stage-body">
+      <div class="row-grid">
+        <div class="box box-white">
+          <div class="box-title"><span class="box-icon">📦</span>RemediationPackage（白盒）</div>
+          <ul>
+            <li>根据 bad case 池 + 指标生成改进建议</li>
+            <li>关联触发这批 bad case 的规则 key</li>
+            <li>链接到对应的 benchmark test set</li>
+          </ul>
+        </div>
+        <div class="box box-white">
+          <div class="box-title"><span class="box-icon">🔁</span>ValidationRun（白盒）</div>
+          <ul>
+            <li>replay / offline_eval 两种模式</li>
+            <li>对修复后的 agent 重跑 benchmark</li>
+            <li>输出 before/after 指标 delta</li>
+            <li>回归判定标准需人工定义</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end pipeline -->
+
+<!-- ── Summary table ── -->
+<div class="summary-section">
+  <div class="section-divider">完整链路黑白盒汇总</div>
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>阶段</th>
+        <th>黑盒节点（LLM / 自动编码）</th>
+        <th>白盒节点（规则透明 / 人工介入）</th>
+        <th>当前局限 / 改进建议</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>数据富化</b></td>
+        <td>—</td>
+        <td class="wb-cell">全部白盒（正则 + 时间差）</td>
+        <td>isQuestion 正则较粗，可接入分词增强</td>
+      </tr>
+      <tr>
+        <td><b>客观指标</b></td>
+        <td>—</td>
+        <td class="wb-cell">全部白盒（11 个规则指标）</td>
+        <td>agentResolutionSignalRate 正则覆盖面窄</td>
+      </tr>
+      <tr>
+        <td><b>主观 · 信号层</b></td>
+        <td>—</td>
+        <td class="wb-cell">implicitSignals 全部白盒</td>
+        <td>信号 key 固定在代码，业务方无法自定义</td>
+      </tr>
+      <tr>
+        <td><b>主观 · goalCompletion</b></td>
+        <td class="bb-cell">LLM 判断 unclear 状态</td>
+        <td class="wb-cell">规则先判 achieved/failed 条件</td>
+        <td>unclear 定义模糊，LLM 一致性较低</td>
+      </tr>
+      <tr>
+        <td><b>主观 · recoveryTrace</b></td>
+        <td class="bb-cell">LLM 生成 repairStrategy</td>
+        <td class="wb-cell">failure/recovery point 检测为规则</td>
+        <td>repairStrategy 文本无结构化验证</td>
+      </tr>
+      <tr>
+        <td><b>主观 · 三维度评分</b></td>
+        <td class="bb-cell">完全 LLM Judge</td>
+        <td class="wb-cell">维度名称和描述由人定义</td>
+        <td>per-session 分数无法回溯到具体 turn</td>
+      </tr>
+      <tr>
+        <td><b>扩展指标</b></td>
+        <td class="bb-cell">9 个 LLM 指标，无限速</td>
+        <td class="wb-cell">toolCorrectness 为规则</td>
+        <td>无并发限制，大批量易打爆 provider</td>
+      </tr>
+      <tr>
+        <td><b>Bad Case 打分</b></td>
+        <td class="bb-cell">goal/recovery 输入来自 LLM</td>
+        <td class="wb-cell">Tag 规则 + 固定权重全白盒</td>
+        <td>权重写死在代码，不同场景无法配置</td>
+      </tr>
+      <tr>
+        <td><b>TP 准入规则</b></td>
+        <td class="bb-cell">empathy/offTopic/preachy 阈值依赖 LLM 分</td>
+        <td class="wb-cell">阈值（≤2）写在代码可直接看</td>
+        <td>聚合分（非 per-session）用于 TP 判断，精度损失</td>
+      </tr>
+      <tr>
+        <td><b>FN 准入规则</b></td>
+        <td>—</td>
+        <td class="wb-cell">4 条规则全白盒（正则/统计）</td>
+        <td>fn_consecutive_short 阈值（≤5字）太宽松</td>
+      </tr>
+      <tr>
+        <td><b>TN 准入规则</b></td>
+        <td class="bb-cell">goal_achieved + confidence 依赖 LLM</td>
+        <td class="wb-cell">sampleRate(5%) 固定可配</td>
+        <td>随机采样的正例质量无保障</td>
+      </tr>
+      <tr>
+        <td><b>Uncertainty 通道</b></td>
+        <td class="bb-cell">LLM confidence ∈ [0.4, 0.6]</td>
+        <td class="wb-cell">区间阈值写在代码可调</td>
+        <td>置信度本身是 LLM 自报，不可全信</td>
+      </tr>
+      <tr>
+        <td><b>人工审核</b></td>
+        <td>—</td>
+        <td class="wb-cell">DatasetConsole 待确认 tab<br>confirmed / rejected 操作</td>
+        <td>目前无审核 SLA / 漏审检测机制</td>
+      </tr>
+      <tr>
+        <td><b>Tag Taxonomy</b></td>
+        <td>—</td>
+        <td class="wb-cell">BadCaseTag 枚举固定</td>
+        <td><b>⚠ 最僵硬处</b>：增加新维度需改代码，无 UI 配置</td>
+      </tr>
+      <tr>
+        <td><b>意图提取</b></td>
+        <td class="bb-cell">完全 LLM（低温 + seed）</td>
+        <td class="wb-cell">successCriteria 由 LLM 输出（弱白盒）</td>
+        <td>提取质量决定回放质量，无 golden set 校准</td>
+      </tr>
+      <tr>
+        <td><b>动态回放</b></td>
+        <td class="bb-cell">SimUser 对话策略为 LLM</td>
+        <td class="wb-cell">agentApiEndpoint 需人工配置</td>
+        <td>SimUser 与真实用户行为分布偏差未量化</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ── Key insight ── -->
+<div class="summary-section">
+  <div class="section-divider">关键洞察</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div class="box box-black">
+      <div class="box-title"><span class="box-icon">🔴</span>最集中的黑盒风险</div>
+      <p style="margin-bottom:6px"><b>goalCompletion → severityScore → 准入通道</b>这条链路。</p>
+      <p>LLM 一旦错判 goal_failed，会导致：severityScore +0.34、TP 通道 goal_failed 规则触发、自动进入 badcase 池，全程无人工拦截。</p>
+    </div>
+    <div class="box box-white">
+      <div class="box-title"><span class="box-icon">🟢</span>最需要人工介入的白盒点</div>
+      <ol style="padding-left:18px;">
+        <li style="margin-bottom:4px"><b>Tag Taxonomy 定义</b> — 不同业务场景的关键能力维度不同，当前是代码写死</li>
+        <li style="margin-bottom:4px"><b>FN / Uncertainty 案例确认</b> — 这两类案例的质量决定 benchmark 的信噪比</li>
+        <li style="margin-bottom:4px"><b>severityScore 权重</b> — 当前加法权重写死，需业务方参与校准</li>
+        <li><b>回归判定标准</b> — ValidationRun 的 pass/fail 阈值需人定义</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+</div><!-- end main -->
+</body>
+</html>

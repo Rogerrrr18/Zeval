@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>意图指针动态评测 · 融合方案</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #0b1118;
+        --panel: #141c28;
+        --border: #2d3a4d;
+        --text: #e8eef6;
+        --dim: #8b9cb3;
+        --s1: #4cb1ff;
+        --s2: #d4a84b;
+        --fuse: #3aa37a;
+        --warn: #e09b3a;
+        --bad: #e07090;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Noto Sans SC", sans-serif;
+        font-size: 14px;
+        line-height: 1.65;
+      }
+      .wrap { max-width: 920px; margin: 0 auto; padding: 32px 24px 64px; }
+      h1 { font-size: 22px; margin: 0 0 8px; }
+      .sub { color: var(--dim); margin: 0 0 28px; font-size: 13px; }
+      h2 {
+        font-size: 17px;
+        margin: 36px 0 12px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+      }
+      h3 { font-size: 15px; margin: 20px 0 8px; color: #c8d8ec; }
+      p, li { color: #b8c8dc; margin: 8px 0; }
+      ul { padding-left: 1.2em; }
+      .tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .tag { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+      .t1 { background: rgba(76,177,255,.15); color: #93d4ff; border: 1px solid rgba(76,177,255,.35); }
+      .t2 { background: rgba(212,168,75,.12); color: #f0d78a; border: 1px solid rgba(212,168,75,.35); }
+      .tf { background: rgba(58,163,122,.12); color: #8fd4b8; border: 1px solid rgba(58,163,122,.35); }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+      th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+      th { background: #1a2434; }
+      .svg-box {
+        background: #0a1018;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+        margin: 14px 0;
+        overflow-x: auto;
+      }
+      .svg-box svg { display: block; max-width: 100%; height: auto; }
+      .cap { font-size: 12px; color: var(--dim); text-align: center; margin-top: 8px; }
+      .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; margin-bottom: 10px; }
+      .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
+      .box { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+      .ok { color: #8fd4b8; }
+      .no { color: #f0a8b8; }
+      .warn-box { border-left: 3px solid var(--warn); padding: 8px 12px; margin: 8px 0; background: rgba(224,155,58,.06); font-size: 13px; }
+      .risk-box { border-left: 3px solid var(--bad); padding: 8px 12px; margin: 8px 0; background: rgba(224,112,144,.06); font-size: 13px; }
+      .foot { margin-top: 40px; font-size: 12px; color: var(--dim); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>意图指针动态评测 · 方案对比与融合</h1>
+      <p class="sub">主干：eval-test-v1（抽取→动态评测 + Web）｜吸收：experiment--main（Judge/SimUser/分意图回填）｜落地：Zeval（Session 单元 + 上传即 Baseline + 意图前置）</p>
+
+      <div class="tags">
+        <span class="tag t1">蓝 · 方案一</span>
+        <span class="tag t2">黄 · 方案二</span>
+        <span class="tag tf">绿 · 融合 / Zeval</span>
+      </div>
+
+      <h2>一、两方案对比（简表）</h2>
+      <table>
+        <thead>
+          <tr><th></th><th>方案一 eval-test-v1</th><th>方案二 experiment--main</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>强项</strong></td>
+            <td class="ok">Web 实验台、流式对话、导出、B/D 雷达图</td>
+            <td class="ok">锁版资产、增强 Judge、Judge→SimUser 联动、按意图注入可回填项</td>
+          </tr>
+          <tr>
+            <td><strong>短板</strong></td>
+            <td class="no">首轮全量回填；Judge 粗；追问未吃上一轮判定；指标与 Zeval 脱节</td>
+            <td class="no">无前端；指标公式偏研究；未接生产数据流</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="warn-box"><strong>澄清：</strong>每轮顺序是「模拟用户 → 被测 Agent → 评审」；不是用户先评审。融合后：<strong>上一轮评审结果决定下一轮用户怎么说</strong>（方案二已有）。</p>
+
+      <h2>二、融合六条（决策清单）</h2>
+      <table>
+        <thead><tr><th>#</th><th>做什么</th><th>来源</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>保留「抽取 → 动态评测」流程与界面</td><td><span class="tag t1">方案一</span></td></tr>
+          <tr><td>2</td><td>增强每轮评审，并把判定方向注入模拟用户（纠偏 / 按达成标准追问）</td><td><span class="tag t2">方案二</span></td></tr>
+          <tr><td>3</td><td>进入<strong>新意图</strong>时才注入该意图相关的可回填项（非首轮全量）</td><td><span class="tag t2">方案二</span></td></tr>
+          <tr><td>4</td><td>每个意图<strong>首轮用户话</strong>固定为示例句原文，禁止改写</td><td><span class="tag tf">融合</span></td></tr>
+          <tr><td>5</td><td>模拟用户<strong>只看当前意图</strong>，不注入完整意图列表</td><td><span class="tag tf">融合</span></td></tr>
+          <tr><td>6</td><td>首次上传跑 Baseline 时完成抽取，绑定会话 ID，沉淀评测集</td><td><span class="tag tf">Zeval</span></td></tr>
+        </tbody>
+      </table>
+
+      <h2>三、融合架构（分层）</h2>
+      <div class="legend">
+        <span><i style="background:var(--s1)"></i>方案一</span>
+        <span><i style="background:var(--s2)"></i>方案二</span>
+        <span><i style="background:var(--fuse)"></i>融合/Zeval</span>
+      </div>
+      <div class="svg-box">
+        <svg viewBox="0 0 880 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="系统分层架构">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#6b8aad"/></marker>
+          </defs>
+          <!-- 展示层 -->
+          <rect x="20" y="16" width="840" height="56" rx="8" fill="#1a2a3d" stroke="#4cb1ff" stroke-width="1.5"/>
+          <text x="40" y="40" fill="#93d4ff" font-size="12" font-weight="600">展示层 · 方案一</text>
+          <text x="40" y="58" fill="#c8d8ec" font-size="13">Web：选会话 / 编辑抽取表 / 动态对话 / 导出 / B与D对比图</text>
+          <!-- 服务层 -->
+          <rect x="20" y="88" width="840" height="72" rx="8" fill="#1a2838" stroke="#3aa37a" stroke-width="1.5"/>
+          <text x="40" y="112" fill="#8fd4b8" font-size="12" font-weight="600">服务层 · 融合</text>
+          <rect x="40" y="122" width="150" height="28" rx="4" fill="#243040" stroke="#2d3a4d"/><text x="52" y="140" fill="#b8c8dc" font-size="11">上传入库</text>
+          <rect x="200" y="122" width="150" height="28" rx="4" fill="#243040" stroke="#2d3a4d"/><text x="212" y="140" fill="#b8c8dc" font-size="11">意图+回填抽取</text>
+          <rect x="360" y="122" width="130" height="28" rx="4" fill="#243040" stroke="#2d3a4d"/><text x="372" y="140" fill="#b8c8dc" font-size="11">基线评测 B</text>
+          <rect x="500" y="122" width="130" height="28" rx="4" fill="#243040" stroke="#2d3a4d"/><text x="512" y="140" fill="#b8c8dc" font-size="11">动态评测 D</text>
+          <rect x="640" y="122" width="200" height="28" rx="4" fill="#243040" stroke="#2d3a4d"/><text x="652" y="140" fill="#b8c8dc" font-size="11">统一指标（中文名注册表）</text>
+          <!-- 核心环 -->
+          <rect x="20" y="176" width="840" height="72" rx="8" fill="#2a2818" stroke="#d4a84b" stroke-width="1.5"/>
+          <text x="40" y="200" fill="#f0d78a" font-size="12" font-weight="600">动态环核心 · 方案二为主</text>
+          <rect x="40" y="214" width="120" height="28" rx="4" fill="#3d3520" stroke="#5a4a28"/><text x="52" y="232" fill="#e8dcc0" font-size="11">模拟用户</text>
+          <rect x="170" y="214" width="120" height="28" rx="4" fill="#3d3520" stroke="#5a4a28"/><text x="182" y="232" fill="#e8dcc0" font-size="11">被测 Agent</text>
+          <rect x="300" y="214" width="120" height="28" rx="4" fill="#3d3520" stroke="#5a4a28"/><text x="312" y="232" fill="#e8dcc0" font-size="11">增强评审</text>
+          <rect x="430" y="214" width="160" height="28" rx="4" fill="#3d3520" stroke="#5a4a28"/><text x="442" y="232" fill="#e8dcc0" font-size="11">按意图过滤回填</text>
+          <rect x="600" y="214" width="240" height="28" rx="4" fill="#3d3520" stroke="#5a4a28"/><text x="612" y="232" fill="#e8dcc0" font-size="11">固定首轮话术 + 仅当前意图上下文</text>
+          <!-- 数据层 -->
+          <rect x="20" y="264" width="840" height="56" rx="8" fill="#1a2434" stroke="#6b8aad" stroke-width="1"/>
+          <text x="40" y="288" fill="#8b9cb3" font-size="12" font-weight="600">数据层 · Zeval</text>
+          <text x="40" y="306" fill="#b8c8dc" font-size="13">原始会话轮次 ｜ 会话资产（意图序列+可回填项）｜ 评测运行记录（B/D 指标与日志）</text>
+          <!-- 箭头 -->
+          <line x1="440" y1="72" x2="440" y2="88" stroke="#6b8aad" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="440" y1="160" x2="440" y2="176" stroke="#6b8aad" stroke-width="1.5" marker-end="url(#arr)"/>
+          <line x1="440" y1="248" x2="440" y2="264" stroke="#6b8aad" stroke-width="1.5" marker-end="url(#arr)"/>
+        </svg>
+        <p class="cap">图1 · 自上而下：界面 → 服务 → 动态环 → 存储</p>
+      </div>
+
+      <h2>四、单会话动态评测环（融合后）</h2>
+      <div class="svg-box">
+        <svg viewBox="0 0 880 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="动态评测单轮流程">
+          <defs>
+            <marker id="a2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#6b8aad"/></marker>
+          </defs>
+          <!-- 外框：每个意图 -->
+          <rect x="24" y="20" width="832" height="480" rx="10" fill="none" stroke="#3aa37a" stroke-width="1.5" stroke-dasharray="6 4"/>
+          <text x="44" y="48" fill="#8fd4b8" font-size="13" font-weight="600">对每个意图指针（有轮次预算上限）</text>
+          <!-- 分支：首轮 vs 追问 -->
+          <polygon points="440,70 520,110 440,150 360,110" fill="#243548" stroke="#4cb1ff"/>
+          <text x="440" y="108" fill="#c8d8ec" font-size="12" text-anchor="middle">本意图第几轮？</text>
+          <text x="440" y="124" fill="#8b9cb3" font-size="10" text-anchor="middle">首轮 / 追问</text>
+          <!-- 首轮 -->
+          <rect x="80" y="170" width="200" height="44" rx="6" fill="#1e3a5f" stroke="#4cb1ff"/>
+          <text x="100" y="192" fill="#93d4ff" font-size="11" font-weight="600">首轮 · 融合</text>
+          <text x="100" y="208" fill="#c8d8ec" font-size="11">固定使用示例用户话原文</text>
+          <!-- 追问 -->
+          <rect x="600" y="170" width="200" height="44" rx="6" fill="#3d3520" stroke="#d4a84b"/>
+          <text x="620" y="192" fill="#f0d78a" font-size="11" font-weight="600">追问 · 方案二</text>
+          <text x="620" y="208" fill="#e8dcc0" font-size="11">依上轮评审：纠偏 / 抬标准</text>
+          <line x1="380" y1="110" x2="180" y2="170" stroke="#6b8aad" marker-end="url(#a2)"/>
+          <line x1="500" y1="110" x2="700" y2="170" stroke="#6b8aad" marker-end="url(#a2)"/>
+          <text x="300" y="155" fill="#8b9cb3" font-size="10">首轮</text>
+          <text x="560" y="155" fill="#8b9cb3" font-size="10">追问</text>
+          <!-- 合并 -->
+          <rect x="340" y="240" width="200" height="36" rx="6" fill="#2a2818" stroke="#d4a84b"/>
+          <text x="440" y="262" fill="#f0d78a" font-size="12" text-anchor="middle">仅注入本意图相关回填 · 方案二</text>
+          <line x1="180" y1="214" x2="400" y2="240" stroke="#6b8aad" marker-end="url(#a2)"/>
+          <line x1="700" y1="214" x2="480" y2="240" stroke="#6b8aad" marker-end="url(#a2)"/>
+          <!-- Agent -->
+          <rect x="300" y="300" width="280" height="44" rx="6" fill="#243040" stroke="#6b8aad"/>
+          <text x="440" y="322" fill="#c8d8ec" font-size="12" text-anchor="middle">被测 Agent 回复</text>
+          <text x="440" y="338" fill="#8b9cb3" font-size="10" text-anchor="middle">（多轮对话历史 + 内部事实前缀）</text>
+          <line x1="440" y1="276" x2="440" y2="300" stroke="#6b8aad" marker-end="url(#a2)"/>
+          <!-- Judge -->
+          <rect x="300" y="368" width="280" height="44" rx="6" fill="#3d3520" stroke="#d4a84b"/>
+          <text x="440" y="390" fill="#f0d78a" font-size="12" text-anchor="middle">增强评审 · 方案二</text>
+          <text x="440" y="406" fill="#8b9cb3" font-size="10" text-anchor="middle">满足 / 未满足 / 偏离 + 失败类型 + 本轮得分</text>
+          <line x1="440" y1="344" x2="440" y2="368" stroke="#6b8aad" marker-end="url(#a2)"/>
+          <!-- 决策 -->
+          <polygon points="440,430 500,460 440,490 380,460" fill="#1a3d2e" stroke="#3aa37a"/>
+          <text x="440" y="458" fill="#8fd4b8" font-size="11" text-anchor="middle">满足？</text>
+          <line x1="440" y1="412" x2="440" y2="430" stroke="#6b8aad" marker-end="url(#a2)"/>
+          <rect x="120" y="468" width="140" height="32" rx="4" fill="#1a3d2e" stroke="#3aa37a"/>
+          <text x="190" y="488" fill="#8fd4b8" font-size="11" text-anchor="middle">是 → 下一意图</text>
+          <rect x="620" y="468" width="160" height="32" rx="4" fill="#3d2830" stroke="#e07090"/>
+          <text x="700" y="488" fill="#f0a8b8" font-size="11" text-anchor="middle">否 → 继续或耗尽预算</text>
+          <line x1="400" y1="460" x2="260" y2="484" stroke="#3aa37a" marker-end="url(#a2)"/>
+          <line x1="480" y1="460" x2="620" y2="484" stroke="#e07090" marker-end="url(#a2)"/>
+          <!-- 流式 UI -->
+          <rect x="24" y="500" width="200" height="0" fill="none"/>
+          <text x="44" y="498" fill="#4cb1ff" font-size="11">方案一：每步结果流式推到 Web 对话区</text>
+        </svg>
+        <p class="cap">图2 · 单意图多轮：固定首轮 → 按意图回填 → Agent → 评审 → 推进指针</p>
+      </div>
+
+      <h2>五、模块归属（谁提供什么）</h2>
+      <table>
+        <thead><tr><th>能力</th><th>方案一</th><th>方案二</th><th>融合</th></tr></thead>
+        <tbody>
+          <tr><td>Web 与流式对话</td><td>✓</td><td>—</td><td>保留</td></tr>
+          <tr><td>表格编辑 / 锁版资产</td><td>✓</td><td>✓</td><td>保留</td></tr>
+          <tr><td>按意图注入可回填项</td><td>—</td><td>✓</td><td>采用</td></tr>
+          <tr><td>评审驱动模拟用户</td><td>—</td><td>✓</td><td>采用</td></tr>
+          <tr><td>增强评审字段</td><td>部分</td><td>✓</td><td>采用</td></tr>
+          <tr><td>B/D 四维雷达</td><td>✓</td><td>✓</td><td>保留，并挂统一中文指标</td></tr>
+          <tr><td>上传即基线+抽取</td><td>—</td><td>—</td><td>Zeval 新增</td></tr>
+        </tbody>
+      </table>
+
+      <h2>六、指标：Baseline 与动态能否共用</h2>
+      <p><strong>评测单元改为「整段会话」后：</strong>依赖「主题切分」的指标降级；依赖<strong>真实时间戳</strong>的指标在动态环不可用（模拟对话无真实等待间隔）。</p>
+
+      <h3>建议保留（中文名）</h3>
+      <table>
+        <thead><tr><th>指标</th><th>基线 B</th><th>动态 D</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>意图完成率</td><td>✓</td><td>✓</td><td>对应原四维雷达「完成率」</td></tr>
+          <tr><td>偏离率</td><td>✓</td><td>✓</td><td>跑题 / 答非所问</td></tr>
+          <tr><td>追问负担</td><td>✓</td><td>✓</td><td>每意图多花了多少轮</td></tr>
+          <tr><td>轮次效率</td><td>✓</td><td>✓</td><td>动态用户轮次 ÷ 历史用户轮次</td></tr>
+          <tr><td>会话深度（轮数）</td><td>✓</td><td>✓</td><td>客观统计</td></tr>
+          <tr><td>用户消息平均长度</td><td>✓</td><td>✓</td><td>参与度</td></tr>
+          <tr><td>助手消息平均长度</td><td>✓</td><td>✓</td><td>冗长 / 说教辅助</td></tr>
+          <tr><td>用户消息变短趋势</td><td>✓</td><td>△</td><td>动态轮次少时仅供参考</td></tr>
+          <tr><td>用户提问占比</td><td>✓</td><td>✓</td><td>理解障碍辅助</td></tr>
+          <tr><td>答非所问风险</td><td>✓</td><td>✓</td><td>评审 + 偏离占比</td></tr>
+          <tr><td>说教风险</td><td>✓</td><td>✓</td><td>规则 + 评审</td></tr>
+          <tr><td>结果交付率</td><td>✓</td><td>✓</td><td>方案二「是否给出结果」</td></tr>
+          <tr><td>提示词泄漏率</td><td>—</td><td>✓</td><td>动态专看</td></tr>
+          <tr><td>复述用户率</td><td>—</td><td>✓</td><td>动态专看</td></tr>
+          <tr><td>逐轮平均得分</td><td>✓</td><td>✓</td><td>方案二 0–1 分聚合</td></tr>
+          <tr><td>共情程度</td><td>✓</td><td>△</td><td>动态阶段模拟用户无真实情绪，宜主看 B</td></tr>
+        </tbody>
+      </table>
+
+      <h3>动态阶段不用</h3>
+      <ul>
+        <li>响应间隔、活跃时段、沉默时长、24 小时返回率（无真实时间戳）</li>
+        <li>主题切换率（原依赖 Topic 切分，需改为意图级或废弃）</li>
+      </ul>
+
+      <h3>展示建议</h3>
+      <ul>
+        <li>保留 B/D 四维雷达（意图专层，一眼对比）</li>
+        <li>另增 6～8 张中文主指标卡片，与 Zeval 注册表一致</li>
+      </ul>
+
+      <h2>七、仍存难点</h2>
+      <div class="risk-box"><strong>可回填项：</strong>可能让弱模型「背答案」过关 → 需对照：无回填 / 分意图回填 / 标准答案槽位，且评审要核对关键事实。</div>
+      <div class="risk-box"><strong>评审过宽：</strong>例如「有确认号即通过」但号码错误 → 须对照可回填项或 CSV 槽位。</div>
+      <div class="risk-box"><strong>B 与 D 不可直接相减：</strong>B 评历史原文，D 是新生成对话，报告须标明「基线臂 / 动态臂」。</div>
+      <div class="risk-box"><strong>抽取前置：</strong>抽错了后面全错 → 必须支持人工改表 + 锁版 + 版本号。</div>
+
+      <h2>八、意图前置后的全流程（生产）</h2>
+      <div class="svg-box">
+        <svg viewBox="0 0 880 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="生产全流程">
+          <defs>
+            <marker id="a3" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#6b8aad"/></marker>
+          </defs>
+          <!-- 阶段0 -->
+          <rect x="16" y="60" width="118" height="80" rx="6" fill="#1a2434" stroke="#6b8aad"/>
+          <text x="75" y="88" fill="#8b9cb3" font-size="10" text-anchor="middle">阶段0</text>
+          <text x="75" y="108" fill="#c8d8ec" font-size="11" text-anchor="middle">上传对话</text>
+          <text x="75" y="124" fill="#8b9cb3" font-size="9" text-anchor="middle">解析·脱敏·按会话入库</text>
+          <!-- 阶段1 -->
+          <rect x="158" y="40" width="200" height="120" rx="6" fill="#1a2a3d" stroke="#4cb1ff"/>
+          <text x="258" y="62" fill="#93d4ff" font-size="10" text-anchor="middle">阶段1 · 首次基线（自动并行）</text>
+          <text x="258" y="82" fill="#c8d8ec" font-size="10" text-anchor="middle">客观指标（轮次/长度等）</text>
+          <text x="258" y="98" fill="#c8d8ec" font-size="10" text-anchor="middle">主观评审（共情/说教/目标等）</text>
+          <text x="258" y="114" fill="#8fd4b8" font-size="10" text-anchor="middle">抽取意图+可回填 → 绑定会话ID</text>
+          <text x="258" y="130" fill="#8b9cb3" font-size="9" text-anchor="middle">可选：人工修订后锁版</text>
+          <!-- 阶段2 -->
+          <rect x="382" y="60" width="118" height="80" rx="6" fill="#1a3d2e" stroke="#3aa37a"/>
+          <text x="441" y="88" fill="#8fd4b8" font-size="10" text-anchor="middle">阶段2</text>
+          <text x="441" y="108" fill="#c8d8ec" font-size="11" text-anchor="middle">沉淀评测集</text>
+          <text x="441" y="124" fill="#8b9cb3" font-size="9" text-anchor="middle">含资产会话+基线结果</text>
+          <!-- 阶段3 -->
+          <rect x="524" y="40" width="200" height="120" rx="6" fill="#2a2818" stroke="#d4a84b"/>
+          <text x="624" y="62" fill="#f0d78a" font-size="10" text-anchor="middle">阶段3 · 动态评测（回归）</text>
+          <text x="624" y="82" fill="#e8dcc0" font-size="10" text-anchor="middle">选会话 + 被测版本</text>
+          <text x="624" y="98" fill="#e8dcc0" font-size="10" text-anchor="middle">只读锁版资产</text>
+          <text x="624" y="114" fill="#e8dcc0" font-size="10" text-anchor="middle">融合动态环 → 写日志</text>
+          <text x="624" y="130" fill="#e8dcc0" font-size="10" text-anchor="middle">B 与 D 中文指标对比看板</text>
+          <!-- POC -->
+          <rect x="748" y="60" width="116" height="80" rx="6" fill="#1e3a5f" stroke="#4cb1ff" stroke-dasharray="4 2"/>
+          <text x="806" y="88" fill="#93d4ff" font-size="10" text-anchor="middle">POC 对应</text>
+          <text x="806" y="108" fill="#c8d8ec" font-size="10" text-anchor="middle">eval-test-v1</text>
+          <text x="806" y="124" fill="#8b9cb3" font-size="9" text-anchor="middle">导入→抽取→动态评测</text>
+          <!-- arrows -->
+          <line x1="134" y1="100" x2="158" y2="100" stroke="#6b8aad" stroke-width="1.5" marker-end="url(#a3)"/>
+          <line x1="358" y1="100" x2="382" y2="100" stroke="#6b8aad" stroke-width="1.5" marker-end="url(#a3)"/>
+          <line x1="500" y1="100" x2="524" y2="100" stroke="#6b8aad" stroke-width="1.5" marker-end="url(#a3)"/>
+          <line x1="724" y1="100" x2="748" y2="100" stroke="#4cb1ff" stroke-width="1" stroke-dasharray="4 2" marker-end="url(#a3)"/>
+          <text x="440" y="28" fill="#c8d8ec" font-size="13" font-weight="600" text-anchor="middle">生产环境：真实对话一次上传，意图资产随 Baseline 落地，动态评测可反复回放</text>
+        </svg>
+        <p class="cap">图3 · 上传 → 基线+抽取 → 评测集 → 动态回归（虚线框为当前 POC 可手工对应步骤）</p>
+      </div>
+
+      <table>
+        <thead><tr><th>生产步骤</th><th>eval-test-v1 现状</th></tr></thead>
+        <tbody>
+          <tr><td>上传</td><td>手动导入 CSV</td></tr>
+          <tr><td>抽取</td><td>每会话点「运行抽取」</td></tr>
+          <tr><td>锁版</td><td>可选「校验并锁版」</td></tr>
+          <tr><td>基线</td><td>动态评测时顺带算 B</td></tr>
+          <tr><td>动态评测</td><td>对话卡片内一键运行</td></tr>
+        </tbody>
+      </table>
+
+      <p class="foot">2026-05-15 · 仓库根目录 · eval-test-v1 + experiment--main + Zeval 重构指标说明</p>
+    </div>
+  </body>
+</html>

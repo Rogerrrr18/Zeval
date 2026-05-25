@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>真人用户动态评测方案与问题记录</title>
+    <style>
+      :root {
+        --bg: #0b1118;
+        --panel: #141c28;
+        --border: #2d3a4d;
+        --text: #e8eef6;
+        --dim: #8b9cb3;
+        --purple: #c77dff;
+        --blue: #4cb1ff;
+        --green: #3aa37a;
+        --warn: #e09b3a;
+        --bad: #e07090;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-size: 14px;
+        line-height: 1.65;
+      }
+      .wrap { max-width: 940px; margin: 0 auto; padding: 32px 24px 64px; }
+      h1 { margin: 0 0 8px; font-size: 23px; }
+      h2 { margin: 34px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-size: 17px; }
+      h3 { margin: 20px 0 8px; font-size: 15px; color: #c8d8ec; }
+      p, li { color: #b8c8dc; }
+      a { color: #93d4ff; }
+      table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+      th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+      th { background: #1a2434; }
+      .sub { color: var(--dim); margin: 0 0 20px; }
+      .tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+      .tag { padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+      .tag-purple { color: #e0b8ff; background: rgba(199, 125, 255, .14); border: 1px solid rgba(199, 125, 255, .4); }
+      .tag-blue { color: #93d4ff; background: rgba(76, 177, 255, .14); border: 1px solid rgba(76, 177, 255, .35); }
+      .tag-green { color: #8fd4b8; background: rgba(58, 163, 122, .12); border: 1px solid rgba(58, 163, 122, .35); }
+      .svg-box { margin: 14px 0; padding: 16px; overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: #0a1018; }
+      .svg-box svg { display: block; max-width: 100%; height: auto; }
+      .cap { margin-top: 8px; color: var(--dim); font-size: 12px; text-align: center; }
+      .ok { color: #8fd4b8; }
+      .no { color: #f0a8b8; }
+      .warn-box { margin: 10px 0; padding: 8px 12px; border-left: 3px solid var(--warn); background: rgba(224, 155, 58, .06); }
+      .risk-box { margin: 10px 0; padding: 8px 12px; border-left: 3px solid var(--bad); background: rgba(224, 112, 144, .06); }
+      .foot { margin-top: 38px; color: var(--dim); font-size: 12px; }
+      code { padding: 1px 5px; border-radius: 4px; background: #0a1018; color: #b8d4f0; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>真人用户动态评测方案与问题记录</h1>
+      <p class="sub">
+        本文件是 RealUser 动态评测方案的正式维护页。后续在 <code>eval-test-v1</code> 中发现的新问题与修复方案，也统一追加到“问题与修复记录”章节。
+      </p>
+
+      <div class="tags">
+        <span class="tag tag-purple">真人用户臂</span>
+        <span class="tag tag-blue">被测 Agent</span>
+        <span class="tag tag-green">共用会话资产</span>
+      </div>
+
+      <h2>一、方案定位</h2>
+      <table>
+        <thead><tr><th>目标</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>降低 LLM 用量</td><td>真人替代 SimUser 和 Judge，动态环内只调用被测 Agent。</td></tr>
+          <tr><td>保证意图精准</td><td>真人直接查看完整意图指针序列，手动切换意图并点选 Judge 状态。</td></tr>
+          <tr><td>加入体感维度</td><td>每轮记录顺畅度、可信度、愿继续对话意愿，补充自动指标看不到的体验问题。</td></tr>
+          <tr><td>用于抽检与争议复核</td><td>不替代大批量自动回归；适合关键版本、重点 session 和可疑 badcase。</td></tr>
+        </tbody>
+      </table>
+
+      <h2>二、界面与流程</h2>
+      <div class="svg-box">
+        <svg viewBox="0 0 880 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="真人用户动态评测界面">
+          <defs>
+            <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#6b8aad"/></marker>
+          </defs>
+          <rect x="20" y="40" width="210" height="220" rx="8" fill="#1a2838" stroke="#3aa37a"/>
+          <text x="36" y="66" fill="#8fd4b8" font-size="12" font-weight="700">完整意图指针</text>
+          <rect x="36" y="84" width="178" height="32" rx="4" fill="#3d2a50" stroke="#c77dff"/>
+          <text x="48" y="105" fill="#e0b8ff" font-size="10">当前意图：#1 找餐厅</text>
+          <rect x="36" y="126" width="178" height="28" rx="4" fill="#1a2434" stroke="#2d3a4d"/>
+          <text x="48" y="144" fill="#b8c8dc" font-size="10">#2 订位</text>
+          <rect x="36" y="164" width="178" height="28" rx="4" fill="#1a2434" stroke="#2d3a4d"/>
+          <text x="48" y="182" fill="#b8c8dc" font-size="10">#3 找酒店 …</text>
+
+          <rect x="258" y="40" width="360" height="220" rx="8" fill="#141c28" stroke="#4cb1ff"/>
+          <text x="274" y="66" fill="#93d4ff" font-size="12" font-weight="700">真人 ↔ 被测 Agent 对话</text>
+          <rect x="282" y="90" width="150" height="34" rx="8" fill="#1e3a5f"/><text x="300" y="112" fill="#c8d8ec" font-size="10">真人用户气泡</text>
+          <rect x="442" y="142" width="150" height="34" rx="8" fill="#243040"/><text x="460" y="164" fill="#c8d8ec" font-size="10">Agent 回复气泡</text>
+          <rect x="282" y="210" width="310" height="28" rx="4" fill="#0c1218" stroke="#2d3a4d"/>
+          <text x="298" y="228" fill="#8b9cb3" font-size="10">真人输入框 …… [发送]</text>
+
+          <rect x="646" y="40" width="214" height="220" rx="8" fill="#2a1a38" stroke="#c77dff"/>
+          <text x="662" y="66" fill="#e0b8ff" font-size="12" font-weight="700">人工 Judge 与体感</text>
+          <rect x="662" y="88" width="54" height="26" rx="4" fill="#1a3d2e" stroke="#3aa37a"/><text x="689" y="105" fill="#8fd4b8" font-size="9" text-anchor="middle">满足</text>
+          <rect x="724" y="88" width="54" height="26" rx="4" fill="#3d3520" stroke="#d4a84b"/><text x="751" y="105" fill="#f0d78a" font-size="9" text-anchor="middle">未满足</text>
+          <rect x="786" y="88" width="54" height="26" rx="4" fill="#3d2830" stroke="#e07090"/><text x="813" y="105" fill="#f0a8b8" font-size="9" text-anchor="middle">偏离</text>
+          <text x="662" y="142" fill="#8b9cb3" font-size="10">顺畅度 / 可信度 / 愿继续：1-5</text>
+          <rect x="662" y="174" width="178" height="30" rx="4" fill="#3d2a50" stroke="#c77dff"/>
+          <text x="751" y="194" fill="#e0b8ff" font-size="10" text-anchor="middle">确认本轮回合</text>
+
+          <line x1="230" y1="150" x2="258" y2="150" stroke="#6b8aad" marker-end="url(#arr)"/>
+          <line x1="618" y1="150" x2="646" y2="150" stroke="#6b8aad" marker-end="url(#arr)"/>
+        </svg>
+        <p class="cap">真人模式：左侧看意图，中间真实对话，右侧人工评审与体感记录。</p>
+      </div>
+
+      <h2>三、当前 POC 实现口径</h2>
+      <table>
+        <thead><tr><th>项目</th><th>当前实现</th></tr></thead>
+        <tbody>
+          <tr><td>Agent 调用</td><td>复用现有 SiliconFlow 设置，仅调用被测 Agent。</td></tr>
+          <tr><td>指针推进</td><td>点“满足”并确认后自动进入下一意图；仍可手动上一/下一意图。</td></tr>
+          <tr><td>可回填展示</td><td>操作台折叠展示当前意图相关可回填项摘要。</td></tr>
+          <tr><td>体感分</td><td>每轮记录顺畅度、可信度、愿继续，范围 1-5。</td></tr>
+          <tr><td>导出</td><td>导出真人评测 TXT，包含抽取结果、对话、人工 Judge 与体感分。</td></tr>
+        </tbody>
+      </table>
+
+      <h2>四、问题与修复记录</h2>
+      <table>
+        <thead>
+          <tr><th style="width: 15%">日期</th><th style="width: 25%">问题</th><th>原因</th><th>修复 / 方案</th><th style="width: 12%">状态</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2026-05-25</td>
+            <td>动态评测首条用户问题不稳定，容易导致开场意图漂移。</td>
+            <td>抽取模型可能改写 <code>example_user_queries</code>；动态环若直接用抽取结果，首轮并不一定等于历史真实 user 话。</td>
+            <td>抽取后根据 <code>historical_span</code> 回填该 span 内第一条真实 user 话；自动动态评测运行时也优先从 <code>sessions.json</code> 原始 span 读取首条 user query。</td>
+            <td class="ok">已修复</td>
+          </tr>
+          <tr>
+            <td>2026-05-25</td>
+            <td>同一 session 重复抽取结果不复现，意图和可回填项会变化。</td>
+            <td>原逻辑每次点“运行抽取”都会重新调用 LLM；<code>historical_span</code> 和 <code>refillables</code> 都由 LLM 一次性判断。</td>
+            <td>首次抽取后立即绑定到该 session（复用 <code>data/locked/{session}.json</code>）；后续抽取优先读取绑定结果。UI 文案改为“抽取/读取绑定结果”。</td>
+            <td class="ok">已修复</td>
+          </tr>
+          <tr>
+            <td>2026-05-25</td>
+            <td>意图片段边界模糊。</td>
+            <td>当前抽取方式是将完整 session + CSV_AUX 一次性输入 LLM，由 LLM 输出完整意图链与每个 <code>historical_span</code>；schema 只校验结构，不校验边界合理性。</td>
+            <td>短期：绑定抽取结果并固定首轮 query，降低波动。后续建议：对 MultiWOZ 类数据先用 <code>active_intents / slot_values</code> 规则生成候选 span，再让 LLM 做命名、达成标准和可回填补充。</td>
+            <td class="warn-box">待增强</td>
+          </tr>
+          <tr>
+            <td>2026-05-25</td>
+            <td>被测 Agent 编造新餐厅，未复用历史事实或可回填项。</td>
+            <td>抽取阶段可能漏掉餐厅名、电话、确认号等事实；动态评测如果只注入可回填项，Agent 仍会自由发挥。</td>
+            <td>自动模式与 RealUser 模式都改为注入“当前意图历史片段 + 当前意图相关可回填项”，作为仅对 Agent 可见的内部事实，减少编造。</td>
+            <td class="ok">已修复</td>
+          </tr>
+          <tr>
+            <td>2026-05-25</td>
+            <td>字段名偏工程化，真人操作员不易理解。</td>
+            <td>表格沿用 schema 字段，如 <code>intent_index</code>、<code>success_criteria</code>。</td>
+            <td>表格表头改为中文：意图序号、意图文本、示例用户话、达成标准、依赖意图、历史起止轮、回填序号、注入文本等。</td>
+            <td class="ok">已修复</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>五、后续建议</h2>
+      <div class="risk-box">
+        <strong>最关键改造：</strong>不要长期依赖 LLM 自己决定意图片段边界。对于带 <code>active_intents</code> 和 <code>slot_values</code> 的数据，应先规则生成候选片段，再交给 LLM 完成语义整理。
+      </div>
+      <ul>
+        <li>为绑定抽取结果增加独立目录或表名，例如 <code>data/session-assets/</code>，避免继续借用 <code>locked</code> 概念。</li>
+        <li>导出时同时附带：原始历史片段、当前意图可回填项、实际注入给 Agent 的内部事实，便于排查漂移。</li>
+        <li>为真人模式加入操作员 ID、确认时间、是否手动跳指针等审计字段。</li>
+      </ul>
+
+      <p class="foot">
+        维护约定：后续在 RealUser 或自动动态评测中发现新问题，应继续追加到本文件“问题与修复记录”表格。
+      </p>
+    </div>
+  </body>
+</html>

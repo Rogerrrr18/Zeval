@@ -1,0 +1,7 @@
+node_modules
+.next
+.env
+.env.local
+data/local.settings.json
+data/locked/*.json
+data/sessions.json
