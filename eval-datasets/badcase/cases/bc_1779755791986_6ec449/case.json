@@ -1,0 +1,29 @@
+{
+  "caseId": "bc_1779755791986_6ec449",
+  "caseSetType": "badcase",
+  "source": "auto_tp",
+  "sessionId": "1_00001",
+  "topicSegmentId": "1_00001",
+  "topicLabel": "auto_tp:goal_failed",
+  "topicSummary": "",
+  "normalizedTranscriptHash": "daf0b65e0237891e3bac6ee11e8bb8282523c7c1a23c8d2a764ec5bc161eab3c",
+  "baselineVersion": "run_1779755111189",
+  "baselineCaseScore": 0.2,
+  "tags": [
+    "goal_partial"
+  ],
+  "transcript": "[turn 1] [user] Hi i need a help, i am very hungry, I am looking for a restaurant\n[turn 2] [assistant] Sure, I will help you, What type of food are you looking for? Which city should i search in?\n[turn 3] [user] Some Punjabi kind of foods in milpitas\n[turn 4] [assistant] I found a good restaurant in Milpitas, The restaurant name is Anjappar Chettinad Restaurant\n[turn 5] [user] Ok, What is the address? How pricey are they?\n[turn 6] [assistant] Price range is moderate, The address is Milpitas Square\n[turn 7] [user] Ok, Find me another restaurant?\n[turn 8] [assistant] I found another restaurant for you, Aria Dining & Banquets Fine Indian Cuisine Restaurant at Milpitas\n[turn 9] [user] No, suggest me another Restaurant, Some Take-out type of food will be perfect\n[turn 10] [assistant] I found 2 Restaurants, Olive garden Italian Restaurant at Milpitas\n[turn 11] [user] Yes, it seems good for me\n[turn 12] [assistant] shall i reserve a table here for you?\n[turn 13] [user] Yes, I want it on the 11th\n[turn 14] [assistant] please tell me what time is the reservation for?\n[turn 15] [user] at afternoon 1:30\n[turn 16] [assistant] Please confirm the following details: Booking a table at Olive Garden Italian Restaurant at Milpitas on March 11th reservation time is 1:30 pm, The reservation is for 2 people\n[turn 17] [user] No, time change to twelve in the afternoon for one people\n[turn 18] [assistant] Please confirm the following details: the reservation time is 12 pm, The reservation is for 1 people\n[turn 19] [user] Yes\n[turn 20] [assistant] Congrats, your reservation is confirmed\n[turn 21] [user] What is the Restaurant address, Do they have live music, I love it\n[turn 22] [assistant] Sorry, They don't have live music, The restaurant address is 1350 Great Mall Drive\n[turn 23] [user] Thank you very much for your help\n[turn 24] [assistant] Shall i help you with anything else?\n[turn 25] [user] No, Thanks\n[turn 26] [assistant] You are welcome, have a great day",
+  "autoSignals": [
+    {
+      "ruleKey": "goal_failed",
+      "severity": "high"
+    }
+  ],
+  "reviewStatus": "auto_captured",
+  "metadata": {
+    "humanReviewRequired": true,
+    "humanReviewQueuedAt": "2026-05-26T00:36:31.986Z"
+  },
+  "createdAt": "2026-05-26T00:36:31.986Z",
+  "updatedAt": "2026-05-26T00:36:31.986Z"
+}

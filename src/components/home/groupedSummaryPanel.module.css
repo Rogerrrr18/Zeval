@@ -219,6 +219,50 @@
   text-transform: uppercase;
 }
 
+:global(html[data-theme="dark"]) .scaleHero,
+:global(html[data-theme="dark"]) .groupCard {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 0.86), rgb(8 13 27 / 0.82));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+:global(html[data-theme="dark"]) .scaleLabel,
+:global(html[data-theme="dark"]) .scaleHint,
+:global(html[data-theme="dark"]) .groupHeader small {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="dark"]) .scaleValue,
+:global(html[data-theme="dark"]) .groupHeader h3,
+:global(html[data-theme="dark"]) .metricValue {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .metricRow {
+  background: rgb(3 7 18 / 0.42);
+}
+
+:global(html[data-theme="dark"]) .metricRow:hover {
+  border-color: var(--zeval-line-strong);
+  background: rgb(103 232 249 / 0.08);
+}
+
+:global(html[data-theme="dark"]) .metricLabel {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .infoIcon {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="dark"]) .infoIcon:hover,
+:global(html[data-theme="dark"]) .infoIcon[aria-expanded="true"] {
+  color: var(--zeval-cyan);
+  background-color: rgb(103 232 249 / 0.1);
+}
+
 .tooltipMeta dd {
   font-size: 11.5px;
   color: rgba(255, 255, 255, 0.92);

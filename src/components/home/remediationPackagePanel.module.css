@@ -258,3 +258,82 @@
     grid-template-columns: 1fr;
   }
 }
+
+:global(html[data-theme="dark"]) .emptyState,
+:global(html[data-theme="dark"]) .metaCard,
+:global(html[data-theme="dark"]) .metricCard,
+:global(html[data-theme="dark"]) .fileCard,
+:global(html[data-theme="dark"]) .emptyInline {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 0.86), rgb(8 13 27 / 0.82));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+:global(html[data-theme="dark"]) .titleBlock h3,
+:global(html[data-theme="dark"]) .metaCard strong,
+:global(html[data-theme="dark"]) .metricCard strong,
+:global(html[data-theme="dark"]) .fileSummary strong {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .titleBlock p,
+:global(html[data-theme="dark"]) .emptyState p,
+:global(html[data-theme="dark"]) .footerNote,
+:global(html[data-theme="dark"]) .metaCard small,
+:global(html[data-theme="dark"]) .metricCard small,
+:global(html[data-theme="dark"]) .metricCard p,
+:global(html[data-theme="dark"]) .bulletList,
+:global(html[data-theme="dark"]) .fileSummary p,
+:global(html[data-theme="dark"]) .emptyInline {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .sectionLabel,
+:global(html[data-theme="dark"]) .metaCard span {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="dark"]) .tagPill,
+:global(html[data-theme="dark"]) .packageTab {
+  border-color: rgb(103 232 249 / 0.18);
+  background: rgb(103 232 249 / 0.08);
+  color: var(--zeval-cyan);
+}
+
+:global(html[data-theme="dark"]) .packageTabActive {
+  border-color: var(--zeval-line-strong);
+  background: linear-gradient(135deg, rgb(103 232 249 / 0.12), rgb(96 165 250 / 0.1));
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .filePreview {
+  border-top-color: var(--zeval-line);
+  background: rgb(3 7 18 / 0.46);
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .primaryButton {
+  border-color: var(--zeval-cyan);
+  background: linear-gradient(135deg, var(--zeval-cyan), var(--zeval-teal));
+  color: #03111a;
+  box-shadow: 0 16px 36px rgb(103 232 249 / 0.18);
+}
+
+:global(html[data-theme="dark"]) .primaryButton:hover:not(:disabled) {
+  background: linear-gradient(135deg, #a5f3fc, #5eead4);
+  transform: translateY(-2px);
+}
+
+:global(html[data-theme="dark"]) .secondaryButton {
+  border-color: var(--zeval-line);
+  background: rgb(15 23 42 / 0.72);
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .secondaryButton:hover:not(:disabled) {
+  border-color: var(--zeval-line-strong);
+  color: var(--zeval-text);
+  background: rgb(103 232 249 / 0.08);
+}

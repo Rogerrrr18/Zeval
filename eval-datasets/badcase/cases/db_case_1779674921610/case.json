@@ -1,0 +1,24 @@
+{
+  "caseId": "db_case_1779674921610",
+  "caseSetType": "badcase",
+  "sessionId": "sess_sup_01",
+  "topicSegmentId": "unknown-topic",
+  "topicLabel": "unknown",
+  "topicSummary": "smoke case",
+  "normalizedTranscriptHash": "hash_db_case_1779674921610",
+  "duplicateGroupKey": "group_db_case_1779674921610",
+  "baselineVersion": "smoke",
+  "baselineCaseScore": 42,
+  "tags": [
+    "smoke"
+  ],
+  "title": "Database store smoke case",
+  "transcript": "[user] 你好我想申请退款订单号 SF882910\n[assistant] 你好我可以协助你先告诉我下单渠道和退款原因吗\n[user] 在官网买的尺寸选错了想换大一码\n[assistant] 了解未拆封且签收七天内可直接发起换货我先把换货入口发你\n[user] 已经拆了包装还能换吗\n[assistant] 拆封后需质检外观与功能我可以先帮你登记人工复核预计一个工作日回复\n[user] 好的那我等结果别让我反复填表就行\n[assistant] 我会把工单号同步给你后续只需回复工单号即可不用重复填写资料",
+  "suggestedAction": "Verify database-backed store can persist case records.",
+  "scenarioId": "toB-customer-support",
+  "sourceRunId": "db_store_run_1779674921610",
+  "harvestedAt": "2026-05-25T02:08:41.614Z",
+  "failureSeverityScore": 58,
+  "createdAt": "2026-05-25T02:08:41.614Z",
+  "updatedAt": "2026-05-25T02:08:41.614Z"
+}

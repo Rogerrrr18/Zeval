@@ -1,0 +1,29 @@
+{
+  "caseId": "bc_1779755791993_ea2b9d",
+  "caseSetType": "badcase",
+  "source": "auto_tp",
+  "sessionId": "1_00007",
+  "topicSegmentId": "1_00007",
+  "topicLabel": "auto_tp:high_dropoff",
+  "topicSummary": "",
+  "normalizedTranscriptHash": "8feea26c5bf54e895050a5009f1922551f061f5eda1d393a1ba9d9d33836de72",
+  "baselineVersion": "run_1779755111189",
+  "baselineCaseScore": 0.6,
+  "tags": [
+    "question_repeat"
+  ],
+  "transcript": "[turn 1] [user] My friend and I are looking for a place to eat.\n[turn 2] [assistant] Please tell me what type of food you are looking for just say Mexican, Chinese or anything else. Also what city would you like me to search int.\n[turn 3] [user] My family and I are in San Jose and the perfect place would have pizza and pasta. We don't have a price preference.\n[turn 4] [assistant] San Jose has a restaurant called Al Castello Ristorante that is nice.\n[turn 5] [user] Is there any other restaurant that you can suggest?\n[turn 6] [assistant] There is also a nice restaurant called Angelo's Italian Restaurant in San Jose.\n[turn 7] [user] Can I please have the address and contact number?\n[turn 8] [assistant] 408-227-5502 is their phone and it is located at 436 Blossom Hill Road.\n[turn 9] [user] Is there any other restaurant that you can suggest?\n[turn 10] [assistant] There is another nice restaurant called Antonella's Ristorante in San Jose.\n[turn 11] [user] That restaurant will work can you please make a reservation for 12:30.\n[turn 12] [assistant] I will be booking a table at Antonella's Ristorante in San Jose. The reservation will be set at 12:30 pm for today. And it is for 2 people is this correct.\n[turn 13] [user] Yes, thank you that is correct.\n[turn 14] [assistant] I have successful made your reservation.\n[turn 15] [user] Thank you so much for setting that up.\n[turn 16] [assistant] Is there anything else that I can help you with.\n[turn 17] [user] That is all thank you so much.\n[turn 18] [assistant] Have a good day thank you.",
+  "autoSignals": [
+    {
+      "ruleKey": "high_dropoff",
+      "severity": "low"
+    }
+  ],
+  "reviewStatus": "auto_captured",
+  "metadata": {
+    "humanReviewRequired": true,
+    "humanReviewQueuedAt": "2026-05-26T00:36:31.993Z"
+  },
+  "createdAt": "2026-05-26T00:36:31.993Z",
+  "updatedAt": "2026-05-26T00:36:31.993Z"
+}

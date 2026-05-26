@@ -52,7 +52,7 @@ export function UploadDropzone(props: {
           ref={fileInputRef}
           className={styles.fileInputHidden}
           type="file"
-          accept=".csv,.json,.jsonl,.txt,.md"
+          accept=".csv,.json,.jsonl,.txt,.md,.xlsx"
           onChange={onFileInputChange}
         />
         <button
@@ -74,11 +74,11 @@ export function UploadDropzone(props: {
                 ? "正在上传并解析..."
                 : fileName
                   ? `当前文件：${fileName}`
-                  : `支持 csv/json/jsonl/txt/md，单文件不超过 ${maxUploadSizeMb}MB`}
+                  : `支持 csv/json/jsonl/txt/md/xlsx，单文件不超过 ${maxUploadSizeMb}MB`}
             </span>
           </div>
           <div className={styles.uploadHintRow}>
-            {["CSV", "JSON", "JSONL", "TXT", "MD"].map((item) => (
+            {["CSV", "JSON", "JSONL", "TXT", "MD", "XLSX"].map((item) => (
               <span className={styles.formatPill} key={item}>
                 {item}
               </span>

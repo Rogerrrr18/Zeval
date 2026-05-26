@@ -29,7 +29,7 @@
 import { randomBytes } from "node:crypto";
 import { findBadCaseDuplicate } from "@/badcase/dedupe";
 import { buildBadCaseFeatureSnapshot } from "@/badcase/feature";
-import { computeNormalizedTranscriptHash } from "@/eval-datasets/case-transcript-hash";
+import { computeNormalizedTranscriptHash, jaccardTranscriptSimilarity } from "@/eval-datasets/case-transcript-hash";
 import {
   evaluateFNRules,
   evaluateTNRules,
@@ -485,7 +485,11 @@ function checkCandidateDuplicate(
     return { isDuplicate: true, reason: "exact_hash", matchedCaseId: exactMatch.caseId };
   }
 
-  // 3. Near-duplicate (TP / badcases only) — reuse feature-vector dedupe.
+  // 3. Near-duplicate — two sub-checks:
+  //    a) TP cases use feature-vector dedupe (embedding cosine, or Jaccard fallback).
+  //    b) All other channels use Jaccard directly for cross-session near-dedup.
+  //       This prevents the same conversation from entering the pool via FN / TN /
+  //       uncertainty channels when it is already stored from a different eval run.
   if (candidate.channel === "auto_tp") {
     const assetIndex = evaluate.badCaseAssets.findIndex(
       (a) => a.sessionId === candidate.sessionId,
@@ -493,12 +497,32 @@ function checkCandidateDuplicate(
     if (assetIndex >= 0) {
       const featureSnapshot = buildBadCaseFeatureSnapshot(evaluate, assetIndex);
       const decision = findBadCaseDuplicate(
-        { normalizedTranscriptHash: candidate.normalizedTranscriptHash, featureSnapshot },
+        {
+          normalizedTranscriptHash: candidate.normalizedTranscriptHash,
+          featureSnapshot,
+          // Supply transcript so findBadCaseDuplicate can fall back to Jaccard
+          // when textEmbedding is empty (no embedding model configured).
+          transcript: candidate.transcript,
+        },
         existingCases,
       );
       if (decision.isDuplicate && decision.layer !== "l1_exact_hash") {
         return { isDuplicate: true, reason: "near_duplicate", matchedCaseId: decision.matchedCaseId };
       }
+    }
+  } else {
+    // For non-TP channels apply Jaccard directly — no feature snapshot needed.
+    const JACCARD_THRESHOLD = 0.85;
+    let bestJaccardCase: { caseId: string; score: number } | null = null;
+    for (const existing of existingCases) {
+      if (!existing.transcript) continue;
+      const score = jaccardTranscriptSimilarity(candidate.transcript, existing.transcript);
+      if (score >= JACCARD_THRESHOLD && (!bestJaccardCase || score > bestJaccardCase.score)) {
+        bestJaccardCase = { caseId: existing.caseId, score };
+      }
+    }
+    if (bestJaccardCase) {
+      return { isDuplicate: true, reason: "near_duplicate", matchedCaseId: bestJaccardCase.caseId };
     }
   }
 

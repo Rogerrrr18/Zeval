@@ -60,10 +60,18 @@ export async function readPersistedEvaluateResult(runId: string): Promise<Evalua
 /**
  * List recently persisted evaluate runs without loading them into browser state.
  *
+ * When `projectId` is provided only runs that were saved under that project are
+ * returned.  Runs without a stored projectId (legacy artifacts) are shown only
+ * when `projectId` equals "default" so they remain visible in the default workspace.
+ *
  * @param limit Maximum number of rows returned.
+ * @param projectId Optional project filter from the request context.
  * @returns Lightweight run index rows sorted by generation time descending.
  */
-export async function listPersistedEvaluateRuns(limit: number): Promise<EvaluateRunIndexRow[]> {
+export async function listPersistedEvaluateRuns(
+  limit: number,
+  projectId?: string,
+): Promise<EvaluateRunIndexRow[]> {
   let entries: Array<{ isDirectory(): boolean; name: string }>;
   try {
     entries = await readdir(EVALUATE_RUNS_ROOT, { withFileTypes: true });
@@ -83,6 +91,17 @@ export async function listPersistedEvaluateRuns(limit: number): Promise<Evaluate
     try {
       const raw = await readFile(outputPath, "utf8");
       const response = JSON.parse(raw) as EvaluateResponse;
+
+      // Project filter: include if no projectId filter requested, or if the
+      // run's stored projectId matches, or if the run has no projectId stored
+      // (legacy) and the caller is looking at the "default" project.
+      if (projectId) {
+        const runProjectId = response.meta.projectId ?? response.meta.workspaceId ?? "default";
+        if (runProjectId !== projectId) {
+          continue;
+        }
+      }
+
       const fileStat = await stat(outputPath);
       rows.push(projectEvaluateRunIndexRow(response, outputPath, fileStat.mtime.toISOString()));
     } catch (error) {

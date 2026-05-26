@@ -1,0 +1,16 @@
+{
+  "caseId": "db_case_1779674921610",
+  "baselineCaseScore": 42,
+  "baselineObjectiveScore": 50,
+  "baselineSubjectiveScore": 40,
+  "baselineRiskPenaltyScore": 8,
+  "baselineSignals": [
+    {
+      "signalKey": "smoke",
+      "score": 0.5,
+      "severity": "medium"
+    }
+  ],
+  "baselineGeneratedAt": "2026-05-25T02:08:41.614Z",
+  "baselineProductVersion": "smoke"
+}

@@ -16,12 +16,14 @@ import type {
   DbIntentEvalMetrics,
   DbIntentRunLog,
   DbIntentSequence,
+  DbMessageTurn,
   DbObjectiveSignal,
   DbRiskTag,
+  DbSession,
   DbSubjectiveSignal,
   DbSuggestion,
 } from "@/db/schema";
-import type { EvaluateResponse, IntentRunLog, ObjectiveMetrics } from "@/types/pipeline";
+import type { EnrichedChatlogRow, EvaluateResponse, IntentRunLog, ObjectiveMetrics } from "@/types/pipeline";
 
 export type EvaluationProjectionOptions = {
   projectId: string;
@@ -35,6 +37,8 @@ export type EvaluationProjection = {
   dbRecords: DbRecord[];
   summary: {
     evaluationRuns: number;
+    sessions: number;
+    messageTurns: number;
     intentSequences: number;
     intentRunLogs: number;
     intentEvalMetrics: number;
@@ -131,6 +135,13 @@ export function buildEvaluationProjection(
     },
     createdAt: now,
   };
+
+  // ── sessions / message_turns ─────────────────────────────────────────────────
+
+  const { sessions, messageTurns } = buildSessionAndTurnProjections(
+    response.enrichedRows,
+    { projectId, evaluationRunId, now },
+  );
 
   // ── objective_signals ─────────────────────────────────────────────────────────
 
@@ -339,6 +350,8 @@ export function buildEvaluationProjection(
 
   const records: DbEvaluationProjectionRecord[] = [
     evaluationRun,
+    ...sessions,
+    ...messageTurns,
     ...intentSequences,
     ...intentRunLogs,
     ...intentEvalMetrics,
@@ -354,6 +367,8 @@ export function buildEvaluationProjection(
     dbRecords: records.map(toDbRecord),
     summary: {
       evaluationRuns: 1,
+      sessions: sessions.length,
+      messageTurns: messageTurns.length,
       intentSequences: intentSequences.length,
       intentRunLogs: intentRunLogs.length,
       intentEvalMetrics: intentEvalMetrics.length,
@@ -382,6 +397,74 @@ export async function persistEvaluationProjection(
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+
+/**
+ * Project enriched chatlog rows into `sessions` and `message_turns` records.
+ * Groups rows by sessionId, emitting one DbSession per session and one
+ * DbMessageTurn per row. Rows are sorted by turnIndex within each session.
+ *
+ * @param rows Enriched chatlog rows from EvaluateResponse.
+ * @param context Shared projection context.
+ * @returns Session and message-turn records.
+ */
+function buildSessionAndTurnProjections(
+  rows: EnrichedChatlogRow[],
+  context: { projectId: string; evaluationRunId: string; now: string },
+): { sessions: DbSession[]; messageTurns: DbMessageTurn[] } {
+  const { projectId, evaluationRunId, now } = context;
+
+  // Group rows by sessionId, preserving order.
+  const sessionMap = new Map<string, EnrichedChatlogRow[]>();
+  for (const row of rows) {
+    if (!sessionMap.has(row.sessionId)) sessionMap.set(row.sessionId, []);
+    sessionMap.get(row.sessionId)!.push(row);
+  }
+
+  const sessions: DbSession[] = [];
+  const messageTurns: DbMessageTurn[] = [];
+
+  for (const [sessionId, sessionRows] of sessionMap.entries()) {
+    const sorted = [...sessionRows].sort((a, b) => a.turnIndex - b.turnIndex);
+    const userTurnCount = sorted.filter((r) => r.role === "user").length;
+
+    const firstRow = sorted[0];
+    const lastRow = sorted[sorted.length - 1];
+
+    sessions.push({
+      table: "sessions",
+      id: stableId("session", projectId, evaluationRunId, sessionId),
+      projectId,
+      evaluationRunId,
+      sessionId,
+      messageCount: sorted.length,
+      userTurnCount,
+      firstTurnAt: firstRow?.timestamp || undefined,
+      lastTurnAt: lastRow?.timestamp || undefined,
+      createdAt: now,
+    });
+
+    for (const row of sorted) {
+      messageTurns.push({
+        table: "message_turns",
+        id: stableId("turn", projectId, evaluationRunId, sessionId, String(row.turnIndex)),
+        projectId,
+        evaluationRunId,
+        sessionId,
+        turnIndex: row.turnIndex,
+        role: row.role,
+        content: row.content,
+        timestampMs: row.timestampMs ?? undefined,
+        responseGapSec: row.responseGapSec ?? undefined,
+        isDropoffTurn: row.isDropoffTurn,
+        isQuestion: row.isQuestion,
+        tokenCountEstimate: row.tokenCountEstimate,
+        createdAt: now,
+      });
+    }
+  }
+
+  return { sessions, messageTurns };
+}
 
 function buildObjectiveSignals(
   metrics: ObjectiveMetrics,

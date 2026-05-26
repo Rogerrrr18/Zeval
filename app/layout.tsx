@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ProjectProvider } from "@/components/shell/ProjectContext";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,8 +13,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN">
-      <body>{children}</body>
+    <html lang="zh-CN" data-theme="dark">
+      <body>
+        <ProjectProvider>{children}</ProjectProvider>
+      </body>
     </html>
   );
 }

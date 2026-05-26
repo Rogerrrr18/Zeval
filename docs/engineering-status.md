@@ -1,6 +1,6 @@
 # Zeval Engineering Status
 
-Updated: 2026-05-24
+Updated: 2026-05-25
 
 This is the canonical handoff document for developers and future coding agents. It replaces the older root-level `CURRENT_DEVELOPMENT_PROGRESS.md` and `AGENT_HANDOFF_ZEVAL.md`.
 
@@ -87,6 +87,11 @@ remediation-skill-<packageId>/
 - `src/lib/judgeLog.ts` — append-only JSONL log at `.zeval-db/judge-logs.jsonl`; one entry per judge call (success + failure).
 - `src/lib/concurrency.ts` — `mapWithConcurrency` / `resolveJudgeConcurrency`; prevents rate-limit storms.
 
+### Near-duplicate deduplication
+- `src/eval-datasets/case-transcript-hash.ts` — `normalizeTranscriptForHash` + `computeNormalizedTranscriptHash` (L1 exact) + **`jaccardTranscriptSimilarity`** (L2 token-set Jaccard for cross-session near-dedup).
+- `src/badcase/dedupe.ts` — Three-layer dedup: L1 exact SHA-256 / L2 Jaccard token similarity (≥ 0.85, fallback when embedding empty) / L3 structural metric+tag distance.
+- `src/eval-datasets/admission/pipeline.ts` — Jaccard near-dedup wired for all non-TP channels directly; TP channels use feature-snapshot path (embedding cosine or Jaccard fallback).
+
 ### Online Eval
 - `src/lib/onlineEvalRunStore.ts` — save/load/list replay runs at `.zeval-db/online-eval-runs/{runId}.json`.
 - `src/online-eval/replayAssistant.ts` — HTTP replay logic.
@@ -165,8 +170,8 @@ npm run jobs:work:once
 | Area | Gap | Priority |
 |---|---|---|
 | `auto_disagreement` channel | Requires dual-track parallel evaluation (rules ‖ LLM). Fused pipeline makes this non-trivial. Empty in MVP. | Low |
-| P1 evaluation projection | Framework (`smoke-evaluate-projection.mts`) exists but not activated for local-json adapter. Tables: sessions / message_turns / objective_signals / subjective_dimensions. | Medium |
-| Near-duplicate dedup | SHA-256 transcript hash exists; `allowNearDuplicate` flag works. Inter-session cluster dedup not yet implemented. | Low |
+| P1 evaluation projection | ✅ **Done** — `sessions` + `message_turns` now projected. `smoke-evaluate-projection.mts` outputs `sessions:1, messageTurns:8`. | — |
+| Near-duplicate dedup | ✅ **Done** — Jaccard token-similarity L2 (threshold 0.85) active for cross-session near-dedup. Exact hash still L1. Jaccard is most effective for 10+ turn sessions or English/mixed-language content; short Chinese-only sessions require near-identical wording due to lack of word boundaries. | — |
 | Large-scale fixtures | `mock-chatlog/raw-data` contains only small fixtures (< 50 rows). No large-scale smoke. | Medium |
 | Gold set coverage | MVP-level labels. Should expand by scenario and add CI workflow. | Medium |
 | Queue | Local durable storage; not a production distributed queue (no BullMQ / Redis). | Low |
@@ -174,8 +179,8 @@ npm run jobs:work:once
 
 ## Safe Next Tasks
 
-1. Activate P1 evaluation projection for local-json adapter.
-2. Implement inter-session dedup clustering (Jaccard / MinHash on top of hash).
+1. ~~Activate P1 evaluation projection for local-json adapter.~~ ✅ Done.
+2. ~~Implement inter-session dedup clustering (Jaccard / MinHash on top of hash).~~ ✅ Done (Jaccard L2).
 3. Add large fixture + `scripts/smoke-end-to-end.mjs --scale large`.
 4. Expand gold labels by scenario and add CI workflow.
 5. Build `auto_disagreement` channel once dual-track evaluation is feasible.

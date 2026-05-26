@@ -111,3 +111,39 @@
   line-height: 1.65;
   text-align: center;
 }
+
+:global(html[data-theme="dark"]) .card,
+:global(html[data-theme="dark"]) .empty {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 0.86), rgb(8 13 27 / 0.82));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+:global(html[data-theme="dark"]) .card:hover {
+  border-color: var(--zeval-line-strong);
+}
+
+:global(html[data-theme="dark"]) .header h3,
+:global(html[data-theme="dark"]) .actionText {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .header p,
+:global(html[data-theme="dark"]) .evidenceBlock ul,
+:global(html[data-theme="dark"]) .empty {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .tag {
+  border-color: rgb(103 232 249 / 0.18);
+  background: rgb(103 232 249 / 0.08);
+  color: var(--zeval-cyan);
+}
+
+:global(html[data-theme="dark"]) .actionText {
+  border: 1px solid var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background: rgb(3 7 18 / 0.46);
+}

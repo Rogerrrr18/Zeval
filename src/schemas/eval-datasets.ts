@@ -112,6 +112,10 @@ export const evalDatasetHarvestBadcasesBodySchema = z.object({
   capabilityDimension: z.string().max(120).optional(),
   evaluate: z.object({
     runId: z.string().min(1),
+    // Only validate the minimum fields needed for schema safety.
+    // .passthrough() on every nested object preserves pipeline-critical fields
+    // (enrichedRows, subjectiveMetrics.status/dimensions/goalCompletions, etc.)
+    // that Zod would otherwise silently strip before the admission pipeline runs.
     subjectiveMetrics: z.object({
       signals: z.array(
         z.object({
@@ -119,9 +123,9 @@ export const evalDatasetHarvestBadcasesBodySchema = z.object({
           score: z.number(),
           severity: z.string().min(1),
           evidenceTurnRange: z.string().min(1),
-        }),
+        }).passthrough(),
       ),
-    }),
+    }).passthrough(),
     badCaseAssets: z.array(
       z.object({
         caseKey: z.string().min(1),
@@ -130,11 +134,9 @@ export const evalDatasetHarvestBadcasesBodySchema = z.object({
         severityScore: z.number(),
         normalizedTranscriptHash: z.string().min(1),
         duplicateGroupKey: z.string().min(1),
-        topicSegmentId: z.string().min(1),
-        topicIndex: z.number().int().optional(),
-        topicRange: z.object({ startTurn: z.number().int(), endTurn: z.number().int() }).optional(),
-        topicLabel: z.string().min(1),
-        topicSummary: z.string(),
+        // topicSegmentId / topicLabel / topicSummary / topicIndex / topicRange
+        // were removed in the P1 refactor — omitting them here fixes the
+        // "请求体不合法" 400 that was blocking all six admission channels.
         tags: z.array(z.string()).default([]),
         transcript: z.string().min(1),
         evidence: z.array(
@@ -147,7 +149,7 @@ export const evalDatasetHarvestBadcasesBodySchema = z.object({
         autoSignals: z.array(z.record(z.string(), z.unknown())).optional(),
         suggestedAction: z.string(),
         sourceRunId: z.string().min(1),
-      }),
+      }).passthrough(),
     ),
-  }),
+  }).passthrough(),
 });

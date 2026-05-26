@@ -11,6 +11,7 @@
  */
 
 import * as admissionPipelineModule from "../src/eval-datasets/admission/pipeline.ts";
+import * as transcriptHashModule from "../src/eval-datasets/case-transcript-hash.ts";
 import type { DatasetStore } from "../src/eval-datasets/storage/dataset-store.ts";
 import type {
   DatasetBaselineRecord,
@@ -33,6 +34,7 @@ function resolveInteropModule<T>(module: T): T {
 }
 
 const { runAdmissionPipeline } = resolveInteropModule(admissionPipelineModule);
+const { jaccardTranscriptSimilarity } = resolveInteropModule(transcriptHashModule);
 
 // ── Colours ───────────────────────────────────────────────────────────────────
 const GREEN = "\x1b[32m";
@@ -283,6 +285,116 @@ const evaluate = {
   scenarioEvaluation: null,
 } as unknown as EvaluateResponse;
 
+function assertApproxGte(label: string, actual: number, min: number): void {
+  const ok = actual >= min;
+  if (ok) {
+    console.log(`  ${GREEN}✔${RESET} ${label} (${actual.toFixed(3)} >= ${min})`);
+    passed++;
+  } else {
+    console.error(`  ${RED}✘ ${label}${RESET}: expected >= ${min}, got ${actual.toFixed(3)}`);
+    failed++;
+  }
+}
+
+// ── Jaccard inter-session near-dedup smoke ────────────────────────────────────
+//
+// Two separate pipeline runs on the same fresh store:
+//   Run 1: s_jac  — 10-turn session admitted as FN (fn_dropoff_negative_tail)
+//   Run 2: s_near — same 10 turns but turn 8 content changed → not exact hash,
+//          but Jaccard(s_near, s_jac) ≈ 0.917 ≥ 0.85 → near_duplicate SKIP
+//
+// This verifies cross-session near-dedup for non-TP channels.
+
+async function runJaccardNearDedupSmoke(): Promise<void> {
+  // 10-turn base session: last 3 user turns carry negative keywords → FN admission.
+  // Turn layout: assistant(0) user(1) assistant(2) user(3) assistant(4)
+  //              user(5) assistant(6) user(7) assistant(8) user(9)
+  // Last 3 user turns: [5] 还没解决呢 (没解决) · [7] 太慢了这根本没用 (没用) · [9] 我要投诉你们 (投诉)
+  const baseRows: EnrichedChatlogRow[] = [
+    makeRow("s_jac", "assistant", "您好有什么可以帮您",           0),
+    makeRow("s_jac", "user",      "我想查询我的订单情况",         1),
+    makeRow("s_jac", "assistant", "请提供您的订单编号",           2),
+    makeRow("s_jac", "user",      "订单编号是SF123456",           3),
+    makeRow("s_jac", "assistant", "正在为您查询请稍候",           4),
+    makeRow("s_jac", "user",      "还没解决呢",                   5),
+    makeRow("s_jac", "assistant", "系统处理需要时间请继续等待",   6),
+    makeRow("s_jac", "user",      "太慢了这根本没用",             7),
+    makeRow("s_jac", "assistant", "非常抱歉给您造成了困扰",       8),
+    makeRow("s_jac", "user",      "我要投诉你们",                 9),
+  ];
+
+  // Near-dup: identical except turn 8 assistant content.
+  // Structural tokens shared: turn·0-9·user·assistant = 13
+  // Content tokens: 9 matching + 2 unique → Jaccard = (13+9)/(13+9+2) = 22/24 ≈ 0.917
+  const nearDupRows: EnrichedChatlogRow[] = [
+    ...baseRows.slice(0, 8).map((r) => ({ ...r, sessionId: "s_near" })),
+    makeRow("s_near", "assistant", "十分抱歉给您带来了不便",     8),
+    makeRow("s_near", "user",      "我要投诉你们",               9),
+  ];
+
+  // Build minimal evaluate responses (no badCaseAssets → FN channel).
+  const baseEval = {
+    ...evaluate,
+    runId: "jac_run_1",
+    enrichedRows: baseRows,
+    badCaseAssets: [],
+    subjectiveMetrics: { ...evaluate.subjectiveMetrics, goalCompletions: [] },
+  } as unknown as EvaluateResponse;
+
+  const nearEval = {
+    ...evaluate,
+    runId: "jac_run_2",
+    enrichedRows: nearDupRows,
+    badCaseAssets: [],
+    subjectiveMetrics: { ...evaluate.subjectiveMetrics, goalCompletions: [] },
+  } as unknown as EvaluateResponse;
+
+  const jStore = createMockStore();
+
+  // Run 1 — admit s_jac as FN.
+  const run1 = await runAdmissionPipeline({
+    store: jStore,
+    evaluate: baseEval,
+    tnSampleRate: 0.0,
+    humanSamplingRate: 0.0,
+  });
+
+  // Run 2 — s_near should be blocked as near_duplicate.
+  const run2 = await runAdmissionPipeline({
+    store: jStore,
+    evaluate: nearEval,
+    tnSampleRate: 0.0,
+    humanSamplingRate: 0.0,
+    allowNearDuplicate: false,
+  });
+
+  // ── Compute expected Jaccard score from actual stored transcripts ──────────
+  const s_jacRecord  = jStore.cases.find((c) => c.sessionId === "s_jac");
+  const s_nearRecord = jStore.cases.find((c) => c.sessionId === "s_near");
+  const s_jacTranscript  = s_jacRecord?.transcript ?? "";
+  const s_nearTranscript = run2.skips.find((s) => s.sessionId === "s_near") && nearDupRows
+    .map((r) => `[turn ${r.turnIndex}] [${r.role}] ${r.content}`)
+    .join("\n");
+
+  const jacScore = typeof s_nearTranscript === "string"
+    ? jaccardTranscriptSimilarity(s_jacTranscript, s_nearTranscript)
+    : 0;
+
+  console.log(`\n${BOLD}Jaccard inter-session near-dedup${RESET}`);
+
+  assert("run 1: s_jac admitted as auto_fn",
+    run1.acceptedBySource["auto_fn"] ?? 0, 1);
+
+  assertApproxGte("Jaccard(s_jac, s_near) >= 0.85 (sanity check)", jacScore, 0.85);
+
+  assert("run 2: s_near NOT saved (near_duplicate blocked)",
+    s_nearRecord, undefined);
+
+  const nearSkip = run2.skips.find((s) => s.sessionId === "s_near");
+  assert("run 2: s_near skip reason = near_duplicate",
+    nearSkip?.reason, "near_duplicate");
+}
+
 // ── Run the pipeline ──────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -376,6 +488,9 @@ async function main(): Promise<void> {
     (s) => s.sessionId === "s_unc" && s.channel === "auto_uncertainty",
   );
   assert("s_unc skip reason is exact_hash", uncSkip?.reason, "exact_hash");
+
+  // ── Jaccard near-dedup smoke ──────────────────────────────────────────────
+  await runJaccardNearDedupSmoke();
 
   // ── Summary ───────────────────────────────────────────────────────────────
   console.log(`\n${BOLD}Summary${RESET}`);

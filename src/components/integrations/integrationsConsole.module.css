@@ -133,3 +133,66 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+:global(html[data-theme="dark"]) .title {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .sub,
+:global(html[data-theme="dark"]) .feature p,
+:global(html[data-theme="dark"]) .snippetMeta p {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .feature,
+:global(html[data-theme="dark"]) .installCard,
+:global(html[data-theme="dark"]) .snippetCard {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 0.86), rgb(8 13 27 / 0.82));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), var(--zeval-shadow);
+}
+
+:global(html[data-theme="dark"]) .feature strong {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .tabs {
+  border-bottom-color: var(--zeval-line);
+  background: rgb(3 7 18 / 0.46);
+}
+
+:global(html[data-theme="dark"]) .tab {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="dark"]) .tab:hover {
+  color: var(--zeval-text);
+  background: rgb(103 232 249 / 0.08);
+}
+
+:global(html[data-theme="dark"]) .tabActive {
+  color: var(--zeval-cyan);
+  border-bottom-color: var(--zeval-cyan);
+  background: rgb(103 232 249 / 0.08);
+}
+
+:global(html[data-theme="dark"]) .copyBtn {
+  border-color: var(--zeval-line);
+  background: rgb(15 23 42 / 0.72);
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .copyBtn:hover {
+  border-color: var(--zeval-line-strong);
+  color: var(--zeval-text);
+  background: rgb(103 232 249 / 0.08);
+}
+
+:global(html[data-theme="dark"]) .installCmd,
+:global(html[data-theme="dark"]) .code {
+  border: 1px solid var(--zeval-line);
+  background: #020617;
+  color: #d7e3f8;
+}

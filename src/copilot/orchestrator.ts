@@ -171,7 +171,20 @@ export async function runCopilotTurn(
       return { events };
     }
 
-    const action = parseJsonObjectFromLlmOutput(raw);
+    let action: unknown;
+    try {
+      action = parseJsonObjectFromLlmOutput(raw);
+    } catch {
+      // Model returned plain text (ZEVAL_JUDGE_JSON_MODE=false and prompt not followed).
+      // Surface the raw text as a final message instead of crashing.
+      const trimmed = raw.trim();
+      if (trimmed) {
+        push({ type: "final", message: trimmed, next_actions: [] });
+      } else {
+        push({ type: "error", message: "LLM 未返回有效内容，请重试。" });
+      }
+      return { events };
+    }
     if (!action || typeof action !== "object") {
       push({ type: "error", message: "LLM 返回不是合法 JSON，已停止。" });
       return { events };

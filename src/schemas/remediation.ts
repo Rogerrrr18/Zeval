@@ -61,11 +61,8 @@ const badCaseAssetSchema = z.object({
   severityScore: z.number(),
   normalizedTranscriptHash: z.string().min(1),
   duplicateGroupKey: z.string().min(1),
-  topicSegmentId: z.string().min(1),
-  topicIndex: z.number().int().optional(),
-  topicRange: z.object({ startTurn: z.number().int(), endTurn: z.number().int() }).optional(),
-  topicLabel: z.string().min(1),
-  topicSummary: z.string(),
+  // topicSegmentId / topicLabel / topicSummary / topicIndex / topicRange were
+  // removed in the P1 refactor — omitting them prevents the "请求体不合法" 400.
   tags: z.array(z.string()).default([]),
   transcript: z.string().min(1),
   evidence: z.array(
@@ -78,7 +75,7 @@ const badCaseAssetSchema = z.object({
   autoSignals: z.array(z.record(z.string(), z.unknown())).optional(),
   suggestedAction: z.string(),
   sourceRunId: z.string().min(1),
-});
+}).passthrough();
 
 const scenarioEvaluationSchema = z.object({
   scenarioId: z.string().min(1),
@@ -120,7 +117,7 @@ export const remediationPackageCreateBodySchema = z.object({
     runId: z.string().min(1),
     objectiveMetrics: z.object({
       avgResponseGapSec: z.number(),
-      topicSwitchRate: z.number(),
+      // topicSwitchRate removed in P1 refactor (depended on topicSegmentId).
       userQuestionRepeatRate: z.number(),
       agentResolutionSignalRate: z.number(),
       escalationKeywordHitRate: z.number(),

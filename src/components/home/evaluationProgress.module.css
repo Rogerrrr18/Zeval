@@ -112,3 +112,55 @@
   }
 }
 
+:global(html[data-theme="dark"]) .stageItem {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background: rgb(3 7 18 / 0.46);
+}
+
+:global(html[data-theme="dark"]) .stageIcon {
+  border-color: var(--zeval-line);
+  background: rgb(15 23 42 / 0.72);
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="dark"]) .stage_running {
+  border-color: var(--zeval-cyan);
+  color: var(--zeval-cyan);
+  box-shadow: 0 0 18px rgb(103 232 249 / 0.22);
+}
+
+:global(html[data-theme="dark"]) .stage_done {
+  border-color: var(--zeval-success);
+  background: var(--zeval-success);
+  color: #03111a;
+}
+
+:global(html[data-theme="dark"]) .stage_failed {
+  border-color: var(--zeval-danger);
+  background: var(--zeval-danger);
+  color: #21080d;
+}
+
+:global(html[data-theme="dark"]) .stageText strong {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .stageText span {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="dark"]) .spinner {
+  border-color: rgb(103 232 249 / 0.22);
+  border-top-color: var(--zeval-cyan);
+}
+
+:global(html[data-theme="dark"]) .failureBox {
+  border-color: rgb(251 113 133 / 0.24);
+  background: rgb(251 113 133 / 0.08);
+  color: #fda4af;
+}
+
+:global(html[data-theme="dark"]) .failureBox strong {
+  color: #fecdd3;
+}

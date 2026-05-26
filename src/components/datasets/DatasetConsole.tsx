@@ -129,8 +129,11 @@ export function DatasetConsole() {
     try {
       const [clusterRes, poolRes, fnRes, ucRes] = await Promise.all([
         fetch("/api/eval-datasets/clusters"),
-        // Pool: all cases that are NOT pending_review (auto_tp + confirmed FN + TN + manual_fp)
-        fetch("/api/eval-datasets/cases?caseSetType=badcase"),
+        // Pool: ALL cases (badcase + goodcase).
+        // Omitting caseSetType so that auto_tn golden positives (goodcase) are
+        // included — previously only badcases were fetched, making the TN channel
+        // invisible in the UI even when harvest succeeded.
+        fetch("/api/eval-datasets/cases"),
         // Pending: FN channel, still in auto_captured / pending
         fetch("/api/eval-datasets/cases?source=auto_fn"),
         // Pending: uncertainty channel
@@ -176,8 +179,10 @@ export function DatasetConsole() {
       });
       setPendingCases([...pendingMap.values()]);
 
+      const goodcasePoolCount = poolFiltered.filter((c) => c.caseSetType === "goodcase").length;
+      const badcasePoolCount  = poolFiltered.filter((c) => c.caseSetType === "badcase").length;
       setNotice(
-        `已入池 ${poolFiltered.length} 条（已审核），待确认 ${pendingMap.size} 条。`,
+        `已入池 ${poolFiltered.length} 条（坏案例 ${badcasePoolCount}，金标正例 ${goodcasePoolCount}），待确认 ${pendingMap.size} 条。`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载数据失败");
@@ -339,9 +344,9 @@ export function DatasetConsole() {
               <small>regression_active</small>
             </article>
             <article className={styles.heroCard}>
-              <span>误判转正例</span>
-              <strong>{poolCases.filter((c) => c.source === "manual_fp").length}</strong>
-              <small>manual_fp 正例对照</small>
+              <span>金标正例</span>
+              <strong>{poolCases.filter((c) => c.caseSetType === "goodcase").length}</strong>
+              <small>auto_tn · 人工纠偏正例</small>
             </article>
           </section>
 

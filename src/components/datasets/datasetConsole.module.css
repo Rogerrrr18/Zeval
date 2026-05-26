@@ -959,3 +959,469 @@
     text-align: center;
   }
 }
+
+/* ─── Dark mode ─────────────────────────────────────────────────────── */
+:global(html[data-theme="dark"]) .page {
+  color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .titleBlock h1,
+:global(html[data-theme="dark"]) .titleBlock p {
+  color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .titleBlock p {
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="dark"]) .heroCard {
+  background: #111111;
+  border-color: #1f1f1f;
+  box-shadow: none;
+}
+
+:global(html[data-theme="dark"]) .heroCard span {
+  color: #52525b;
+}
+
+:global(html[data-theme="dark"]) .heroCard strong {
+  color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .heroCard small {
+  color: #71717a;
+}
+
+:global(html[data-theme="dark"]) .panel {
+  background: #111111;
+  border-color: #1f1f1f;
+  box-shadow: none;
+}
+
+:global(html[data-theme="dark"]) .panelHeader h2 {
+  color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .panelHeader p {
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="dark"]) .meta {
+  color: #a1a1aa;
+  background: #1a1a1a;
+  border-color: #2e2e2e;
+}
+
+:global(html[data-theme="dark"]) .label {
+  color: #71717a;
+}
+
+:global(html[data-theme="dark"]) .select,
+:global(html[data-theme="dark"]) .input,
+:global(html[data-theme="dark"]) .textarea {
+  background: #1a1a1a;
+  color: #fafafa;
+  border-color: #2e2e2e;
+}
+
+:global(html[data-theme="dark"]) .select:focus,
+:global(html[data-theme="dark"]) .input:focus,
+:global(html[data-theme="dark"]) .textarea:focus {
+  border-color: #a78bfa;
+}
+
+:global(html[data-theme="dark"]) .input::placeholder,
+:global(html[data-theme="dark"]) .textarea::placeholder {
+  color: #52525b;
+}
+
+:global(html[data-theme="dark"]) .secondaryButton {
+  background: #1a1a1a;
+  color: #fafafa;
+  border-color: #2e2e2e;
+}
+
+:global(html[data-theme="dark"]) .secondaryButton:hover:not(:disabled) {
+  border-color: #52525b;
+}
+
+:global(html[data-theme="dark"]) .primaryButton {
+  background: #fafafa;
+  color: #0a0a0a;
+  border-color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .primaryButton:hover:not(:disabled) {
+  background: #e4e4e7;
+}
+
+:global(html[data-theme="dark"]) .error {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
+:global(html[data-theme="dark"]) .notice {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.08);
+  border-color: rgba(74, 222, 128, 0.2);
+}
+
+:global(html[data-theme="dark"]) .tagPill,
+:global(html[data-theme="dark"]) .statusPill {
+  color: #a1a1aa;
+  background: #1a1a1a;
+  border-color: #2e2e2e;
+}
+
+:global(html[data-theme="dark"]) .taskButton {
+  background: #111111;
+  color: #a1a1aa;
+  border-color: #1f1f1f;
+}
+
+:global(html[data-theme="dark"]) .taskButton:hover {
+  border-color: #2e2e2e;
+}
+
+:global(html[data-theme="dark"]) .taskButtonActive {
+  border-color: #a78bfa;
+  background: #1a1a1a;
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.08);
+}
+
+:global(html[data-theme="dark"]) .taskButton strong {
+  color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .taskButton span,
+:global(html[data-theme="dark"]) .taskButton small {
+  color: #71717a;
+}
+
+:global(html[data-theme="dark"]) .draftEditor {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+
+:global(html[data-theme="dark"]) .prefillBox {
+  background: #1a1a1a;
+  border-color: #2e2e2e;
+}
+
+:global(html[data-theme="dark"]) .prefillBox strong {
+  color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .prefillBox span {
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="dark"]) .clusterCard {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+
+:global(html[data-theme="dark"]) .clusterSummary strong {
+  color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .clusterSummary p {
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="dark"]) .clusterItems {
+  border-top-color: #1f1f1f;
+}
+
+:global(html[data-theme="dark"]) .caseCard {
+  background: #1a1a1a;
+  border-color: #2e2e2e;
+}
+
+:global(html[data-theme="dark"]) .caseHeader h3 {
+  color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .caseHeader p,
+:global(html[data-theme="dark"]) .actionText {
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="dark"]) .reviewBox {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+
+:global(html[data-theme="dark"]) .reviewHeader strong {
+  color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .reviewHeader span,
+:global(html[data-theme="dark"]) .savingHint {
+  color: #71717a;
+}
+
+:global(html[data-theme="dark"]) .transcript {
+  background: #1a1a1a;
+  border-color: #1f1f1f;
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="dark"]) .empty {
+  background: #111111;
+  border-color: #2e2e2e;
+  color: #52525b;
+}
+
+:global(html[data-theme="dark"]) .tabBar {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+
+:global(html[data-theme="dark"]) .tabButton {
+  color: #71717a;
+}
+
+:global(html[data-theme="dark"]) .tabButton:hover {
+  color: #fafafa;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:global(html[data-theme="dark"]) .tabActive,
+:global(html[data-theme="dark"]) .tab.tabActive {
+  background: #1a1a1a;
+  color: #fafafa;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+:global(html[data-theme="dark"]) .tabCount {
+  color: #71717a;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:global(html[data-theme="dark"]) .tab {
+  color: #71717a;
+}
+
+:global(html[data-theme="dark"]) .tab:hover {
+  color: #fafafa;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:global(html[data-theme="dark"]) .stepIntro {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+
+:global(html[data-theme="dark"]) .stepIntro h2 {
+  color: #fafafa;
+}
+
+:global(html[data-theme="dark"]) .stepIntro p {
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="dark"]) .howTo {
+  background: #1a1a1a;
+  border-left-color: #a78bfa;
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="dark"]) .howToTitle {
+  color: #52525b;
+}
+
+:global(html[data-theme="dark"]) .pendingCard {
+  background: rgba(249, 115, 22, 0.08);
+  border-color: rgba(249, 115, 22, 0.2);
+}
+
+:global(html[data-theme="dark"]) .channelDesc {
+  color: #f97316;
+}
+
+:global(html[data-theme="dark"]) .transcriptToggle {
+  color: #a1a1aa;
+  border-color: #2e2e2e;
+}
+
+:global(html[data-theme="dark"]) .transcriptToggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:global(html[data-theme="dark"]) .noteToggle {
+  color: #a1a1aa;
+  border-color: #2e2e2e;
+}
+
+:global(html[data-theme="dark"]) .noteToggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+:global(html[data-theme="dark"]) .skipButton {
+  color: #52525b;
+}
+
+:global(html[data-theme="dark"]) .skipButton:hover {
+  color: #71717a;
+}
+
+:global(html[data-theme="dark"]) .signalBox {
+  background: rgba(255, 255, 255, 0.04);
+  border-left-color: rgba(96, 165, 250, 0.4);
+}
+
+:global(html[data-theme="dark"]) .signalBox strong {
+  color: #71717a;
+}
+
+:global(html[data-theme="dark"]) .signalBox li {
+  color: #d1d5db;
+}
+
+:global(html[data-theme="dark"]) .overrideRow {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+:global(html[data-theme="dark"]) .overrideBadge {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.25);
+}
+
+:global(html[data-theme="dark"]) .pendingActions {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+:global(html[data-theme="dark"]) .confirmButton {
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
+:global(html[data-theme="dark"]) .confirmButton:hover:not(:disabled) {
+  background: #15803d;
+}
+
+:global(html[data-theme="dark"]) .rejectButton {
+  color: #f87171;
+  border-color: #f87171;
+}
+
+:global(html[data-theme="dark"]) .rejectButton:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.08);
+}
+
+:global(html[data-theme="dark"]) .severityBadge {
+  background: rgba(248, 113, 113, 0.1);
+  color: #f87171;
+}
+
+:global(html[data-theme="dark"]) .badgeGroup .sourceBadge {
+  opacity: 0.85;
+}
+
+/* ─── 2026 dark product polish ─────────────────────────────────────── */
+:global(html[data-theme="dark"]) .heroCard,
+:global(html[data-theme="dark"]) .panel,
+:global(html[data-theme="dark"]) .clusterCard,
+:global(html[data-theme="dark"]) .caseCard,
+:global(html[data-theme="dark"]) .reviewBox,
+:global(html[data-theme="dark"]) .pendingCard,
+:global(html[data-theme="dark"]) .stepIntro {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 0.86), rgb(8 13 27 / 0.82));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), var(--zeval-shadow);
+}
+
+:global(html[data-theme="dark"]) .titleBlock h1,
+:global(html[data-theme="dark"]) .panelHeader h2,
+:global(html[data-theme="dark"]) .heroCard strong,
+:global(html[data-theme="dark"]) .caseHeader h3,
+:global(html[data-theme="dark"]) .clusterSummary strong {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .titleBlock p,
+:global(html[data-theme="dark"]) .panelHeader p,
+:global(html[data-theme="dark"]) .caseHeader p,
+:global(html[data-theme="dark"]) .clusterSummary p,
+:global(html[data-theme="dark"]) .actionText {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .meta,
+:global(html[data-theme="dark"]) .tagPill,
+:global(html[data-theme="dark"]) .statusPill,
+:global(html[data-theme="dark"]) .tabCount,
+:global(html[data-theme="dark"]) .overrideBadge {
+  border-color: rgb(103 232 249 / 0.18);
+  background: rgb(103 232 249 / 0.08);
+  color: var(--zeval-cyan);
+}
+
+:global(html[data-theme="dark"]) .select,
+:global(html[data-theme="dark"]) .input,
+:global(html[data-theme="dark"]) .textarea,
+:global(html[data-theme="dark"]) .transcript,
+:global(html[data-theme="dark"]) .tabBar,
+:global(html[data-theme="dark"]) .taskButton,
+:global(html[data-theme="dark"]) .prefillBox,
+:global(html[data-theme="dark"]) .empty {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background: rgb(3 7 18 / 0.46);
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .select:focus,
+:global(html[data-theme="dark"]) .input:focus,
+:global(html[data-theme="dark"]) .textarea:focus {
+  border-color: var(--zeval-cyan);
+  box-shadow: var(--zeval-focus);
+}
+
+:global(html[data-theme="dark"]) .primaryButton,
+:global(html[data-theme="dark"]) .confirmButton {
+  border-color: var(--zeval-cyan);
+  background: linear-gradient(135deg, var(--zeval-cyan), var(--zeval-teal));
+  color: #03111a;
+  box-shadow: 0 16px 36px rgb(103 232 249 / 0.18);
+}
+
+:global(html[data-theme="dark"]) .primaryButton:hover:not(:disabled),
+:global(html[data-theme="dark"]) .confirmButton:hover:not(:disabled) {
+  background: linear-gradient(135deg, #a5f3fc, #5eead4);
+  transform: translateY(-2px);
+}
+
+:global(html[data-theme="dark"]) .secondaryButton,
+:global(html[data-theme="dark"]) .transcriptToggle,
+:global(html[data-theme="dark"]) .noteToggle {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background: rgb(15 23 42 / 0.72);
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .secondaryButton:hover:not(:disabled),
+:global(html[data-theme="dark"]) .transcriptToggle:hover,
+:global(html[data-theme="dark"]) .noteToggle:hover,
+:global(html[data-theme="dark"]) .taskButton:hover,
+:global(html[data-theme="dark"]) .clusterCard:hover,
+:global(html[data-theme="dark"]) .caseCard:hover {
+  border-color: var(--zeval-line-strong);
+  color: var(--zeval-text);
+  background: rgb(103 232 249 / 0.08);
+  transform: translateY(-1px);
+}
+
+:global(html[data-theme="dark"]) .tabActive,
+:global(html[data-theme="dark"]) .taskButtonActive {
+  border-color: var(--zeval-line-strong);
+  background: linear-gradient(135deg, rgb(103 232 249 / 0.12), rgb(96 165 250 / 0.1));
+  color: var(--zeval-text);
+  box-shadow: inset 0 0 0 1px rgb(103 232 249 / 0.16);
+}

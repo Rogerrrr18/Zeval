@@ -100,28 +100,29 @@ type DeltaTableProps = {
   signalRows: CompareRow[];
 };
 
+/** Render one metric group inside the delta comparison table. */
+function DeltaTableSection({ title, rows }: { title: string; rows: CompareRow[] }) {
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <tr className={styles.deltaTableGroupRow}>
+        <td colSpan={5}>{title}</td>
+      </tr>
+      {rows.map((row) => (
+        <tr key={row.name}>
+          <td className={styles.deltaMetricName}>{row.name}</td>
+          <td className={styles.deltaScore}>{row.baseline.toFixed(2)}</td>
+          <td className={styles.deltaScore}>{row.current.toFixed(2)}</td>
+          <td><VerdictBadge row={row} /></td>
+          <td className={styles.deltaVerdict}>{verdictOf(row) === "win" ? "✅ 改善" : verdictOf(row) === "loss" ? "⚠ 回退" : "— 持平"}</td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
 /** Tabular comparison of baseline vs current with deltas and verdicts. */
 function DeltaTable(props: DeltaTableProps) {
-  function Section({ title, rows }: { title: string; rows: CompareRow[] }) {
-    if (rows.length === 0) return null;
-    return (
-      <>
-        <tr className={styles.deltaTableGroupRow}>
-          <td colSpan={5}>{title}</td>
-        </tr>
-        {rows.map((row) => (
-          <tr key={row.name}>
-            <td className={styles.deltaMetricName}>{row.name}</td>
-            <td className={styles.deltaScore}>{row.baseline.toFixed(2)}</td>
-            <td className={styles.deltaScore}>{row.current.toFixed(2)}</td>
-            <td><VerdictBadge row={row} /></td>
-            <td className={styles.deltaVerdict}>{verdictOf(row) === "win" ? "✅ 改善" : verdictOf(row) === "loss" ? "⚠ 回退" : "— 持平"}</td>
-          </tr>
-        ))}
-      </>
-    );
-  }
-
   return (
     <div style={{ overflowX: "auto", marginTop: 18 }}>
       <table className={styles.deltaTable}>
@@ -135,9 +136,9 @@ function DeltaTable(props: DeltaTableProps) {
           </tr>
         </thead>
         <tbody>
-          <Section title="主观维度" rows={props.dimensionRows} />
-          <Section title="客观指标" rows={props.objectiveRows} />
-          <Section title="隐式信号" rows={props.signalRows} />
+          <DeltaTableSection title="主观维度" rows={props.dimensionRows} />
+          <DeltaTableSection title="客观指标" rows={props.objectiveRows} />
+          <DeltaTableSection title="隐式信号" rows={props.signalRows} />
         </tbody>
       </table>
     </div>

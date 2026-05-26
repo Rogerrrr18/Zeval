@@ -108,13 +108,12 @@ export function CopilotConsole() {
     safeSetLocalStorageItem(CHAT_ACTIVE_STORAGE_KEY, activeChannelId);
   }, [activeChannelId, channels, hydrated]);
 
-  // Auto-scroll on new turn.
+  // Auto-scroll whenever content changes or loading state changes.
   useEffect(() => {
-    transcriptRef.current?.scrollTo({
-      top: transcriptRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [turns]);
+    const el = transcriptRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [turns, running]);
 
   /**
    * Patch a channel and refresh its updated timestamp.
@@ -351,9 +350,11 @@ export function CopilotConsole() {
               <p className={styles.channelEyebrow}>Chat</p>
               <h1 className={styles.channelTitle}>Channels</h1>
             </div>
-            <button className={styles.newChannelBtn} onClick={createChannel} title="New channel">
-              +
-            </button>
+            <div className={styles.channelHeaderActions}>
+              <button className={styles.newChannelBtn} onClick={createChannel} title="New channel">
+                +
+              </button>
+            </div>
           </div>
           <div className={styles.channelList}>
             {channels.map((channel) => {

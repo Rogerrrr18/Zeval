@@ -1,0 +1,29 @@
+{
+  "caseId": "bc_1779755791991_4ac406",
+  "caseSetType": "badcase",
+  "source": "auto_tp",
+  "sessionId": "1_00004",
+  "topicSegmentId": "1_00004",
+  "topicLabel": "auto_tp:high_dropoff",
+  "topicSummary": "",
+  "normalizedTranscriptHash": "64937822bbf8674b5943bc856b54096149c9e68bf79d418e647b2ac34256d2aa",
+  "baselineVersion": "run_1779755111189",
+  "baselineCaseScore": 0.6,
+  "tags": [
+    "question_repeat"
+  ],
+  "transcript": "[turn 1] [user] I'd like to find a place to eat.\n[turn 2] [assistant] Where should I look? What kind of food are you in the mood for? You can say things like Mexican, Italian or any other kind of food.\n[turn 3] [user] Lobster sounds great. Please search in San Mateo.\n[turn 4] [assistant] I have found 9 restaurants. Andes Cafe San Mateo is a great restaurant in San Mateo.\n[turn 5] [user] What's their phone number?\n[turn 6] [assistant] Their number is 650-581-1305.\n[turn 7] [user] Any other suggestions?\n[turn 8] [assistant] Fuji Sukiyaki is another great choice in San Mateo.\n[turn 9] [user] Do they have live music?\n[turn 10] [assistant] They do not.\n[turn 11] [user] Any other suggestions?\n[turn 12] [assistant] Golden Wok would be a great choice in San Mateo.\n[turn 13] [user] That would work great. I would like to make a reservation there at evening 5:30 on March 14th.\n[turn 14] [assistant] Please confirm the following: You want to eat at Golden Wok in San Mateo on March 14th starting at 5:30 pm. The reservation would be for 2 people.\n[turn 15] [user] Yes, that would be great. Do they serve liquor or have live music?\n[turn 16] [assistant] Your reservation was successful. They do not play live music or serve alcohol.\n[turn 17] [user] Thanks so much!\n[turn 18] [assistant] Is there anything else today?\n[turn 19] [user] Nope, that'll be all. Thanks!\n[turn 20] [assistant] Have a great day!",
+  "autoSignals": [
+    {
+      "ruleKey": "high_dropoff",
+      "severity": "low"
+    }
+  ],
+  "reviewStatus": "auto_captured",
+  "metadata": {
+    "humanReviewRequired": true,
+    "humanReviewQueuedAt": "2026-05-26T00:36:31.991Z"
+  },
+  "createdAt": "2026-05-26T00:36:31.991Z",
+  "updatedAt": "2026-05-26T00:36:31.991Z"
+}

@@ -150,3 +150,48 @@
   padding: 4px 6px;
   border-radius: 3px;
 }
+
+:global(html[data-theme="dark"]) .empty,
+:global(html[data-theme="dark"]) .card {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 0.86), rgb(8 13 27 / 0.82));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+:global(html[data-theme="dark"]) .summary,
+:global(html[data-theme="dark"]) .groupTitle,
+:global(html[data-theme="dark"]) .needs,
+:global(html[data-theme="dark"]) .threshold,
+:global(html[data-theme="dark"]) .source {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="dark"]) .empty strong,
+:global(html[data-theme="dark"]) .cardLabel,
+:global(html[data-theme="dark"]) .scorePill {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .empty,
+:global(html[data-theme="dark"]) .reason,
+:global(html[data-theme="dark"]) .evidenceList li {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .bar {
+  background: rgb(148 163 184 / 0.16);
+}
+
+:global(html[data-theme="dark"]) .barFill {
+  background: linear-gradient(90deg, var(--zeval-cyan), var(--zeval-teal));
+}
+
+:global(html[data-theme="dark"]) .detail {
+  border-top-color: var(--zeval-line);
+}
+
+:global(html[data-theme="dark"]) .evidenceList li {
+  background: rgb(3 7 18 / 0.46);
+}

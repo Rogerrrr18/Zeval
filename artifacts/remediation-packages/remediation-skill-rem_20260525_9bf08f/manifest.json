@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "packageId": "rem_20260525_9bf08f",
+  "createdAt": "2026-05-25T03:55:26.858Z",
+  "runId": "copilot_1779681322651",
+  "title": "通用对话 · 升级风险 调优包",
+  "priority": "P0",
+  "selectedCaseKeys": [
+    "sess_ec_angry_01_76d6c691fb"
+  ],
+  "selectedCaseCount": 1,
+  "dominantTags": [
+    "escalation_keyword",
+    "goal_failed",
+    "understanding_barrier"
+  ],
+  "problemSummary": [
+    "会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。",
+    "用户主任务没有完成，session 结束在失败态。",
+    "对话出现理解障碍，agent 的表达方式对用户不够友好。"
+  ],
+  "editScope": [
+    "prompt",
+    "policy",
+    "orchestration"
+  ],
+  "constraints": [
+    "不要降低现有安全拒答质量。",
+    "不要让平均响应时延恶化超过 20%。",
+    "不要破坏当前已支持的业务场景与回放链路。",
+    "投诉与转人工路径要保留可追踪的 SLA 与兜底话术。",
+    "优先保证用户主任务闭环，不要用冗长解释替代动作完成。"
+  ],
+  "targetMetrics": [
+    {
+      "metricId": "goal_completion_rate",
+      "displayName": "目标达成率",
+      "currentValue": 0,
+      "targetValue": 0.7,
+      "direction": "increase",
+      "reason": "失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。"
+    },
+    {
+      "metricId": "user_question_repeat_rate",
+      "displayName": "重复提问率",
+      "currentValue": 0,
+      "targetValue": 0.05,
+      "direction": "decrease",
+      "reason": "用户在追问同一个问题，说明回答结构仍然不够直接。"
+    },
+    {
+      "metricId": "empathy_score",
+      "displayName": "共情得分",
+      "currentValue": 3,
+      "targetValue": 4,
+      "direction": "increase",
+      "reason": "理解障碍与重复追问通常伴随共情不足和回答方式僵硬。"
+    },
+    {
+      "metricId": "escalation_keyword_hit_rate",
+      "displayName": "升级触发率",
+      "currentValue": 1,
+      "targetValue": 0.9,
+      "direction": "decrease",
+      "reason": "用户已进入投诉/转人工语境，需先降低升级触发。"
+    }
+  ],
+  "acceptanceGate": {
+    "replay": {
+      "required": true,
+      "baselineRunId": "copilot_1779681322651",
+      "baselineCustomerId": null,
+      "minWinRate": 0.65
+    },
+    "offlineEval": {
+      "required": true,
+      "sampleBatchId": null,
+      "maxRegressions": 0
+    },
+    "sandbox": {
+      "required": false,
+      "scenarios": []
+    },
+    "guards": {
+      "dangerous_reply_count": 0,
+      "max_regressions": 0,
+      "goal_completion_rate_min": 0.7,
+      "user_question_repeat_rate_max": 0.05,
+      "empathy_score_min": 4,
+      "escalation_keyword_hit_rate_max": 0.9
+    }
+  },
+  "artifactDir": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f",
+  "files": [
+    {
+      "fileName": "issue-brief.md",
+      "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/issue-brief.md",
+      "content": "# rem_20260525_9bf08f\n\n## 概览\n- 生成时间：2026-05-25T03:55:26.858Z\n- 来源 Run：copilot_1779681322651\n- 场景：通用评估\n- 优先级：P0\n- 选中 bad case：1\n- 建议优先修改层：prompt, policy, orchestration\n\n## 问题摘要\n- 会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\n- 用户主任务没有完成，session 结束在失败态。\n- 对话出现理解障碍，agent 的表达方式对用户不够友好。\n\n## 目标指标\n- 目标达成率: 0 -> 0.7 (提高)。失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。\n- 重复提问率: 0 -> 0.05 (降低)。用户在追问同一个问题，说明回答结构仍然不够直接。\n- 共情得分: 3 -> 4 (提高)。理解障碍与重复追问通常伴随共情不足和回答方式僵硬。\n- 升级触发率: 1 -> 0.9 (降低)。用户已进入投诉/转人工语境，需先降低升级触发。\n\n## 关键证据\n### 第 7 轮后目标未达成：如果又出问题我会投诉到底\n- tags: escalation_keyword, goal_failed, understanding_barrier\n- severity: 1.00\n- suggested_action: 优先把失败 session 编译为 remediation spec，并补一键回放验证。\n- [turn 7] [user] 如果又出问题我会投诉到底\n- [turn 1] [user] 你们物流显示签收了我根本没收到货\n\n## 约束条件\n- 不要降低现有安全拒答质量。\n- 不要让平均响应时延恶化超过 20%。\n- 不要破坏当前已支持的业务场景与回放链路。\n- 投诉与转人工路径要保留可追踪的 SLA 与兜底话术。\n- 优先保证用户主任务闭环，不要用冗长解释替代动作完成。\n\n## Agent Handoff\n- 将本目录下的 `remediation-spec.yaml`、`badcases.jsonl`、`acceptance-gate.yaml` 一起交给 Claude Code / Codex。\n- 优先从 edit_scope 指定的层开始改，不要无关重构。\n- 完成后必须先跑 replay，再跑固定 sample batch；任何 guard 退化都不算通过。\n\n## 验收摘要\n- replay.min_win_rate = 0.65\n- offline_eval.max_regressions = 0"
+    },
+    {
+      "fileName": "remediation-spec.yaml",
+      "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/remediation-spec.yaml",
+      "content": "package_id: \"rem_20260525_9bf08f\"\ncreated_at: \"2026-05-25T03:55:26.858Z\"\nsource_run_id: \"copilot_1779681322651\"\nscenario_id: null\npriority: \"P0\"\ngoal: \"会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\"\nproblem_summary:\n  - \"会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\"\n  - \"用户主任务没有完成，session 结束在失败态。\"\n  - \"对话出现理解障碍，agent 的表达方式对用户不够友好。\"\nselected_case_keys:\n  - \"sess_ec_angry_01_76d6c691fb\"\nedit_scope:\n  - \"prompt\"\n  - \"policy\"\n  - \"orchestration\"\nconstraints:\n  - \"不要降低现有安全拒答质量。\"\n  - \"不要让平均响应时延恶化超过 20%。\"\n  - \"不要破坏当前已支持的业务场景与回放链路。\"\n  - \"投诉与转人工路径要保留可追踪的 SLA 与兜底话术。\"\n  - \"优先保证用户主任务闭环，不要用冗长解释替代动作完成。\"\ntarget_metrics:\n  - metric_id: \"goal_completion_rate\"\n    display_name: \"目标达成率\"\n    current_value: 0\n    target_value: 0.7\n    direction: \"increase\"\n    reason: \"失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。\"\n  - metric_id: \"user_question_repeat_rate\"\n    display_name: \"重复提问率\"\n    current_value: 0\n    target_value: 0.05\n    direction: \"decrease\"\n    reason: \"用户在追问同一个问题，说明回答结构仍然不够直接。\"\n  - metric_id: \"empathy_score\"\n    display_name: \"共情得分\"\n    current_value: 3\n    target_value: 4\n    direction: \"increase\"\n    reason: \"理解障碍与重复追问通常伴随共情不足和回答方式僵硬。\"\n  - metric_id: \"escalation_keyword_hit_rate\"\n    display_name: \"升级触发率\"\n    current_value: 1\n    target_value: 0.9\n    direction: \"decrease\"\n    reason: \"用户已进入投诉/转人工语境，需先降低升级触发。\"\nexecution_notes:\n  - \"优先处理 P0/P1 失败标签最多的 case。\"\n  - \"如需改 prompt，请同步说明 why 与 expected behavior。\"\n  - \"如需改代码或 orchestration，保持回放输入兼容。\"\n"
+    },
+    {
+      "fileName": "badcases.jsonl",
+      "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/badcases.jsonl",
+      "content": "{\"case_id\":\"sess_ec_angry_01_76d6c691fb\",\"session_id\":\"sess_ec_angry_01\",\"severity_score\":1,\"turn_range\":\"1-7\",\"current_output\":\"[turn 8] [assistant] 理解你的担心我会把升级专员电话一并给你方便你随时跟进\",\"problem_tags\":[\"escalation_keyword\",\"goal_failed\",\"understanding_barrier\"],\"expected_behavior\":\"明确重述用户主任务，给出完成态或清晰的下一步动作。 先直接回答问题核心，再补背景，避免用户重复追问。 在升级前给出兜底动作、SLA 承诺和明确升级路径。\",\"evidence\":[{\"turnIndex\":7,\"role\":\"user\",\"content\":\"如果又出问题我会投诉到底\"},{\"turnIndex\":1,\"role\":\"user\",\"content\":\"你们物流显示签收了我根本没收到货\"}],\"transcript\":\"[turn 1] [user] 你们物流显示签收了我根本没收到货\\n[turn 2] [assistant] 非常抱歉给你带来困扰我先核对快递柜代收与签收人信息\\n[turn 3] [user] 别套话我就问今天能不能解决\\n[turn 4] [assistant] 可以今天内处理若确认丢件我们启动补发或退款你更倾向哪一种\\n[turn 5] [user] 补发但要保证别再丢\\n[turn 6] [assistant] 明白我会备注改送货上门并加急单号预计今晚前发出\\n[turn 7] [user] 如果又出问题我会投诉到底\\n[turn 8] [assistant] 理解你的担心我会把升级专员电话一并给你方便你随时跟进\",\"suggested_action\":\"优先把失败 session 编译为 remediation spec，并补一键回放验证。\",\"source_run_id\":\"copilot_1779681322651\"}\n"
+    },
+    {
+      "fileName": "acceptance-gate.yaml",
+      "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/acceptance-gate.yaml",
+      "content": "replay:\n  required: true\n  baselineRunId: \"copilot_1779681322651\"\n  baselineCustomerId: null\n  minWinRate: 0.65\nofflineEval:\n  required: true\n  sampleBatchId: null\n  maxRegressions: 0\nsandbox:\n  required: false\n  scenarios: []\nguards:\n  dangerous_reply_count: 0\n  max_regressions: 0\n  goal_completion_rate_min: 0.7\n  user_question_repeat_rate_max: 0.05\n  empathy_score_min: 4\n  escalation_keyword_hit_rate_max: 0.9\n"
+    }
+  ],
+  "skillFolder": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f",
+  "skillBundle": {
+    "folderName": "remediation-skill-rem_20260525_9bf08f",
+    "rootPath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f",
+    "skillFile": {
+      "fileName": "SKILL.md",
+      "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/SKILL.md",
+      "role": "overview",
+      "content": "# 通用对话 · 升级风险 调优包\n\n## 什么时候使用\n当 Zeval run `copilot_1779681322651` 暴露出以下问题时使用本 skill：\n- 会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\n- 用户主任务没有完成，session 结束在失败态。\n- 对话出现理解障碍，agent 的表达方式对用户不够友好。\n\n## 修复策略\n- 优先级：P0\n- 优先修改层：prompt, policy, orchestration\n- 先修复覆盖面最大的失败标签，再处理单点异常。\n- 不做无关重构；所有改动都要能被 reference/acceptance-gate.yaml 验证。\n\n## 关键 bad case\n- 第 7 轮后目标未达成：如果又出问题我会投诉到底：severity=1.00，tags=escalation_keyword, goal_failed, understanding_barrier，建议=优先把失败 session 编译为 remediation spec，并补一键回放验证。\n\n## 目标指标\n- 目标达成率: 0 -> 0.7 (提高)\n- 重复提问率: 0 -> 0.05 (降低)\n- 共情得分: 3 -> 4 (提高)\n- 升级触发率: 1 -> 0.9 (降低)\n\n## 验收标准\n- Replay win rate >= 0.65\n- Offline eval max regressions <= 0\n- `reference/badcases.jsonl` 中的关键样例不再触发同类失败。\n- 如果修改 prompt/policy/orchestration/code，必须在提交说明里写清楚影响范围。\n\n## Reference\n- `reference/issue-brief.md`：完整问题说明与证据。\n- `reference/badcases.jsonl`：机器可读 bad case。\n- `reference/remediation-spec.yaml`：修复范围、约束与目标指标。\n- `reference/acceptance-gate.yaml`：验收门禁。"
+    },
+    "readmeFile": {
+      "fileName": "README.md",
+      "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/README.md",
+      "role": "readme",
+      "content": "# remediation-skill-rem_20260525_9bf08f\n\n这是 Zeval 自动生成的 remediation skill 文件夹，面向 Claude Code / Codex 使用。\n\n## 使用方式\n1. 先读 `SKILL.md`，理解问题、修复策略与验收标准。\n2. 再读 `reference/issue-brief.md` 和 `reference/badcases.jsonl`，确认证据。\n3. 按 `reference/remediation-spec.yaml` 限定的 edit_scope 修改系统。\n4. 用 `reference/acceptance-gate.yaml` 验证 replay / offline eval 门禁。\n\n## 元数据\n- package_id: rem_20260525_9bf08f\n- source_run_id: copilot_1779681322651\n- generated_at: 2026-05-25T03:55:26.858Z\n- artifact_dir: artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f"
+    },
+    "referenceFiles": [
+      {
+        "fileName": "issue-brief.md",
+        "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/issue-brief.md",
+        "content": "# rem_20260525_9bf08f\n\n## 概览\n- 生成时间：2026-05-25T03:55:26.858Z\n- 来源 Run：copilot_1779681322651\n- 场景：通用评估\n- 优先级：P0\n- 选中 bad case：1\n- 建议优先修改层：prompt, policy, orchestration\n\n## 问题摘要\n- 会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\n- 用户主任务没有完成，session 结束在失败态。\n- 对话出现理解障碍，agent 的表达方式对用户不够友好。\n\n## 目标指标\n- 目标达成率: 0 -> 0.7 (提高)。失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。\n- 重复提问率: 0 -> 0.05 (降低)。用户在追问同一个问题，说明回答结构仍然不够直接。\n- 共情得分: 3 -> 4 (提高)。理解障碍与重复追问通常伴随共情不足和回答方式僵硬。\n- 升级触发率: 1 -> 0.9 (降低)。用户已进入投诉/转人工语境，需先降低升级触发。\n\n## 关键证据\n### 第 7 轮后目标未达成：如果又出问题我会投诉到底\n- tags: escalation_keyword, goal_failed, understanding_barrier\n- severity: 1.00\n- suggested_action: 优先把失败 session 编译为 remediation spec，并补一键回放验证。\n- [turn 7] [user] 如果又出问题我会投诉到底\n- [turn 1] [user] 你们物流显示签收了我根本没收到货\n\n## 约束条件\n- 不要降低现有安全拒答质量。\n- 不要让平均响应时延恶化超过 20%。\n- 不要破坏当前已支持的业务场景与回放链路。\n- 投诉与转人工路径要保留可追踪的 SLA 与兜底话术。\n- 优先保证用户主任务闭环，不要用冗长解释替代动作完成。\n\n## Agent Handoff\n- 将本目录下的 `remediation-spec.yaml`、`badcases.jsonl`、`acceptance-gate.yaml` 一起交给 Claude Code / Codex。\n- 优先从 edit_scope 指定的层开始改，不要无关重构。\n- 完成后必须先跑 replay，再跑固定 sample batch；任何 guard 退化都不算通过。\n\n## 验收摘要\n- replay.min_win_rate = 0.65\n- offline_eval.max_regressions = 0",
+        "role": "reference"
+      },
+      {
+        "fileName": "remediation-spec.yaml",
+        "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/remediation-spec.yaml",
+        "content": "package_id: \"rem_20260525_9bf08f\"\ncreated_at: \"2026-05-25T03:55:26.858Z\"\nsource_run_id: \"copilot_1779681322651\"\nscenario_id: null\npriority: \"P0\"\ngoal: \"会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\"\nproblem_summary:\n  - \"会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\"\n  - \"用户主任务没有完成，session 结束在失败态。\"\n  - \"对话出现理解障碍，agent 的表达方式对用户不够友好。\"\nselected_case_keys:\n  - \"sess_ec_angry_01_76d6c691fb\"\nedit_scope:\n  - \"prompt\"\n  - \"policy\"\n  - \"orchestration\"\nconstraints:\n  - \"不要降低现有安全拒答质量。\"\n  - \"不要让平均响应时延恶化超过 20%。\"\n  - \"不要破坏当前已支持的业务场景与回放链路。\"\n  - \"投诉与转人工路径要保留可追踪的 SLA 与兜底话术。\"\n  - \"优先保证用户主任务闭环，不要用冗长解释替代动作完成。\"\ntarget_metrics:\n  - metric_id: \"goal_completion_rate\"\n    display_name: \"目标达成率\"\n    current_value: 0\n    target_value: 0.7\n    direction: \"increase\"\n    reason: \"失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。\"\n  - metric_id: \"user_question_repeat_rate\"\n    display_name: \"重复提问率\"\n    current_value: 0\n    target_value: 0.05\n    direction: \"decrease\"\n    reason: \"用户在追问同一个问题，说明回答结构仍然不够直接。\"\n  - metric_id: \"empathy_score\"\n    display_name: \"共情得分\"\n    current_value: 3\n    target_value: 4\n    direction: \"increase\"\n    reason: \"理解障碍与重复追问通常伴随共情不足和回答方式僵硬。\"\n  - metric_id: \"escalation_keyword_hit_rate\"\n    display_name: \"升级触发率\"\n    current_value: 1\n    target_value: 0.9\n    direction: \"decrease\"\n    reason: \"用户已进入投诉/转人工语境，需先降低升级触发。\"\nexecution_notes:\n  - \"优先处理 P0/P1 失败标签最多的 case。\"\n  - \"如需改 prompt，请同步说明 why 与 expected behavior。\"\n  - \"如需改代码或 orchestration，保持回放输入兼容。\"\n",
+        "role": "reference"
+      },
+      {
+        "fileName": "badcases.jsonl",
+        "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/badcases.jsonl",
+        "content": "{\"case_id\":\"sess_ec_angry_01_76d6c691fb\",\"session_id\":\"sess_ec_angry_01\",\"severity_score\":1,\"turn_range\":\"1-7\",\"current_output\":\"[turn 8] [assistant] 理解你的担心我会把升级专员电话一并给你方便你随时跟进\",\"problem_tags\":[\"escalation_keyword\",\"goal_failed\",\"understanding_barrier\"],\"expected_behavior\":\"明确重述用户主任务，给出完成态或清晰的下一步动作。 先直接回答问题核心，再补背景，避免用户重复追问。 在升级前给出兜底动作、SLA 承诺和明确升级路径。\",\"evidence\":[{\"turnIndex\":7,\"role\":\"user\",\"content\":\"如果又出问题我会投诉到底\"},{\"turnIndex\":1,\"role\":\"user\",\"content\":\"你们物流显示签收了我根本没收到货\"}],\"transcript\":\"[turn 1] [user] 你们物流显示签收了我根本没收到货\\n[turn 2] [assistant] 非常抱歉给你带来困扰我先核对快递柜代收与签收人信息\\n[turn 3] [user] 别套话我就问今天能不能解决\\n[turn 4] [assistant] 可以今天内处理若确认丢件我们启动补发或退款你更倾向哪一种\\n[turn 5] [user] 补发但要保证别再丢\\n[turn 6] [assistant] 明白我会备注改送货上门并加急单号预计今晚前发出\\n[turn 7] [user] 如果又出问题我会投诉到底\\n[turn 8] [assistant] 理解你的担心我会把升级专员电话一并给你方便你随时跟进\",\"suggested_action\":\"优先把失败 session 编译为 remediation spec，并补一键回放验证。\",\"source_run_id\":\"copilot_1779681322651\"}\n",
+        "role": "reference"
+      },
+      {
+        "fileName": "acceptance-gate.yaml",
+        "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/acceptance-gate.yaml",
+        "content": "replay:\n  required: true\n  baselineRunId: \"copilot_1779681322651\"\n  baselineCustomerId: null\n  minWinRate: 0.65\nofflineEval:\n  required: true\n  sampleBatchId: null\n  maxRegressions: 0\nsandbox:\n  required: false\n  scenarios: []\nguards:\n  dangerous_reply_count: 0\n  max_regressions: 0\n  goal_completion_rate_min: 0.7\n  user_question_repeat_rate_max: 0.05\n  empathy_score_min: 4\n  escalation_keyword_hit_rate_max: 0.9\n",
+        "role": "reference"
+      }
+    ],
+    "files": [
+      {
+        "fileName": "SKILL.md",
+        "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/SKILL.md",
+        "role": "overview",
+        "content": "# 通用对话 · 升级风险 调优包\n\n## 什么时候使用\n当 Zeval run `copilot_1779681322651` 暴露出以下问题时使用本 skill：\n- 会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\n- 用户主任务没有完成，session 结束在失败态。\n- 对话出现理解障碍，agent 的表达方式对用户不够友好。\n\n## 修复策略\n- 优先级：P0\n- 优先修改层：prompt, policy, orchestration\n- 先修复覆盖面最大的失败标签，再处理单点异常。\n- 不做无关重构；所有改动都要能被 reference/acceptance-gate.yaml 验证。\n\n## 关键 bad case\n- 第 7 轮后目标未达成：如果又出问题我会投诉到底：severity=1.00，tags=escalation_keyword, goal_failed, understanding_barrier，建议=优先把失败 session 编译为 remediation spec，并补一键回放验证。\n\n## 目标指标\n- 目标达成率: 0 -> 0.7 (提高)\n- 重复提问率: 0 -> 0.05 (降低)\n- 共情得分: 3 -> 4 (提高)\n- 升级触发率: 1 -> 0.9 (降低)\n\n## 验收标准\n- Replay win rate >= 0.65\n- Offline eval max regressions <= 0\n- `reference/badcases.jsonl` 中的关键样例不再触发同类失败。\n- 如果修改 prompt/policy/orchestration/code，必须在提交说明里写清楚影响范围。\n\n## Reference\n- `reference/issue-brief.md`：完整问题说明与证据。\n- `reference/badcases.jsonl`：机器可读 bad case。\n- `reference/remediation-spec.yaml`：修复范围、约束与目标指标。\n- `reference/acceptance-gate.yaml`：验收门禁。"
+      },
+      {
+        "fileName": "issue-brief.md",
+        "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/issue-brief.md",
+        "content": "# rem_20260525_9bf08f\n\n## 概览\n- 生成时间：2026-05-25T03:55:26.858Z\n- 来源 Run：copilot_1779681322651\n- 场景：通用评估\n- 优先级：P0\n- 选中 bad case：1\n- 建议优先修改层：prompt, policy, orchestration\n\n## 问题摘要\n- 会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\n- 用户主任务没有完成，session 结束在失败态。\n- 对话出现理解障碍，agent 的表达方式对用户不够友好。\n\n## 目标指标\n- 目标达成率: 0 -> 0.7 (提高)。失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。\n- 重复提问率: 0 -> 0.05 (降低)。用户在追问同一个问题，说明回答结构仍然不够直接。\n- 共情得分: 3 -> 4 (提高)。理解障碍与重复追问通常伴随共情不足和回答方式僵硬。\n- 升级触发率: 1 -> 0.9 (降低)。用户已进入投诉/转人工语境，需先降低升级触发。\n\n## 关键证据\n### 第 7 轮后目标未达成：如果又出问题我会投诉到底\n- tags: escalation_keyword, goal_failed, understanding_barrier\n- severity: 1.00\n- suggested_action: 优先把失败 session 编译为 remediation spec，并补一键回放验证。\n- [turn 7] [user] 如果又出问题我会投诉到底\n- [turn 1] [user] 你们物流显示签收了我根本没收到货\n\n## 约束条件\n- 不要降低现有安全拒答质量。\n- 不要让平均响应时延恶化超过 20%。\n- 不要破坏当前已支持的业务场景与回放链路。\n- 投诉与转人工路径要保留可追踪的 SLA 与兜底话术。\n- 优先保证用户主任务闭环，不要用冗长解释替代动作完成。\n\n## Agent Handoff\n- 将本目录下的 `remediation-spec.yaml`、`badcases.jsonl`、`acceptance-gate.yaml` 一起交给 Claude Code / Codex。\n- 优先从 edit_scope 指定的层开始改，不要无关重构。\n- 完成后必须先跑 replay，再跑固定 sample batch；任何 guard 退化都不算通过。\n\n## 验收摘要\n- replay.min_win_rate = 0.65\n- offline_eval.max_regressions = 0",
+        "role": "reference"
+      },
+      {
+        "fileName": "remediation-spec.yaml",
+        "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/remediation-spec.yaml",
+        "content": "package_id: \"rem_20260525_9bf08f\"\ncreated_at: \"2026-05-25T03:55:26.858Z\"\nsource_run_id: \"copilot_1779681322651\"\nscenario_id: null\npriority: \"P0\"\ngoal: \"会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\"\nproblem_summary:\n  - \"会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。\"\n  - \"用户主任务没有完成，session 结束在失败态。\"\n  - \"对话出现理解障碍，agent 的表达方式对用户不够友好。\"\nselected_case_keys:\n  - \"sess_ec_angry_01_76d6c691fb\"\nedit_scope:\n  - \"prompt\"\n  - \"policy\"\n  - \"orchestration\"\nconstraints:\n  - \"不要降低现有安全拒答质量。\"\n  - \"不要让平均响应时延恶化超过 20%。\"\n  - \"不要破坏当前已支持的业务场景与回放链路。\"\n  - \"投诉与转人工路径要保留可追踪的 SLA 与兜底话术。\"\n  - \"优先保证用户主任务闭环，不要用冗长解释替代动作完成。\"\ntarget_metrics:\n  - metric_id: \"goal_completion_rate\"\n    display_name: \"目标达成率\"\n    current_value: 0\n    target_value: 0.7\n    direction: \"increase\"\n    reason: \"失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。\"\n  - metric_id: \"user_question_repeat_rate\"\n    display_name: \"重复提问率\"\n    current_value: 0\n    target_value: 0.05\n    direction: \"decrease\"\n    reason: \"用户在追问同一个问题，说明回答结构仍然不够直接。\"\n  - metric_id: \"empathy_score\"\n    display_name: \"共情得分\"\n    current_value: 3\n    target_value: 4\n    direction: \"increase\"\n    reason: \"理解障碍与重复追问通常伴随共情不足和回答方式僵硬。\"\n  - metric_id: \"escalation_keyword_hit_rate\"\n    display_name: \"升级触发率\"\n    current_value: 1\n    target_value: 0.9\n    direction: \"decrease\"\n    reason: \"用户已进入投诉/转人工语境，需先降低升级触发。\"\nexecution_notes:\n  - \"优先处理 P0/P1 失败标签最多的 case。\"\n  - \"如需改 prompt，请同步说明 why 与 expected behavior。\"\n  - \"如需改代码或 orchestration，保持回放输入兼容。\"\n",
+        "role": "reference"
+      },
+      {
+        "fileName": "badcases.jsonl",
+        "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/badcases.jsonl",
+        "content": "{\"case_id\":\"sess_ec_angry_01_76d6c691fb\",\"session_id\":\"sess_ec_angry_01\",\"severity_score\":1,\"turn_range\":\"1-7\",\"current_output\":\"[turn 8] [assistant] 理解你的担心我会把升级专员电话一并给你方便你随时跟进\",\"problem_tags\":[\"escalation_keyword\",\"goal_failed\",\"understanding_barrier\"],\"expected_behavior\":\"明确重述用户主任务，给出完成态或清晰的下一步动作。 先直接回答问题核心，再补背景，避免用户重复追问。 在升级前给出兜底动作、SLA 承诺和明确升级路径。\",\"evidence\":[{\"turnIndex\":7,\"role\":\"user\",\"content\":\"如果又出问题我会投诉到底\"},{\"turnIndex\":1,\"role\":\"user\",\"content\":\"你们物流显示签收了我根本没收到货\"}],\"transcript\":\"[turn 1] [user] 你们物流显示签收了我根本没收到货\\n[turn 2] [assistant] 非常抱歉给你带来困扰我先核对快递柜代收与签收人信息\\n[turn 3] [user] 别套话我就问今天能不能解决\\n[turn 4] [assistant] 可以今天内处理若确认丢件我们启动补发或退款你更倾向哪一种\\n[turn 5] [user] 补发但要保证别再丢\\n[turn 6] [assistant] 明白我会备注改送货上门并加急单号预计今晚前发出\\n[turn 7] [user] 如果又出问题我会投诉到底\\n[turn 8] [assistant] 理解你的担心我会把升级专员电话一并给你方便你随时跟进\",\"suggested_action\":\"优先把失败 session 编译为 remediation spec，并补一键回放验证。\",\"source_run_id\":\"copilot_1779681322651\"}\n",
+        "role": "reference"
+      },
+      {
+        "fileName": "acceptance-gate.yaml",
+        "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/reference/acceptance-gate.yaml",
+        "content": "replay:\n  required: true\n  baselineRunId: \"copilot_1779681322651\"\n  baselineCustomerId: null\n  minWinRate: 0.65\nofflineEval:\n  required: true\n  sampleBatchId: null\n  maxRegressions: 0\nsandbox:\n  required: false\n  scenarios: []\nguards:\n  dangerous_reply_count: 0\n  max_regressions: 0\n  goal_completion_rate_min: 0.7\n  user_question_repeat_rate_max: 0.05\n  empathy_score_min: 4\n  escalation_keyword_hit_rate_max: 0.9\n",
+        "role": "reference"
+      },
+      {
+        "fileName": "README.md",
+        "relativePath": "artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f/README.md",
+        "role": "readme",
+        "content": "# remediation-skill-rem_20260525_9bf08f\n\n这是 Zeval 自动生成的 remediation skill 文件夹，面向 Claude Code / Codex 使用。\n\n## 使用方式\n1. 先读 `SKILL.md`，理解问题、修复策略与验收标准。\n2. 再读 `reference/issue-brief.md` 和 `reference/badcases.jsonl`，确认证据。\n3. 按 `reference/remediation-spec.yaml` 限定的 edit_scope 修改系统。\n4. 用 `reference/acceptance-gate.yaml` 验证 replay / offline eval 门禁。\n\n## 元数据\n- package_id: rem_20260525_9bf08f\n- source_run_id: copilot_1779681322651\n- generated_at: 2026-05-25T03:55:26.858Z\n- artifact_dir: artifacts/remediation-packages/remediation-skill-rem_20260525_9bf08f"
+      }
+    ]
+  }
+}

@@ -1916,3 +1916,444 @@
     flex-direction: column;
   }
 }
+
+/* ─── Dark mode ─────────────────────────────────────────────────────── */
+:global(html[data-theme="dark"]) .page { color: #fafafa; }
+
+:global(html[data-theme="dark"]) .hero {
+  background: #111111;
+  border-color: #1f1f1f;
+  box-shadow: none;
+}
+:global(html[data-theme="dark"]) .badge {
+  background: #1a1a1a;
+  border-color: #2e2e2e;
+  color: #a1a1aa;
+}
+:global(html[data-theme="dark"]) .heroTitle { color: #fafafa; }
+:global(html[data-theme="dark"]) .heroCopy { color: #a1a1aa; }
+:global(html[data-theme="dark"]) .heroTag {
+  background: #1a1a1a;
+  border-color: #2e2e2e;
+  color: #a1a1aa;
+}
+:global(html[data-theme="dark"]) .heroMetaCard {
+  background: #1a1a1a;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .heroMetaCard span { color: #52525b; }
+:global(html[data-theme="dark"]) .heroMetaCard strong { color: #fafafa; }
+:global(html[data-theme="dark"]) .heroMetaCard small { color: #71717a; }
+
+:global(html[data-theme="dark"]) .panel {
+  background: #111111;
+  border-color: #1f1f1f;
+  box-shadow: none;
+}
+:global(html[data-theme="dark"]) .panelHeader h2 { color: #fafafa; }
+:global(html[data-theme="dark"]) .panelHeader p { color: #a1a1aa; }
+:global(html[data-theme="dark"]) .panelMeta {
+  background: #1a1a1a;
+  border-color: #2e2e2e;
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="dark"]) .sampleDatasetCard {
+  background: #1a1a1a;
+  border-color: #2e2e2e;
+}
+:global(html[data-theme="dark"]) .sampleDatasetCard strong { color: #fafafa; }
+:global(html[data-theme="dark"]) .sampleDatasetCard p { color: #a1a1aa; }
+:global(html[data-theme="dark"]) .sampleDatasetEyebrow { color: #52525b; }
+
+:global(html[data-theme="dark"]) .recentRunsBox {
+  background: #1a1a1a;
+  border-color: #2e2e2e;
+}
+:global(html[data-theme="dark"]) .recentRunsHeader strong { color: #fafafa; }
+:global(html[data-theme="dark"]) .recentRunsHeader span { color: #71717a; }
+:global(html[data-theme="dark"]) .recentRunButton {
+  background: transparent;
+  border-color: transparent;
+  color: #a1a1aa;
+}
+:global(html[data-theme="dark"]) .recentRunButton:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: #2e2e2e;
+}
+:global(html[data-theme="dark"]) .recentRunButton span { color: #52525b; }
+:global(html[data-theme="dark"]) .recentRunButton strong { color: #fafafa; }
+:global(html[data-theme="dark"]) .recentRunButton small { color: #71717a; }
+
+:global(html[data-theme="dark"]) .uploadZone {
+  background: #111111;
+  border-color: #2e2e2e;
+  color: #a1a1aa;
+}
+:global(html[data-theme="dark"]) .uploadZoneActive { border-color: #a78bfa; }
+:global(html[data-theme="dark"]) .uploadText { color: #a1a1aa; }
+
+:global(html[data-theme="dark"]) .secondaryButton {
+  background: #1a1a1a;
+  color: #fafafa;
+  border-color: #2e2e2e;
+}
+:global(html[data-theme="dark"]) .secondaryButton:hover:not(:disabled) { border-color: #52525b; }
+
+:global(html[data-theme="dark"]) .metricCard {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .metricCard:hover { border-color: #2e2e2e; }
+:global(html[data-theme="dark"]) .metricCard p { color: #52525b; }
+:global(html[data-theme="dark"]) .metricCard strong { color: #fafafa; }
+:global(html[data-theme="dark"]) .metricCard span { color: #71717a; }
+
+:global(html[data-theme="dark"]) .chartCard {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .chartCard h3 { color: #fafafa; }
+:global(html[data-theme="dark"]) .chartCard p { color: #a1a1aa; }
+
+:global(html[data-theme="dark"]) .insightCard,
+:global(html[data-theme="dark"]) .traceCard {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .insightTitleBlock strong { color: #fafafa; }
+:global(html[data-theme="dark"]) .insightTitleBlock span,
+:global(html[data-theme="dark"]) .insightSubcopy { color: #a1a1aa; }
+:global(html[data-theme="dark"]) .insightMeta { color: #52525b; }
+:global(html[data-theme="dark"]) .insightBadgeNeutral { background: #1a1a1a; color: #a1a1aa; }
+:global(html[data-theme="dark"]) .insightSectionTitle { color: #52525b; }
+:global(html[data-theme="dark"]) .insightBulletList { color: #a1a1aa; }
+
+:global(html[data-theme="dark"]) .tabs {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .tab { color: #71717a; }
+:global(html[data-theme="dark"]) .tab:hover { color: #fafafa; background: rgba(255,255,255,0.05); }
+:global(html[data-theme="dark"]) .tabActive {
+  background: #1a1a1a;
+  color: #fafafa;
+}
+:global(html[data-theme="dark"]) .tabBadge { background: rgba(255,255,255,0.08); color: #a1a1aa; }
+:global(html[data-theme="dark"]) .tabActive .tabBadge { background: rgba(167,139,250,0.2); color: #a78bfa; }
+
+:global(html[data-theme="dark"]) .stepIntro {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .stepIntro h2 { color: #fafafa; }
+:global(html[data-theme="dark"]) .stepIntro p { color: #a1a1aa; }
+:global(html[data-theme="dark"]) .howTo {
+  background: #1a1a1a;
+  border-left-color: #a78bfa;
+  color: #a1a1aa;
+}
+:global(html[data-theme="dark"]) .howToTitle { color: #52525b; }
+
+:global(html[data-theme="dark"]) .baselineInput {
+  background: #1a1a1a;
+  color: #fafafa;
+  border-color: #2e2e2e;
+}
+:global(html[data-theme="dark"]) .baselineLabel { color: #a1a1aa; }
+:global(html[data-theme="dark"]) .baselineHint { color: #71717a; }
+:global(html[data-theme="dark"]) .baselineHint code { background: rgba(255,255,255,0.06); }
+
+:global(html[data-theme="dark"]) .suggestionList { color: #a1a1aa; }
+:global(html[data-theme="dark"]) .suggestionIndex { color: #52525b; }
+:global(html[data-theme="dark"]) .emptyState,
+:global(html[data-theme="dark"]) .emptySuggestion { color: #52525b; }
+
+:global(html[data-theme="dark"]) .exportMeta p { color: #a1a1aa; }
+:global(html[data-theme="dark"]) .exportMeta strong { color: #fafafa; }
+:global(html[data-theme="dark"]) .exportMeta span { color: #71717a; }
+
+:global(html[data-theme="dark"]) .warningItem {
+  background: rgba(251,146,60,0.08);
+  border-color: rgba(251,146,60,0.2);
+  color: #fb923c;
+}
+:global(html[data-theme="dark"]) .traceEvidenceRow { border-top-color: #1f1f1f; }
+:global(html[data-theme="dark"]) .traceEvidenceRow span { color: #71717a; }
+:global(html[data-theme="dark"]) .traceEvidenceRow strong { color: #fafafa; }
+:global(html[data-theme="dark"]) .traceEvidenceRow p { color: #a1a1aa; }
+
+/* ─── 2026 dark product polish ─────────────────────────────────────── */
+:global(html[data-theme="dark"]) .hero,
+:global(html[data-theme="dark"]) .panel,
+:global(html[data-theme="dark"]) .sampleDatasetCard,
+:global(html[data-theme="dark"]) .recentRunsBox,
+:global(html[data-theme="dark"]) .metricCard,
+:global(html[data-theme="dark"]) .chartCard,
+:global(html[data-theme="dark"]) .insightCard,
+:global(html[data-theme="dark"]) .traceCard,
+:global(html[data-theme="dark"]) .stepIntro {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 0.86), rgb(8 13 27 / 0.82));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), var(--zeval-shadow);
+}
+
+:global(html[data-theme="dark"]) .hero {
+  position: relative;
+  overflow: hidden;
+}
+
+:global(html[data-theme="dark"]) .hero::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgb(103 232 249 / 0.08), transparent 42%),
+    radial-gradient(circle at 82% 16%, rgb(45 212 191 / 0.12), transparent 18rem);
+  content: "";
+}
+
+:global(html[data-theme="dark"]) .heroContent,
+:global(html[data-theme="dark"]) .heroAside {
+  position: relative;
+  z-index: 1;
+}
+
+:global(html[data-theme="dark"]) .heroTitle,
+:global(html[data-theme="dark"]) .panelHeader h2,
+:global(html[data-theme="dark"]) .metricCard strong,
+:global(html[data-theme="dark"]) .chartCard h3 {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .heroCopy,
+:global(html[data-theme="dark"]) .panelHeader p,
+:global(html[data-theme="dark"]) .metricCard span,
+:global(html[data-theme="dark"]) .chartCard p {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .badge,
+:global(html[data-theme="dark"]) .heroTag,
+:global(html[data-theme="dark"]) .panelMeta,
+:global(html[data-theme="dark"]) .formatPill,
+:global(html[data-theme="dark"]) .tabBadge,
+:global(html[data-theme="dark"]) .insightBadgeNeutral {
+  border-color: rgb(103 232 249 / 0.18);
+  background: rgb(103 232 249 / 0.08);
+  color: var(--zeval-cyan);
+}
+
+:global(html[data-theme="dark"]) .heroMetaCard,
+:global(html[data-theme="dark"]) .recentRunButton,
+:global(html[data-theme="dark"]) .tabs,
+:global(html[data-theme="dark"]) .uploadZone,
+:global(html[data-theme="dark"]) .baselineInput,
+:global(html[data-theme="dark"]) .howTo {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background: rgb(3 7 18 / 0.46);
+}
+
+:global(html[data-theme="dark"]) .heroMetaCard strong,
+:global(html[data-theme="dark"]) .uploadText strong,
+:global(html[data-theme="dark"]) .recentRunButton strong {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .uploadText span,
+:global(html[data-theme="dark"]) .recentRunButton small,
+:global(html[data-theme="dark"]) .heroMetaCard small {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="dark"]) .processButton,
+:global(html[data-theme="dark"]) .onlineEvalLink {
+  border: 1px solid var(--zeval-cyan);
+  background: linear-gradient(135deg, var(--zeval-cyan), var(--zeval-teal));
+  color: #03111a;
+  box-shadow: 0 16px 36px rgb(103 232 249 / 0.18);
+}
+
+:global(html[data-theme="dark"]) .processButton small {
+  color: rgb(3 17 26 / 0.72);
+}
+
+:global(html[data-theme="dark"]) .processButton:hover:not(:disabled),
+:global(html[data-theme="dark"]) .onlineEvalLink:hover {
+  background: linear-gradient(135deg, #a5f3fc, #5eead4);
+  transform: translateY(-2px);
+}
+
+:global(html[data-theme="dark"]) .secondaryButton,
+:global(html[data-theme="dark"]) .secondaryNavLink,
+:global(html[data-theme="dark"]) .downloadLinkButton {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background: rgb(15 23 42 / 0.72);
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .secondaryButton:hover:not(:disabled),
+:global(html[data-theme="dark"]) .secondaryNavLink:hover,
+:global(html[data-theme="dark"]) .downloadLinkButton:hover {
+  border-color: var(--zeval-line-strong);
+  color: var(--zeval-text);
+  background: rgb(103 232 249 / 0.08);
+  transform: translateY(-1px);
+}
+
+:global(html[data-theme="dark"]) .tabActive {
+  background: linear-gradient(135deg, rgb(103 232 249 / 0.12), rgb(96 165 250 / 0.1));
+  color: var(--zeval-text);
+  box-shadow: inset 0 0 0 1px rgb(103 232 249 / 0.16);
+}
+
+:global(html[data-theme="dark"]) .uploadZone:hover,
+:global(html[data-theme="dark"]) .recentRunButton:hover:not(:disabled),
+:global(html[data-theme="dark"]) .metricCard:hover,
+:global(html[data-theme="dark"]) .chartCard:hover,
+:global(html[data-theme="dark"]) .insightCard:hover,
+:global(html[data-theme="dark"]) .traceCard:hover {
+  border-color: var(--zeval-line-strong);
+  transform: translateY(-1px);
+}
+
+:global(html[data-theme="dark"]) .uploadZoneActive {
+  border-color: var(--zeval-cyan);
+  background: rgb(103 232 249 / 0.08);
+  box-shadow: var(--zeval-focus);
+}
+
+:global(html[data-theme="dark"]) .iconButton {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background: rgb(15 23 42 / 0.75);
+  color: var(--zeval-cyan);
+}
+
+:global(html[data-theme="dark"]) .warningItem {
+  border-color: rgb(251 191 36 / 0.24);
+  background: rgb(251 191 36 / 0.08);
+  color: var(--zeval-warning);
+}
+
+/* ─── Pipeline dashboard layout ───────────────────────────────────── */
+:global(html[data-theme="dark"]) .main {
+  gap: 16px;
+}
+
+:global(html[data-theme="dark"]) .hero {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.52fr);
+  gap: 16px;
+  min-height: 172px;
+  padding: 18px;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgb(10 14 24 / 0.94), rgb(6 9 16 / 0.92));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+:global(html[data-theme="dark"]) .hero::before {
+  background:
+    linear-gradient(90deg, rgb(124 58 237 / 0.14), transparent 46%),
+    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
+  background-size: auto, 28px 28px, 28px 28px;
+}
+
+:global(html[data-theme="dark"]) .badge {
+  min-height: 24px;
+  padding: 0 9px;
+  border-color: rgb(167 139 250 / 0.26);
+  background: rgb(167 139 250 / 0.1);
+  color: #c4b5fd;
+  font-size: 10px;
+}
+
+:global(html[data-theme="dark"]) .heroTitle {
+  max-width: none;
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+:global(html[data-theme="dark"]) .heroCopy {
+  max-width: 58ch;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+:global(html[data-theme="dark"]) .heroMetaGrid {
+  gap: 8px;
+}
+
+:global(html[data-theme="dark"]) .heroMetaCard {
+  min-height: 88px;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+:global(html[data-theme="dark"]) .heroMetaCard span {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+:global(html[data-theme="dark"]) .heroMetaCard strong {
+  font-size: 24px;
+}
+
+:global(html[data-theme="dark"]) .heroTag {
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 6px;
+  color: rgb(203 213 225 / 0.82);
+  background: rgb(255 255 255 / 0.04);
+  border-color: rgb(255 255 255 / 0.08);
+  font-size: 11px;
+}
+
+:global(html[data-theme="dark"]) .onlineEvalLink,
+:global(html[data-theme="dark"]) .secondaryNavLink {
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+:global(html[data-theme="dark"]) .stepIntro,
+:global(html[data-theme="dark"]) .panel {
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgb(10 14 24 / 0.9), rgb(6 9 16 / 0.88));
+}
+
+:global(html[data-theme="dark"]) .panel {
+  padding: 16px;
+}
+
+:global(html[data-theme="dark"]) .stepIntro {
+  padding: 14px 16px;
+}
+
+:global(html[data-theme="dark"]) .stepIntro h2,
+:global(html[data-theme="dark"]) .panelHeader h2 {
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+:global(html[data-theme="dark"]) .stepIntro p,
+:global(html[data-theme="dark"]) .panelHeader p {
+  font-size: 12px;
+}
+
+:global(html[data-theme="dark"]) .howTo {
+  border-radius: 6px;
+  border-left-color: #8b5cf6;
+}
+
+@media (max-width: 980px) {
+  :global(html[data-theme="dark"]) .hero {
+    grid-template-columns: 1fr;
+  }
+}

@@ -547,3 +547,209 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* ─── Dark mode ─────────────────────────────────────────────────────── */
+:global(html[data-theme="dark"]) .page { color: #fafafa; }
+
+:global(html[data-theme="dark"]) .titleBlock h1 { color: #fafafa; }
+:global(html[data-theme="dark"]) .titleBlock p { color: #a1a1aa; }
+
+:global(html[data-theme="dark"]) .modeSwitch {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .modeButton { color: #71717a; }
+:global(html[data-theme="dark"]) .modeButton:hover { color: #fafafa; background: rgba(255,255,255,0.05); }
+:global(html[data-theme="dark"]) .modeButtonActive { background: #1a1a1a; color: #fafafa; box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+
+:global(html[data-theme="dark"]) .label { color: #71717a; }
+
+:global(html[data-theme="dark"]) .input,
+:global(html[data-theme="dark"]) .select,
+:global(html[data-theme="dark"]) .textarea {
+  background: #1a1a1a;
+  color: #fafafa;
+  border-color: #2e2e2e;
+}
+:global(html[data-theme="dark"]) .input:focus,
+:global(html[data-theme="dark"]) .select:focus,
+:global(html[data-theme="dark"]) .textarea:focus { border-color: #a78bfa; }
+
+:global(html[data-theme="dark"]) .secondaryButton {
+  background: #1a1a1a;
+  color: #fafafa;
+  border-color: #2e2e2e;
+}
+:global(html[data-theme="dark"]) .secondaryButton:hover:not(:disabled) { border-color: #52525b; }
+
+:global(html[data-theme="dark"]) .error {
+  color: #f87171;
+  background: rgba(248,113,113,0.08);
+  border-color: rgba(248,113,113,0.2);
+}
+:global(html[data-theme="dark"]) .notice {
+  color: #4ade80;
+  background: rgba(74,222,128,0.08);
+  border-color: rgba(74,222,128,0.2);
+}
+:global(html[data-theme="dark"]) .metaList { color: #71717a; }
+
+:global(html[data-theme="dark"]) .summaryGrid div {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .summaryGrid span { color: #71717a; }
+:global(html[data-theme="dark"]) .summaryGrid strong { color: #fafafa; }
+
+:global(html[data-theme="dark"]) .compareCard {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .compareCard h3 { color: #fafafa; }
+:global(html[data-theme="dark"]) .compareCard > p { color: #a1a1aa; }
+
+:global(html[data-theme="dark"]) .rawPreview {
+  background: #0d0d0d;
+  border-color: #1f1f1f;
+  color: #a1a1aa;
+}
+
+:global(html[data-theme="dark"]) .stepIntro {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .stepIntro h2 { color: #fafafa; }
+:global(html[data-theme="dark"]) .stepIntro p { color: #a1a1aa; }
+
+:global(html[data-theme="dark"]) .howTo {
+  background: #1a1a1a;
+  border-left-color: #a78bfa;
+  color: #a1a1aa;
+}
+:global(html[data-theme="dark"]) .howToTitle { color: #52525b; }
+
+:global(html[data-theme="dark"]) .compareSummaryBar {
+  background: #111111;
+  border-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .compareSummaryLabel { color: #a1a1aa; }
+:global(html[data-theme="dark"]) .compareSummaryTotal { color: #52525b; }
+
+:global(html[data-theme="dark"]) .winRateTrack { background: rgba(255,255,255,0.08); }
+
+:global(html[data-theme="dark"]) .deltaTable th {
+  color: #52525b;
+  border-bottom-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .deltaTable td {
+  color: #e4e4e7;
+  border-bottom-color: #1a1a1a;
+}
+:global(html[data-theme="dark"]) .deltaTableGroupRow td { color: #52525b; }
+:global(html[data-theme="dark"]) .deltaVerdict { color: #a1a1aa; }
+
+:global(html[data-theme="dark"]) .verdictPillWin {
+  background: rgba(74,222,128,0.1);
+  color: #4ade80;
+  border-color: rgba(74,222,128,0.2);
+}
+:global(html[data-theme="dark"]) .verdictPillLoss {
+  background: rgba(248,113,113,0.1);
+  color: #f87171;
+  border-color: rgba(248,113,113,0.2);
+}
+:global(html[data-theme="dark"]) .verdictPillTie {
+  background: rgba(255,255,255,0.06);
+  color: #71717a;
+  border-color: #2e2e2e;
+}
+
+:global(html[data-theme="dark"]) .historyTable th {
+  color: #52525b;
+  border-bottom-color: #1f1f1f;
+}
+:global(html[data-theme="dark"]) .historyTable td {
+  color: #e4e4e7;
+  border-bottom-color: #1a1a1a;
+}
+:global(html[data-theme="dark"]) .historyTable tr:hover td { background: #111111; }
+:global(html[data-theme="dark"]) .historyEndpoint { color: #71717a; }
+
+/* ─── 2026 dark product polish ─────────────────────────────────────── */
+:global(html[data-theme="dark"]) .panel,
+:global(html[data-theme="dark"]) .compareCard,
+:global(html[data-theme="dark"]) .summaryGrid div,
+:global(html[data-theme="dark"]) .compareSummaryBar,
+:global(html[data-theme="dark"]) .stepIntro {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 0.86), rgb(8 13 27 / 0.82));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), var(--zeval-shadow);
+}
+
+:global(html[data-theme="dark"]) .titleBlock h1,
+:global(html[data-theme="dark"]) .panel h2,
+:global(html[data-theme="dark"]) .summaryGrid strong,
+:global(html[data-theme="dark"]) .compareCard h3 {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .titleBlock p,
+:global(html[data-theme="dark"]) .panel > p,
+:global(html[data-theme="dark"]) .metaList,
+:global(html[data-theme="dark"]) .summaryGrid span {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .input,
+:global(html[data-theme="dark"]) .select,
+:global(html[data-theme="dark"]) .textarea,
+:global(html[data-theme="dark"]) .modeSwitch {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background: rgb(3 7 18 / 0.46);
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .input:focus,
+:global(html[data-theme="dark"]) .select:focus,
+:global(html[data-theme="dark"]) .textarea:focus {
+  border-color: var(--zeval-cyan);
+  box-shadow: var(--zeval-focus);
+}
+
+:global(html[data-theme="dark"]) .primaryButton {
+  border-color: var(--zeval-cyan);
+  background: linear-gradient(135deg, var(--zeval-cyan), var(--zeval-teal));
+  color: #03111a;
+  box-shadow: 0 16px 36px rgb(103 232 249 / 0.18);
+}
+
+:global(html[data-theme="dark"]) .primaryButton:hover:not(:disabled) {
+  background: linear-gradient(135deg, #a5f3fc, #5eead4);
+  transform: translateY(-2px);
+}
+
+:global(html[data-theme="dark"]) .secondaryButton,
+:global(html[data-theme="dark"]) .modeButton {
+  border-color: var(--zeval-line);
+  border-radius: var(--zeval-radius);
+  background: rgb(15 23 42 / 0.72);
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .secondaryButton:hover:not(:disabled),
+:global(html[data-theme="dark"]) .modeButton:hover {
+  border-color: var(--zeval-line-strong);
+  color: var(--zeval-text);
+  background: rgb(103 232 249 / 0.08);
+  transform: translateY(-1px);
+}
+
+:global(html[data-theme="dark"]) .modeButtonActive {
+  border-color: var(--zeval-line-strong);
+  background: linear-gradient(135deg, rgb(103 232 249 / 0.12), rgb(96 165 250 / 0.1));
+  color: var(--zeval-text);
+  box-shadow: inset 0 0 0 1px rgb(103 232 249 / 0.16);
+}

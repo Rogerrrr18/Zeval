@@ -1,0 +1,20 @@
+{
+  "sampleBatchId": "sample_1779756554910_78820847",
+  "caseIds": [
+    "bc_1776997463483_fd433c",
+    "bc_1779755791993_ea2b9d",
+    "db_case_1779674921610",
+    "bc_1779755791991_4ac406",
+    "bc_1779755791986_6ec449"
+  ],
+  "requestedGoodcaseCount": 8,
+  "requestedBadcaseCount": 12,
+  "strategy": "benchmark_dashboard_default",
+  "createdAt": "2026-05-26T00:49:14.913Z",
+  "actualGoodcaseCount": 0,
+  "actualBadcaseCount": 5,
+  "warnings": [
+    "goodcase 请求 8 条，实际仅可取 0 条（池子 0 条，可能因哈希去重后不足）。",
+    "badcase 请求 12 条，实际仅可取 5 条（池子 5 条，可能因哈希去重后不足）。"
+  ]
+}

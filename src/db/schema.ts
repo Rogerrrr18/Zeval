@@ -83,6 +83,48 @@ export type DbBaseRecord = {
   createdAt: string;
 };
 
+// ── Data ingestion projection ─────────────────────────────────────────────────
+
+/**
+ * Projected session record — one per unique sessionId in one evaluation run.
+ * Materialised from `EvaluateResponse.enrichedRows` grouped by sessionId.
+ */
+export type DbSession = DbBaseRecord & {
+  table: "sessions";
+  /** Foreign key to the parent evaluation run. */
+  evaluationRunId: string;
+  /** Original session identifier from the uploaded chatlog. */
+  sessionId: string;
+  /** Total message count across all roles. */
+  messageCount: number;
+  /** Number of user-role turns in this session. */
+  userTurnCount: number;
+  /** ISO timestamp of the first turn (undefined when source had no timestamps). */
+  firstTurnAt?: string;
+  /** ISO timestamp of the last turn (undefined when source had no timestamps). */
+  lastTurnAt?: string;
+};
+
+/**
+ * Projected message-turn record — one per `EnrichedChatlogRow`.
+ */
+export type DbMessageTurn = DbBaseRecord & {
+  table: "message_turns";
+  evaluationRunId: string;
+  sessionId: string;
+  turnIndex: number;
+  /** Message role: "user" | "assistant" | "system". */
+  role: string;
+  content: string;
+  /** Unix milliseconds epoch. Absent when source had no timestamps. */
+  timestampMs?: number;
+  /** Seconds since the previous message in this session. Absent for the first turn. */
+  responseGapSec?: number;
+  isDropoffTurn: boolean;
+  isQuestion: boolean;
+  tokenCountEstimate: number;
+};
+
 // ── Evaluation runs ──────────────────────────────────────────────────────────
 
 export type DbEvaluationRun = DbBaseRecord & {
@@ -255,6 +297,8 @@ export type DbQualitySignal =
 
 export type DbEvaluationProjectionRecord =
   | DbEvaluationRun
+  | DbSession
+  | DbMessageTurn
   | DbJudgeRun
   | DbIntentSequence
   | DbIntentRunLog
@@ -265,6 +309,8 @@ export type DbEvaluationProjectionRecord =
 
 export const EVALUATION_PROJECTION_TABLES = [
   "evaluation_runs",
+  "sessions",
+  "message_turns",
   "judge_runs",
   "intent_sequences",
   "intent_run_logs",

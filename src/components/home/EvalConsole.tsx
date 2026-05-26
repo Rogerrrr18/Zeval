@@ -6,6 +6,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import * as XLSX from "xlsx";
 import { BadCasePanel } from "@/components/home/BadCasePanel";
 import { BaselineTrendPanel } from "@/components/home/BaselineTrendPanel";
 import { previewCsvLines, splitCsvLine } from "@/lib/csv";
@@ -97,7 +98,7 @@ const EVALUATION_STAGE_INDEX: Record<EvaluationStageKey, number> = {
   badcase: 4,
   complete: 5,
 };
-const ALLOWED_EXTENSIONS = new Set(["csv", "json", "jsonl", "txt", "md"]);
+const ALLOWED_EXTENSIONS = new Set(["csv", "json", "jsonl", "txt", "md", "xlsx"]);
 const MAX_UPLOAD_SIZE_MB = 5;
 const EVAL_CONSOLE_SNAPSHOT_KEY = "zeval.workbench.snapshot.v1";
 const EVAL_CONSOLE_RECENT_RUNS_KEY = "zeval.workbench.recentRuns.v1";
@@ -441,12 +442,24 @@ export function EvalConsole() {
   }
 
   /**
+   * Convert an XLSX file to a CSV string using SheetJS (first sheet only).
+   */
+  async function convertXlsxToCsv(file: File): Promise<string> {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: "array" });
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) throw new Error("XLSX 文件中未找到有效工作表。");
+    const worksheet = workbook.Sheets[firstSheetName];
+    return XLSX.utils.sheet_to_csv(worksheet, { blankrows: false });
+  }
+
+  /**
    * Parse and upload one selected file.
    */
   async function handleFile(file: File) {
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
     if (!ALLOWED_EXTENSIONS.has(ext)) {
-      setError("文件类型不支持，请上传 csv/json/jsonl/txt/md。");
+      setError("文件类型不支持，请上传 csv/json/jsonl/txt/md/xlsx。");
       setRunState("error");
       return;
     }
@@ -467,9 +480,13 @@ export function EvalConsole() {
       setShowEvaluationProgress(false);
       setEvaluationStages(createInitialEvaluationStages());
       setFileName(file.name);
-      const inferred = inferFormatFromFileName(file.name);
+
+      // XLSX files are binary — convert the first sheet to CSV before ingesting.
+      const isXlsx = ext === "xlsx";
+      const text = isXlsx ? await convertXlsxToCsv(file) : await file.text();
+      const inferred = isXlsx ? "csv" : inferFormatFromFileName(file.name);
       setFormat(inferred);
-      const text = await file.text();
+
       setDataMappingPlan(await requestDataMappingPlan(text, inferred, file.name));
 
       const response = await fetch("/api/ingest", {
@@ -705,11 +722,34 @@ export function EvalConsole() {
         detail?: string;
         savedCount?: number;
         skippedCount?: number;
+        acceptedBySource?: Partial<Record<string, number>>;
+        pendingReviewCount?: number;
+        humanReviewQueueCount?: number;
+        auditSummary?: { candidateTotal: number; accepted: number; skipped: number; humanReviewQueued: number };
       };
       if (!response.ok) {
         throw new Error(data.detail ?? data.error ?? "沉淀 bad case 失败");
       }
-      setNotice(`已沉淀 bad case：新增 ${data.savedCount ?? 0} 条，跳过 ${data.skippedCount ?? 0} 条重复案例。`);
+      // Build per-channel breakdown string, e.g. "TP 2 · FN漏报 1 · TN正例 3 · 边界 1"
+      const HARVEST_CHANNEL_LABELS: Record<string, string> = {
+        auto_tp: "TP",
+        auto_fn: "FN漏报",
+        auto_tn: "TN正例",
+        auto_uncertainty: "边界",
+        auto_disagreement: "分歧",
+      };
+      const breakdown = Object.entries(data.acceptedBySource ?? {})
+        .filter(([, n]) => (n ?? 0) > 0)
+        .map(([src, n]) => `${HARVEST_CHANNEL_LABELS[src] ?? src} ${n}`)
+        .join(" · ");
+      const reviewNote = (data.humanReviewQueueCount ?? 0) > 0
+        ? `，其中 ${data.humanReviewQueueCount} 条需在「案例校准」页人工确认后生效`
+        : "";
+      setNotice(
+        `已沉淀 ${data.savedCount ?? 0} 条` +
+        (breakdown ? `（${breakdown}）` : "") +
+        `，跳过重复 ${data.skippedCount ?? 0} 条${reviewNote}。`,
+      );
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "沉淀 bad case 失败");
     } finally {
@@ -831,6 +871,14 @@ export function EvalConsole() {
                   <span className={styles.heroTag}>状态 · {runStateLabel}</span>
                   <span className={styles.heroTag}>场景 · {selectedScenarioLabel}</span>
                   <span className={styles.heroTag}>文件 · {fileName ? fileName : "等待上传"}</span>
+                </div>
+                <div className={styles.heroActionLinks}>
+                  <Link href="/datasets" className={styles.secondaryNavLink}>
+                    案例校准
+                  </Link>
+                  <Link href="/benchmark" className={styles.onlineEvalLink}>
+                    Benchmark
+                  </Link>
                 </div>
               </div>
             </div>
@@ -2377,19 +2425,19 @@ function getRunStateLabel(runState: EvalConsoleRunState): string {
 }
 
 function getStepHeroTitle(step: number): string {
-  if (step === 0) return "接入对话数据";
-  if (step === 1) return "观测质量信号";
-  return "交付修复资产";
+  if (step === 0) return "Evaluation";
+  if (step === 1) return "Quality Signals";
+  return "Fix Package";
 }
 
 function getStepHeroCopy(step: number): string {
   if (step === 0) {
-    return "上传 CSV / JSON / TXT / MD 对话日志，系统会自动解析、按 session 分组，并把字段映射与数据质量状态提前暴露出来。";
+    return "接入真实 chatlog，生成可审计指标、bad case 和后续 Benchmark 素材。";
   }
   if (step === 1) {
-    return "用核心指标、bad case、目标达成、恢复轨迹与业务 KPI 看清当前质量水位。所有结论都带证据，不是单一打分。";
+    return "查看质量趋势、失败证据和 LLM Judge 风险，把诊断结果转成可校准案例。";
   }
-  return "把失败证据、目标指标与验收门槛编译成调优包；导出、baseline 与在线评测保留为结果区动作。";
+  return "把失败证据、目标指标与验收门槛编译成修复任务，并进入回归验证。";
 }
 
 function pickActiveOnboardingAnswers(

@@ -31,3 +31,41 @@ export function computeNormalizedTranscriptHash(rawTranscript: string): string {
   const normalized = normalizeTranscriptForHash(rawTranscript);
   return createHash("sha256").update(normalized, "utf8").digest("hex");
 }
+
+/**
+ * Tokenize a normalized transcript string into a whitespace-delimited token set.
+ * Internal helper for {@link jaccardTranscriptSimilarity}.
+ */
+function tokenizeNormalized(normalized: string): Set<string> {
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+  return new Set(tokens);
+}
+
+/**
+ * Compute token-level Jaccard similarity between two raw transcripts.
+ *
+ * Both transcripts are passed through {@link normalizeTranscriptForHash} before
+ * tokenization, so comparisons are insensitive to whitespace, casing, and
+ * common punctuation.  No LLM or embedding model is required.
+ *
+ * Use this as an L2 near-duplicate signal when embedding vectors are unavailable.
+ *
+ * @param a First raw transcript.
+ * @param b Second raw transcript.
+ * @returns Jaccard similarity in [0, 1] where 1 = identical token sets.
+ */
+export function jaccardTranscriptSimilarity(a: string, b: string): number {
+  const setA = tokenizeNormalized(normalizeTranscriptForHash(a));
+  const setB = tokenizeNormalized(normalizeTranscriptForHash(b));
+
+  if (setA.size === 0 && setB.size === 0) return 1;
+  if (setA.size === 0 || setB.size === 0) return 0;
+
+  let intersection = 0;
+  for (const token of setA) {
+    if (setB.has(token)) intersection++;
+  }
+
+  const union = setA.size + setB.size - intersection;
+  return intersection / union;
+}

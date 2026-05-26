@@ -1,0 +1,393 @@
+/* ─── Root ─────────────────────────────────────────────────────────────────── */
+
+.root {
+  position: relative;
+}
+
+/* ─── Trigger button ────────────────────────────────────────────────────────── */
+
+.trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid rgb(255 255 255 / 0.09);
+  border-radius: 7px;
+  background: rgb(255 255 255 / 0.04);
+  color: rgb(203 213 225 / 0.82);
+  font-size: 12px;
+  font-weight: 620;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.trigger:hover,
+.triggerOpen {
+  border-color: rgb(255 255 255 / 0.16);
+  background: rgb(255 255 255 / 0.07);
+  color: rgb(248 250 252);
+}
+
+.triggerIcon {
+  color: rgb(148 163 184 / 0.7);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.triggerName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.triggerChevron {
+  flex: 0 0 auto;
+  color: rgb(148 163 184 / 0.6);
+  transition: transform 160ms ease;
+}
+
+.triggerOpen .triggerChevron {
+  transform: rotate(180deg);
+}
+
+/* ─── Dropdown ──────────────────────────────────────────────────────────────── */
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 8px;
+  background: rgb(12 16 28 / 0.97);
+  backdrop-filter: saturate(160%) blur(20px);
+  box-shadow:
+    0 12px 40px rgb(0 0 0 / 0.5),
+    0 0 0 1px rgb(255 255 255 / 0.04) inset;
+  overflow: hidden;
+  padding: 4px;
+}
+
+/* ─── Project list ──────────────────────────────────────────────────────────── */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 7px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.item:hover {
+  background: rgb(255 255 255 / 0.06);
+}
+
+.itemActive {
+  background: rgb(124 58 237 / 0.14);
+}
+
+.itemActive:hover {
+  background: rgb(124 58 237 / 0.2);
+}
+
+.itemCheck {
+  width: 16px;
+  flex: 0 0 auto;
+  color: #a78bfa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.itemName {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 580;
+  color: rgb(226 232 240 / 0.88);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemActive .itemName {
+  color: #e2e8f0;
+  font-weight: 650;
+}
+
+/* ─── Delete button ─────────────────────────────────────────────────────────── */
+
+.deleteBtn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgb(148 163 184 / 0.5);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 660;
+  opacity: 0;
+  transition: background-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.item:hover .deleteBtn {
+  opacity: 1;
+}
+
+.deleteBtn:hover {
+  background: rgb(239 68 68 / 0.15);
+  color: #f87171;
+}
+
+.deleteBtnConfirm {
+  opacity: 1 !important;
+  background: rgb(239 68 68 / 0.15);
+  color: #f87171;
+  width: auto;
+  padding: 0 5px;
+}
+
+/* ─── Divider ───────────────────────────────────────────────────────────────── */
+
+.divider {
+  height: 1px;
+  background: rgb(255 255 255 / 0.07);
+  margin: 4px 0;
+}
+
+/* ─── New project button ────────────────────────────────────────────────────── */
+
+.newProjectBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 7px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: rgb(148 163 184 / 0.78);
+  font-size: 12px;
+  font-weight: 580;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.newProjectBtn:hover {
+  background: rgb(255 255 255 / 0.06);
+  color: rgb(226 232 240);
+}
+
+/* ─── Create form ───────────────────────────────────────────────────────────── */
+
+.createForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 4px 4px;
+}
+
+.createInput {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 5px;
+  background: rgb(255 255 255 / 0.05);
+  color: rgb(226 232 240);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+.createInput::placeholder {
+  color: rgb(148 163 184 / 0.5);
+}
+
+.createInput:focus {
+  border-color: rgb(124 58 237 / 0.5);
+}
+
+.createActions {
+  display: flex;
+  gap: 6px;
+}
+
+.createConfirmBtn {
+  flex: 1;
+  min-height: 28px;
+  border: 1px solid rgb(124 58 237 / 0.5);
+  border-radius: 5px;
+  background: rgb(124 58 237 / 0.2);
+  color: #c4b5fd;
+  font-size: 12px;
+  font-weight: 660;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.createConfirmBtn:hover:not(:disabled) {
+  background: rgb(124 58 237 / 0.32);
+}
+
+.createConfirmBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.createCancelBtn {
+  flex: 1;
+  min-height: 28px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  border-radius: 5px;
+  background: transparent;
+  color: rgb(148 163 184 / 0.72);
+  font-size: 12px;
+  font-weight: 580;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.createCancelBtn:hover {
+  background: rgb(255 255 255 / 0.05);
+  color: rgb(226 232 240 / 0.9);
+}
+
+/* ─── Light mode ────────────────────────────────────────────────────────────── */
+
+:global(html[data-theme="light"]) .trigger {
+  border-color: var(--zeval-line);
+  background: rgb(15 23 42 / 0.03);
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="light"]) .trigger:hover,
+:global(html[data-theme="light"]) .triggerOpen {
+  border-color: var(--zeval-line-strong);
+  background: rgb(15 23 42 / 0.06);
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="light"]) .triggerIcon {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="light"]) .triggerChevron {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="light"]) .dropdown {
+  border-color: var(--zeval-line);
+  background: rgb(255 255 255 / 0.98);
+  box-shadow:
+    0 8px 30px rgb(15 23 42 / 0.12),
+    0 0 0 1px rgb(15 23 42 / 0.04) inset;
+}
+
+:global(html[data-theme="light"]) .item:hover {
+  background: rgb(15 23 42 / 0.04);
+}
+
+:global(html[data-theme="light"]) .itemActive {
+  background: rgb(8 145 178 / 0.08);
+}
+
+:global(html[data-theme="light"]) .itemActive:hover {
+  background: rgb(8 145 178 / 0.13);
+}
+
+:global(html[data-theme="light"]) .itemCheck {
+  color: var(--zeval-cyan);
+}
+
+:global(html[data-theme="light"]) .itemName {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="light"]) .itemActive .itemName {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="light"]) .deleteBtn {
+  color: rgb(100 116 139 / 0.5);
+}
+
+:global(html[data-theme="light"]) .deleteBtn:hover {
+  background: rgb(239 68 68 / 0.08);
+  color: #dc2626;
+}
+
+:global(html[data-theme="light"]) .deleteBtnConfirm {
+  background: rgb(239 68 68 / 0.08);
+  color: #dc2626;
+}
+
+:global(html[data-theme="light"]) .divider {
+  background: var(--zeval-line);
+}
+
+:global(html[data-theme="light"]) .newProjectBtn {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="light"]) .newProjectBtn:hover {
+  background: rgb(15 23 42 / 0.04);
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="light"]) .createInput {
+  border-color: var(--zeval-line);
+  background: rgb(15 23 42 / 0.03);
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="light"]) .createInput::placeholder {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="light"]) .createInput:focus {
+  border-color: var(--zeval-cyan);
+}
+
+:global(html[data-theme="light"]) .createConfirmBtn {
+  border-color: rgb(8 145 178 / 0.4);
+  background: rgb(8 145 178 / 0.1);
+  color: var(--zeval-cyan);
+}
+
+:global(html[data-theme="light"]) .createConfirmBtn:hover:not(:disabled) {
+  background: rgb(8 145 178 / 0.18);
+}
+
+:global(html[data-theme="light"]) .createCancelBtn {
+  border-color: var(--zeval-line);
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="light"]) .createCancelBtn:hover {
+  background: rgb(15 23 42 / 0.04);
+  color: var(--zeval-text);
+}

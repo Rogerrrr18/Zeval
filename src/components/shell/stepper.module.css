@@ -153,3 +153,72 @@
     min-width: 12px;
   }
 }
+
+/* ─── Dark console polish ───────────────────────────────────────────── */
+:global(html[data-theme="dark"]) .stepper {
+  background: transparent;
+}
+
+:global(html[data-theme="dark"]) .stepButton {
+  border: 1px solid transparent;
+}
+
+:global(html[data-theme="dark"]) .stepReachable .stepButton:hover {
+  border-color: var(--zeval-line);
+  background: rgb(103 232 249 / 0.06);
+}
+
+:global(html[data-theme="dark"]) .dot {
+  background: rgb(15 23 42 / 0.72);
+  border-color: var(--zeval-line);
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="dark"]) .label strong {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .label small {
+  color: var(--zeval-muted);
+}
+
+:global(html[data-theme="dark"]) .stepCurrent .dot {
+  background: rgb(103 232 249 / 0.12);
+  border-color: var(--zeval-cyan);
+  color: var(--zeval-cyan);
+  box-shadow: 0 0 0 4px rgb(103 232 249 / 0.09), 0 0 20px rgb(103 232 249 / 0.18);
+}
+
+:global(html[data-theme="dark"]) .stepCurrent .label strong {
+  color: var(--zeval-text);
+}
+
+:global(html[data-theme="dark"]) .stepDone .dot {
+  background: var(--zeval-cyan);
+  border-color: var(--zeval-cyan);
+  color: #03111a;
+}
+
+:global(html[data-theme="dark"]) .stepDone .label strong {
+  color: var(--zeval-text-2);
+}
+
+:global(html[data-theme="dark"]) .stepPending .dot {
+  background: rgb(15 23 42 / 0.42);
+  border-color: rgb(148 163 184 / 0.12);
+  color: rgb(148 163 184 / 0.44);
+}
+
+:global(html[data-theme="dark"]) .stepPending .label strong,
+:global(html[data-theme="dark"]) .stepPending .label small {
+  color: rgb(148 163 184 / 0.46);
+}
+
+:global(html[data-theme="dark"]) .connector {
+  background: rgb(148 163 184 / 0.14);
+}
+
+:global(html[data-theme="dark"]) .stepDone + .step .connector,
+:global(html[data-theme="dark"]) .stepDone .connector {
+  background: linear-gradient(90deg, var(--zeval-cyan), rgb(96 165 250 / 0.8));
+}
