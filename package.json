@@ -39,8 +39,14 @@
     "gold:v2:coverage": "node --import tsx calibration/scripts/report-gold-coverage.mts",
     "datasets:sgd:package": "node scripts/package-sgd-dataset.mjs"
   },
-  "dependencies": {
-    "pg": "^8.20.0"
+  "dependencies": {},
+  "peerDependencies": {
+    "pg": ">=8"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^20",
