@@ -1,0 +1,30 @@
+{
+  "caseId": "gc_1779760458981_9897d5",
+  "caseSetType": "goodcase",
+  "source": "auto_tn",
+  "sessionId": "1_00003",
+  "topicSegmentId": "1_00003",
+  "topicLabel": "golden_positive",
+  "topicSummary": "",
+  "normalizedTranscriptHash": "2b7304c6926c7ff78a17a2394326df6b1dfcb22e7a80cfa9c1bb132563e0730c",
+  "baselineVersion": "run_1779759984994",
+  "baselineCaseScore": 0.9,
+  "tags": [],
+  "transcript": "[turn 1] [user] I'm looking for a place to eat.\n[turn 2] [assistant] Which city should I search in? What kind of food are you looking for?\n[turn 3] [user] Some Freshwater fish kind of food in Palo Alto would be perfect.\n[turn 4] [assistant] I found 4 restaurants. Odori Japanese Cuisine is a nice restaurant in Palo Alto.\n[turn 5] [user] Could you suggest any other restaurant?\n[turn 6] [assistant] P.f. Chang's is another nice restaurant in Palo Alto.\n[turn 7] [user] Yes, that works for me.\n[turn 8] [assistant] Would you like to reserve a table here?\n[turn 9] [user] Yes, I want to make a reservation for one. Make it at half past 6 in the evening.\n[turn 10] [assistant] Please confirm: Booking a table for 1 at P.f. Chang's at 6:30 pm today in Palo Alto.\n[turn 11] [user] Yes, that works for me. How pricey are they? What is their contact number?\n[turn 12] [assistant] Your reservation is successful. Their price range is moderate and their phone number is 650-330-1782.\n[turn 13] [user] Thank you very much.\n[turn 14] [assistant] Can I help you with anything else?\n[turn 15] [user] No, thank you very much.\n[turn 16] [assistant] Have a good day.",
+  "autoSignals": [
+    {
+      "ruleKey": "clean_session_sampled",
+      "severity": "low"
+    }
+  ],
+  "reviewStatus": "regression_active",
+  "metadata": {
+    "humanReviewRequired": true,
+    "humanReviewQueuedAt": "2026-05-26T01:54:18.981Z"
+  },
+  "createdAt": "2026-05-26T01:54:18.981Z",
+  "updatedAt": "2026-05-26T01:54:37.909Z",
+  "humanVerdict": "valid_bad_case",
+  "manualOverrides": [],
+  "reviewedAt": "2026-05-26T01:54:37.909Z"
+}

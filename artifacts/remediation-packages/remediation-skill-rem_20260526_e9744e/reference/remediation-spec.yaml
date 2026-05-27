@@ -1,0 +1,51 @@
+package_id: "rem_20260526_e9744e"
+created_at: "2026-05-26T02:06:08.225Z"
+source_run_id: "copilot_1779761168221"
+scenario_id: null
+priority: "P0"
+goal: "会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。"
+problem_summary:
+  - "会话已经进入投诉 / 转人工风险区，需要优先压降升级触发。"
+  - "用户主任务没有完成，session 结束在失败态。"
+  - "对话出现理解障碍，agent 的表达方式对用户不够友好。"
+selected_case_keys:
+  - "sess_ec_angry_01_76d6c691fb"
+edit_scope:
+  - "prompt"
+  - "policy"
+  - "orchestration"
+constraints:
+  - "不要降低现有安全拒答质量。"
+  - "不要让平均响应时延恶化超过 20%。"
+  - "不要破坏当前已支持的业务场景与回放链路。"
+  - "投诉与转人工路径要保留可追踪的 SLA 与兜底话术。"
+  - "优先保证用户主任务闭环，不要用冗长解释替代动作完成。"
+target_metrics:
+  - metric_id: "goal_completion_rate"
+    display_name: "目标达成率"
+    current_value: 0
+    target_value: 0.7
+    direction: "increase"
+    reason: "失败案例显示用户主任务没有闭环，必须先把任务完成态拉回安全线。"
+  - metric_id: "user_question_repeat_rate"
+    display_name: "重复提问率"
+    current_value: 0
+    target_value: 0.05
+    direction: "decrease"
+    reason: "用户在追问同一个问题，说明回答结构仍然不够直接。"
+  - metric_id: "empathy_score"
+    display_name: "共情得分"
+    current_value: 3
+    target_value: 4
+    direction: "increase"
+    reason: "理解障碍与重复追问通常伴随共情不足和回答方式僵硬。"
+  - metric_id: "escalation_keyword_hit_rate"
+    display_name: "升级触发率"
+    current_value: 1
+    target_value: 0.9
+    direction: "decrease"
+    reason: "用户已进入投诉/转人工语境，需先降低升级触发。"
+execution_notes:
+  - "优先处理 P0/P1 失败标签最多的 case。"
+  - "如需改 prompt，请同步说明 why 与 expected behavior。"
+  - "如需改代码或 orchestration，保持回放输入兼容。"

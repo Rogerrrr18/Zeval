@@ -19,11 +19,14 @@
       "severity": "high"
     }
   ],
-  "reviewStatus": "auto_captured",
+  "reviewStatus": "regression_active",
   "metadata": {
     "humanReviewRequired": true,
     "humanReviewQueuedAt": "2026-05-26T00:36:31.986Z"
   },
   "createdAt": "2026-05-26T00:36:31.986Z",
-  "updatedAt": "2026-05-26T00:36:31.986Z"
+  "updatedAt": "2026-05-26T01:42:43.174Z",
+  "humanVerdict": "valid_bad_case",
+  "manualOverrides": [],
+  "reviewedAt": "2026-05-26T01:42:43.174Z"
 }

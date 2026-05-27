@@ -1,7 +1,7 @@
 {
   "caseId": "bc_1779755791991_4ac406",
-  "caseSetType": "badcase",
-  "source": "auto_tp",
+  "caseSetType": "goodcase",
+  "source": "manual_fp",
   "sessionId": "1_00004",
   "topicSegmentId": "1_00004",
   "topicLabel": "auto_tp:high_dropoff",
@@ -19,11 +19,20 @@
       "severity": "low"
     }
   ],
-  "reviewStatus": "auto_captured",
+  "reviewStatus": "human_reviewed",
   "metadata": {
     "humanReviewRequired": true,
-    "humanReviewQueuedAt": "2026-05-26T00:36:31.991Z"
+    "humanReviewQueuedAt": "2026-05-26T00:36:31.991Z",
+    "false_positive": true
   },
   "createdAt": "2026-05-26T00:36:31.991Z",
-  "updatedAt": "2026-05-26T00:36:31.991Z"
+  "updatedAt": "2026-05-26T01:43:01.633Z",
+  "humanVerdict": "false_positive",
+  "manualOverrides": [
+    {
+      "type": "false_positive",
+      "createdAt": "2026-05-26T01:43:01.633Z"
+    }
+  ],
+  "reviewedAt": "2026-05-26T01:43:01.633Z"
 }

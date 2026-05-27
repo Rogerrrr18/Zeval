@@ -1,6 +1,6 @@
 {
   "caseId": "db_case_1779674921610",
-  "caseSetType": "badcase",
+  "caseSetType": "goodcase",
   "sessionId": "sess_sup_01",
   "topicSegmentId": "unknown-topic",
   "topicLabel": "unknown",
@@ -20,5 +20,20 @@
   "harvestedAt": "2026-05-25T02:08:41.614Z",
   "failureSeverityScore": 58,
   "createdAt": "2026-05-25T02:08:41.614Z",
-  "updatedAt": "2026-05-25T02:08:41.614Z"
+  "updatedAt": "2026-05-26T02:07:17.547Z",
+  "humanVerdict": "false_positive",
+  "reviewNotes": "ks da",
+  "reviewStatus": "human_reviewed",
+  "source": "manual_fp",
+  "metadata": {
+    "false_positive": true
+  },
+  "manualOverrides": [
+    {
+      "type": "false_positive",
+      "note": "ks da",
+      "createdAt": "2026-05-26T02:07:17.547Z"
+    }
+  ],
+  "reviewedAt": "2026-05-26T02:07:17.547Z"
 }

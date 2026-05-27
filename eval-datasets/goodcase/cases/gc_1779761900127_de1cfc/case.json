@@ -1,0 +1,27 @@
+{
+  "caseId": "gc_1779761900127_de1cfc",
+  "caseSetType": "goodcase",
+  "source": "auto_tn",
+  "sessionId": "1_00010",
+  "topicSegmentId": "1_00010",
+  "topicLabel": "golden_positive",
+  "topicSummary": "",
+  "normalizedTranscriptHash": "4efcafdd7736ffa6191533b921b23923d6c5942e7021b8f1332247b107aaf3b2",
+  "baselineVersion": "run_1779759984994",
+  "baselineCaseScore": 0.9,
+  "tags": [],
+  "transcript": "[turn 1] [user] I'm starving! Can you help me find a restaurant that serves Breakfast in Fairfield?\n[turn 2] [assistant] There is 1 restaurant that meets your needs. Mimi's Cafe in Fairfield serves breakfast.\n[turn 3] [user] Is there a band playing there?\n[turn 4] [assistant] No, unfortunately, they don't offer live music.\n[turn 5] [user] That's okay. It will work anyway.\n[turn 6] [assistant] Do you wish to make a reservation?\n[turn 7] [user] Yes, I'll need to make a reservation for a table for 2.\n[turn 8] [assistant] What time will you be visiting?\n[turn 9] [user] Please make it for half past 5 in the evening.\n[turn 10] [assistant] You'd like a table for 2 today at Mimi's Cafe in Fairfield at 5:30 pm. Is this correct?\n[turn 11] [user] I'm sorry, I need to change that. I'd like it on the 9th and it will be for 3 people.\n[turn 12] [assistant] Let's review those changes. You'd like the reservation on March 9th for 3. Have I got it right?\n[turn 13] [user] I'm sorry. I need to make it on Monday next week at half past 12 in the afternoon.\n[turn 14] [assistant] You'd like your reservation for 3 next Monday at 12:30 pm. Is that correct?\n[turn 15] [user] Yes, I'm sorry for the confusion. Can you tell me their phone number please?\n[turn 16] [assistant] The phone number is 707-421-0835. Your reservation is confirmed.\n[turn 17] [user] Great! Thank you so much for your help.\n[turn 18] [assistant] You're welcome. Have a nice day!",
+  "autoSignals": [
+    {
+      "ruleKey": "clean_session_sampled",
+      "severity": "low"
+    }
+  ],
+  "reviewStatus": "auto_captured",
+  "metadata": {
+    "humanReviewRequired": true,
+    "humanReviewQueuedAt": "2026-05-26T02:18:20.127Z"
+  },
+  "createdAt": "2026-05-26T02:18:20.127Z",
+  "updatedAt": "2026-05-26T02:18:20.127Z"
+}

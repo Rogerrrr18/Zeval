@@ -1,0 +1,32 @@
+{
+  "caseId": "bc_1779760458986_213e19",
+  "caseSetType": "badcase",
+  "source": "auto_tp",
+  "sessionId": "1_00008",
+  "topicSegmentId": "1_00008",
+  "topicLabel": "auto_tp:goal_failed",
+  "topicSummary": "",
+  "normalizedTranscriptHash": "361875cd2584f3d9833c7e0af2fffeb9c69b3694bdc3268508d457c0e85b7c12",
+  "baselineVersion": "run_1779759984994",
+  "baselineCaseScore": 0.2,
+  "tags": [
+    "goal_partial"
+  ],
+  "transcript": "[turn 1] [user] Can you find me something economical to eat in Pleasanton.\n[turn 2] [assistant] Are you looking for Italian, Indian or something else?\n[turn 3] [user] I would like some Italian food.\n[turn 4] [assistant] Found 5 restaurants for you out of which De La Torre's Trattoria seems a great from Pleasanton.\n[turn 5] [user] Can you provide the address and do they have live music?\n[turn 6] [assistant] No, they do not have live music and its address is 6025 West Las Positas Boulevard.\n[turn 7] [user] Any other recommendation?\n[turn 8] [assistant] Forno Vecchio also seems nice and its located n Pleasanton as well.\n[turn 9] [user] Can you provide more options?\n[turn 10] [assistant] Another good restaurant in Pleasanton in Gay 90's Pizza Co.\n[turn 11] [user] That sounds like a good choice for me.\n[turn 12] [assistant] Is there anything else?\n[turn 13] [user] Yes, make a reservation at the restaurant.\n[turn 14] [assistant] What time do you want me to make the reservation?\n[turn 15] [user] I'll reach there at 1:30 pm.\n[turn 16] [assistant] Please confirm that you want to make a reservation at Gay 90's Pizza Co. which is located in Pleasanton for 2 people. The reservation is for today at 1:30 pm.\n[turn 17] [user] No, change the time to 7 pm and for one person only.\n[turn 18] [assistant] Alright, please confirm that the reservation is at 7 pm for 1 person.\n[turn 19] [user] No, change it on next friday.\n[turn 20] [assistant] Sure. Please confirm that the date is now next Friday and for 1 person.\n[turn 21] [user] Yes. Sounds good.\n[turn 22] [assistant] Your reservation is booked.\n[turn 23] [user] What is the address of the restaurant and do the have live music?\n[turn 24] [assistant] The address is 288 Main Street and No, they don't have live music either.\n[turn 25] [user] Alright, Thank you.\n[turn 26] [assistant] Have a great day.",
+  "autoSignals": [
+    {
+      "ruleKey": "goal_failed",
+      "severity": "high"
+    }
+  ],
+  "reviewStatus": "regression_active",
+  "metadata": {
+    "humanReviewRequired": true,
+    "humanReviewQueuedAt": "2026-05-26T01:54:18.986Z"
+  },
+  "createdAt": "2026-05-26T01:54:18.986Z",
+  "updatedAt": "2026-05-26T01:54:45.509Z",
+  "humanVerdict": "valid_bad_case",
+  "manualOverrides": [],
+  "reviewedAt": "2026-05-26T01:54:45.509Z"
+}
