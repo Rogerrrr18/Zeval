@@ -32,18 +32,11 @@ export default defineConfig({
       "@": resolve(__dirname, "src"),
     };
   },
-  // Keep true third-party npm packages external (they stay in node_modules).
-  // Everything under src/ is bundled into the single output file.
-  external: [
-    "commander",
-    "zod",
-    "xlsx",
-    "pg",
-    "next",
-    "react",
-    "react-dom",
-    "recharts",
-  ],
+  // Bundle all third-party deps except pg (native addon).
+  // commander, zod, xlsx are pure JS — safe to inline.
+  // next/react/recharts are never imported by CLI code (they're web-only).
+  noExternal: [/^(?!pg$|pg-native$|@vercel|next|react|recharts).*/],
+  external: ["pg", "pg-native"],
   // Suppress "mixed named + default" warnings from the pipeline modules
   silent: true,
 });
