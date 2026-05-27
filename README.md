@@ -1,139 +1,567 @@
-# Zeval MVP
+# Zeval 2.1
 
-Zeval is a Next.js + TypeScript workbench for evaluating AI conversations and turning bad cases into remediation tasks.
+**Zeval** is an AI conversation quality evaluation workbench.  
+Upload chatlog files, run objective + LLM-judge subjective metrics, harvest bad cases into a dataset pool, and generate remediation skill bundles — all from a browser UI **or a terminal CLI**.
 
-Current product loop:
-
-```text
-upload chatlog -> parse / normalize -> objective + subjective evaluation
--> charts / evidence / suggestions -> baseline -> remediation skill bundle
--> replay / validation -> Chat-assisted follow-up
+```
+chatlog file
+    │
+    ▼
+zeval evaluate           ← parse → enrich → objective + subjective metrics
+    │
+    ├──▶ zeval runs show  ← inspect results, view bad cases
+    │
+    ├──▶ zeval harvest    ← 5-channel admission pipeline → dataset pool
+    │
+    └──▶ zeval package    ← build remediation skill bundle (YAML + Markdown)
 ```
 
-## Quick Start
+---
+
+## Table of Contents
+
+1. [Prerequisites](#prerequisites)
+2. [Installation](#installation)
+3. [Quick Start — CLI](#quick-start--cli)
+4. [Quick Start — Web UI](#quick-start--web-ui)
+5. [CLI Command Reference](#cli-command-reference)
+6. [Step-by-Step Workflow](#step-by-step-workflow)
+7. [Input File Format](#input-file-format)
+8. [Environment Variables](#environment-variables)
+9. [REST API](#rest-api)
+10. [Project Structure](#project-structure)
+11. [Documentation](#documentation)
+
+---
+
+## Prerequisites
+
+| Requirement | Version | Check |
+|---|---|---|
+| Node.js | ≥ 18 | `node -v` |
+| npm | ≥ 9 | `npm -v` |
+| An LLM API key | any OpenAI-compatible gateway | — |
+
+> **No database required for local use.**  
+> The default storage adapter (`local-json`) writes everything to the local filesystem.
+
+---
+
+## Installation
 
 ```bash
+# 1. Clone and install dependencies
+git clone https://github.com/Rogerrrr18/Zeval_2.0.git
+cd Zeval_2.0
 npm install
+
+# 2. Create your environment file
+cp .env.example .env
+```
+
+Open `.env` and fill in your LLM API key (the only required field):
+
+```bash
+# .env — minimum required configuration
+ZEVAL_JUDGE_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+ZEVAL_JUDGE_BASE_URL=https://api.siliconflow.cn/v1   # or any OpenAI-compatible endpoint
+ZEVAL_JUDGE_MODEL=Qwen/Qwen3-7B                      # any capable chat model
+```
+
+That's it. You're ready to go.
+
+---
+
+## Quick Start — CLI
+
+The fastest way to evaluate a chatlog file:
+
+```bash
+# Run evaluation on the included sample file (no LLM, objective metrics only)
+npm run zeval -- evaluate mock-chatlog/raw-data/support-refund-short.csv --no-llm
+
+# Run full evaluation with LLM judge (requires ZEVAL_JUDGE_API_KEY in .env)
+npm run zeval -- evaluate mock-chatlog/raw-data/support-refund-short.csv
+
+# See all saved runs
+npm run zeval -- runs list
+
+# Inspect a specific run
+npm run zeval -- runs show <run-id>
+```
+
+You should see output like:
+
+```
+✓ Evaluation complete
+
+Results
+  sessions                       12
+  messages                       242
+  bad cases detected             4
+
+  ─── Objective ───────────────
+  avg response gap (s)           1.20
+  user repeat rate               10.8%
+  agent resolution rate          42.0%
+  escalation hit rate            8.3%
+
+  ─── Subjective ──────────────
+  dimensions evaluated           5
+  implicit signals               3
+  goal completions               12
+```
+
+---
+
+## Quick Start — Web UI
+
+```bash
 npm run dev
 ```
 
-Open:
+Open **http://localhost:3000** and use the browser interface:
 
-```text
-http://localhost:3000
-```
+| Page | Path | Purpose |
+|---|---|---|
+| Workbench 评估工作台 | `/workbench` | Upload files, run evaluation, view charts |
+| Dataset Pool 案例校准 | `/datasets` | Browse harvested bad cases, human review |
+| Remediation 修复验证 | `/remediation-packages` | View & validate skill bundles |
+| Benchmark | `/benchmark` | Offline regression testing |
+| Copilot | `/chat` | AI assistant for result interpretation |
 
-Useful checks:
+---
+
+## CLI Command Reference
+
+> All commands follow the pattern:  
+> `npm run zeval -- <command> [options]`
+
+---
+
+### `evaluate` — Run evaluation pipeline
 
 ```bash
-npx tsc --noEmit
-npm run lint
-npm run build
-npm run calibration:ci
+npm run zeval -- evaluate <file> [options]
 ```
 
-Smoke commands:
+| Option | Description | Default |
+|---|---|---|
+| `--run-id <id>` | Custom run identifier | auto-generated |
+| `--format <fmt>` | `csv` / `json` / `jsonl` / `txt` / `md` | auto-detected |
+| `--no-llm` | Skip LLM judge, objective metrics only (fast) | LLM on |
+| `--no-persist` | Don't save result to `eval-runs/` | saves by default |
+| `--harvest` | Auto-harvest bad cases after evaluation | off |
+| `--baseline-version <ver>` | Version tag for harvested cases | `"cli"` |
+
+**Examples:**
 
 ```bash
-npm run smoke:e2e:clean
-npm run smoke:e2e:bad
-npm run jobs:work:once
+# Fastest run — no LLM, results in ~1 second
+npm run zeval -- evaluate ./chatlog.csv --no-llm
+
+# Full run with custom run ID
+npm run zeval -- evaluate ./chatlog.csv --run-id sprint-42-eval
+
+# Full run + auto-harvest bad cases in one command
+npm run zeval -- evaluate ./chatlog.csv --harvest --baseline-version v1.3
+
+# JSON format file, skip saving artifact
+npm run zeval -- evaluate ./sessions.json --format json --no-persist
 ```
 
-## Main Surfaces
+---
 
-- `/chat`：Chat agent, multi-channel history, evaluation and baseline skills.
-- `/workbench`：upload / ingest / streamed evaluation / charts / baseline trends / remediation package entry.
-- `/datasets`：read-only bad case pool with automatic signals and manual false-positive overrides.
-- `/online-eval`：baseline replay and current-vs-baseline comparison.
-- `/remediation-packages`：Skill-bundle remediation package browser and validation workflow.
-- `/synthesize`：LLM-assisted sample generation for evaluation datasets.
+### `harvest` — Admit bad cases to dataset pool
 
-## Integration Methods
+Runs the 5-channel admission pipeline on a saved evaluate result and persists accepted cases.
 
-Start with the smallest path that proves the loop, then automate the same contract in CI or release checks.
+```bash
+npm run zeval -- harvest --run-id <id> [options]
+```
 
-### 1. File Upload
+| Option | Description | Default |
+|---|---|---|
+| `--run-id <id>` | **Required.** Run ID from a previous `evaluate` | — |
+| `--baseline-version <ver>` | Version tag stamped on admitted cases | `"cli"` |
+| `--near-duplicate` | Allow near-duplicate cases | reject |
+| `--tn-sample-rate <0-1>` | Sampling rate for TN (golden positive) cases | `0.05` |
+| `--human-sampling-rate <0-1>` | Fraction of TP/TN requiring human review | `1.0` |
+| `--capability-dimension <tag>` | Capability label for all cases in this batch | — |
 
-Use `/workbench` for demos and first customer datasets.
+**Examples:**
 
-- Supported files: `CSV / JSON / TXT / MD`.
-- Output: objective metrics, LLM Judge metrics, charts, suggestions, bad cases and baseline artifacts.
-- Best for: sample validation, PM review, bad-case triage.
+```bash
+# Harvest bad cases from run "sprint-42-eval"
+npm run zeval -- harvest --run-id sprint-42-eval
 
-### 2. REST API
+# Harvest with version tag and no human review gate
+npm run zeval -- harvest --run-id sprint-42-eval \
+  --baseline-version v1.3 \
+  --human-sampling-rate 0
 
-Call the evaluation endpoint with canonical `rawRows`.
+# Tag all cases with a capability dimension
+npm run zeval -- harvest --run-id sprint-42-eval \
+  --capability-dimension intent_understanding
+```
+
+**5 admission channels explained:**
+
+| Channel | What it captures |
+|---|---|
+| `auto_tp` | True positives — confirmed bad cases |
+| `auto_fn` | False negatives — bad cases the judge missed |
+| `auto_tn` | True negatives — golden positive sessions |
+| `auto_uncertainty` | Borderline cases where judge confidence is low |
+| `auto_disagreement` | Cases where multiple judges disagree |
+
+---
+
+### `package` — Build a remediation skill bundle
+
+Compiles bad cases from a run into a structured remediation package:  
+`issue-brief.md`, `remediation-spec.yaml`, `badcases.jsonl`, `acceptance-gate.yaml`.
+
+```bash
+npm run zeval -- package --run-id <id> [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--run-id <id>` | **Required.** Run ID from a previous `evaluate` | — |
+| `--case-keys <k1,k2>` | Only include specific bad case keys | all cases |
+| `--baseline-customer-id <id>` | Customer ID for the acceptance gate | — |
+
+**Examples:**
+
+```bash
+# Package all bad cases from a run
+npm run zeval -- package --run-id sprint-42-eval
+
+# Package only specific cases
+npm run zeval -- package --run-id sprint-42-eval \
+  --case-keys bc_001,bc_007,bc_012
+
+# Package with acceptance gate tied to a customer baseline
+npm run zeval -- package --run-id sprint-42-eval \
+  --baseline-customer-id customer_prod_a
+```
+
+Output is saved to `artifacts/remediation-packages/<package-id>/`.
+
+---
+
+### `runs list` — List saved evaluate runs
+
+```bash
+npm run zeval -- runs list [options]
+```
+
+| Option | Description | Default |
+|---|---|---|
+| `--limit <n>` | Max runs to display | `20` |
+| `--project-id <id>` | Filter by project | all projects |
+
+```bash
+npm run zeval -- runs list
+npm run zeval -- runs list --limit 5
+```
+
+---
+
+### `runs show` — Inspect a saved run
+
+```bash
+npm run zeval -- runs show <run-id>
+```
+
+Prints objective metrics, subjective dimensions with mini bar charts, bad case list, and warnings.
+
+```bash
+npm run zeval -- runs show run_1748965432000
+```
+
+---
+
+## Step-by-Step Workflow
+
+A complete beginner workflow from first run to remediation package:
+
+### Step 1 — Prepare your chatlog file
+
+Your file must have four columns:
+
+```csv
+sessionId,timestamp,role,content
+sess_01,2026-05-01T09:00:00Z,user,你好我想退款
+sess_01,2026-05-01T09:00:12Z,assistant,好的请提供一下订单号
+sess_01,2026-05-01T09:00:25Z,user,订单号是 123456
+sess_02,2026-05-01T10:00:00Z,user,我的包裹什么时候到
+```
+
+- `sessionId` — one value per conversation
+- `timestamp` — ISO 8601 format (e.g. `2026-05-01T09:00:00Z`)
+- `role` — `user`, `assistant`, or `system`
+- `content` — the message text
+
+> **Supported file types:** CSV · JSON · JSONL · TXT · MD · XLSX  
+> See [Input File Format](#input-file-format) for non-CSV formats.
+
+---
+
+### Step 2 — Run evaluation
+
+```bash
+npm run zeval -- evaluate ./my-chatlog.csv
+```
+
+Watch the spinner. When done, you'll see a results table.  
+The result is automatically saved to `eval-runs/<run-id>/evaluate.json`.
+
+---
+
+### Step 3 — Review results
+
+```bash
+npm run zeval -- runs list                          # find your run ID
+npm run zeval -- runs show run_1748965432000        # inspect it
+```
+
+Look at:
+- **bad cases detected** — conversations the system flagged as problematic
+- **subjective dimensions** — LLM judge scores for quality dimensions
+- **user repeat rate** — users repeating questions (sign of poor resolution)
+- **escalation hit rate** — conversations that escalated (high = bad)
+
+---
+
+### Step 4 — Harvest bad cases
+
+```bash
+npm run zeval -- harvest --run-id run_1748965432000
+```
+
+This pushes the bad cases into the local dataset pool (`eval-datasets/`).  
+You can also view them in the browser at **http://localhost:3000/datasets**.
+
+---
+
+### Step 5 — Build remediation package
+
+```bash
+npm run zeval -- package --run-id run_1748965432000
+```
+
+Find the output at:
+
+```
+artifacts/remediation-packages/<package-id>/
+├── manifest.json           ← metadata
+└── reference/
+    ├── issue-brief.md          ← plain-language problem description
+    ├── remediation-spec.yaml   ← structured fix specification
+    ├── badcases.jsonl          ← evidence conversations
+    └── acceptance-gate.yaml    ← test criteria for verifying the fix
+```
+
+Hand `issue-brief.md` and `remediation-spec.yaml` to your agent or engineering team.
+
+---
+
+### One-liner (evaluate + harvest in one step)
+
+```bash
+npm run zeval -- evaluate ./my-chatlog.csv --harvest --baseline-version v1.3
+```
+
+---
+
+## Input File Format
+
+### CSV (recommended)
+
+Required columns: `sessionId`, `timestamp`, `role`, `content`
+
+```csv
+sessionId,timestamp,role,content
+sess_01,2026-05-01T09:00:00Z,user,Hello
+sess_01,2026-05-01T09:00:05Z,assistant,Hi! How can I help?
+```
+
+### JSON / JSONL
+
+Array of row objects (JSON) or one object per line (JSONL):
+
+```json
+[
+  { "sessionId": "sess_01", "timestamp": "2026-05-01T09:00:00Z", "role": "user", "content": "Hello" },
+  { "sessionId": "sess_01", "timestamp": "2026-05-01T09:00:05Z", "role": "assistant", "content": "Hi!" }
+]
+```
+
+### XLSX
+
+Export your spreadsheet as `.xlsx`. The first sheet is used.  
+Columns must match the CSV spec above. Column order doesn't matter.
+
+### TXT / MD
+
+Free-form text is auto-parsed using heuristics. Results may vary — CSV/JSON are recommended for production use.
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in values.
+
+### Minimum required (CLI + Web)
+
+```bash
+ZEVAL_JUDGE_API_KEY=sk-xxxxxxxx          # Your LLM API key
+ZEVAL_JUDGE_BASE_URL=https://api.siliconflow.cn/v1
+ZEVAL_JUDGE_MODEL=Qwen/Qwen3-7B
+```
+
+### All variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `ZEVAL_JUDGE_API_KEY` | LLM API key (OpenAI-compatible) | — |
+| `ZEVAL_JUDGE_BASE_URL` | LLM gateway base URL | — |
+| `ZEVAL_JUDGE_MODEL` | Model name | — |
+| `ZEVAL_JUDGE_CONCURRENCY` | Max concurrent judge calls | `4` |
+| `ZEVAL_JUDGE_ENABLE_THINKING` | Enable chain-of-thought (model-dependent) | `false` |
+| `ZEVAL_DATABASE_ADAPTER` | `local-json` or `postgres` | `local-json` |
+| `DATASET_STORE_PROVIDER` | `filesystem` or `database` | `filesystem` |
+| `ZEVAL_ADMISSION_TN_SAMPLE_RATE` | Fraction of clean sessions sampled as gold | `0.05` |
+| `ZEVAL_ADMISSION_HUMAN_SAMPLING_RATE` | Fraction of TP/TN requiring review | `1.0` |
+| `ZEVAL_DEFAULT_ORGANIZATION_ID` | Default org for multi-tenant use | `default-org` |
+
+### CLI-only (optional)
+
+```bash
+ZEVAL_PROJECT_ID=my-project     # default: "default"
+ZEVAL_USER_ID=my-user           # default: "cli-user"
+ZEVAL_ORG_ID=my-org             # default: "default-org"
+```
+
+---
+
+## REST API
+
+The web server exposes the same pipeline as an HTTP API.  
+Start the server first: `npm run dev`
+
+### Ingest + evaluate
+
+```bash
+curl -X POST http://localhost:3000/api/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "sessionId,timestamp,role,content\nsess_01,2026-05-01T09:00:00Z,user,退款",
+    "format": "csv",
+    "fileName": "chatlog.csv"
+  }'
+```
 
 ```bash
 curl -X POST http://localhost:3000/api/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "useLlm": true,
-    "judgeRequired": true,
     "rawRows": [
-      {
-        "sessionId": "s1",
-        "timestamp": "2026-05-06T00:00:00.000Z",
-        "role": "user",
-        "content": "我想查一下订单退款进度"
-      },
-      {
-        "sessionId": "s1",
-        "timestamp": "2026-05-06T00:00:10.000Z",
-        "role": "assistant",
-        "content": "我来帮你核对订单状态。"
-      }
+      { "sessionId": "s1", "timestamp": "2026-05-01T09:00:00Z", "role": "user",      "content": "我想申请退款" },
+      { "sessionId": "s1", "timestamp": "2026-05-01T09:00:10Z", "role": "assistant", "content": "好的请提供订单号" }
     ]
   }'
 ```
 
-The response follows the product contract:
-
-```text
-meta + objectiveMetrics + subjectiveMetrics + charts + suggestions
+Response shape:
+```
+meta + objectiveMetrics + subjectiveMetrics + charts + suggestions + badCaseAssets
 ```
 
-### 3. Agent Workflow
+### Harvest bad cases
 
-Use `/chat` or `/remediation-packages` after an evaluation run.
+```bash
+curl -X POST http://localhost:3000/api/eval-datasets/harvest-badcases \
+  -H "Content-Type: application/json" \
+  -d '{ "evaluate": <evaluate-response-body> }'
+```
 
-- Chat can explain results and trigger evaluation/baseline skills.
-- Remediation packages compile bad cases into `issue-brief.md`, `remediation-spec.yaml`, `badcases.jsonl` and `acceptance-gate.yaml`.
-- Replay checks compare current behavior against saved baselines before shipping.
+### Generate remediation package
 
-## Current Scope
+```bash
+curl -X POST http://localhost:3000/api/remediation-packages \
+  -H "Content-Type: application/json" \
+  -d '{ "evaluate": <evaluate-response-body> }'
+```
 
-Supported input formats:
+---
 
-- `CSV`
-- `JSON`
-- `TXT`
-- `MD`
+## Project Structure
 
-Core evaluation layers:
+```
+app/                        Next.js App Router — pages and API routes
+  api/                      HTTP API endpoints (ingest, evaluate, harvest, package, …)
 
-- parser / normalizer
-- topic segmentation
-- objective metrics
-- subjective LLM judge as a required product dependency
-- bad case harvesting
-- report and suggestion builder
-- baseline storage
-- replay / offline validation
+src/
+  cli/                      ← CLI entry point and commands
+    index.ts                Commander program
+    display.ts              Terminal output helpers (ANSI, spinner, tables)
+    context.ts              CLI workspace context
+    commands/
+      evaluate.ts           zeval evaluate <file>
+      harvest.ts            zeval harvest --run-id <id>
+      package.ts            zeval package --run-id <id>
+      runs.ts               zeval runs list | show <id>
 
-MVP boundaries:
+  pipeline/                 Evaluation pipeline (enrich → metrics → bad cases)
+  eval-datasets/            5-channel admission pipeline and dataset store
+  remediation/              Skill bundle builder and package store
+  parsers/                  CSV / JSON / JSONL / TXT / MD parsers
+  schemas/                  Zod request validation schemas
+  persistence/              Evaluate result file-system store
+  copilot/                  Chat skill registry and orchestrator
+  components/               React UI components (web only)
 
-- No production login system.
-- No full multi-tenant permission UI.
-- No heavyweight workflow orchestration.
-- Keep changes scoped to the evaluation and remediation loop.
+bin/
+  zeval.mjs                 Executable shim that runs src/cli/index.ts via tsx
+
+eval-runs/                  Saved evaluate result artifacts (auto-created)
+eval-datasets/              Dataset pool: bad cases, good cases, sample batches
+artifacts/                  Remediation packages (auto-created)
+mock-chatlog/               Sample chatlog files for testing
+docs/                       Project documentation
+```
+
+---
+
+## Useful Scripts
+
+```bash
+# Development
+npm run dev                  # Start web UI at http://localhost:3000
+
+# CLI
+npm run zeval -- --help      # Show all CLI commands
+npm run zeval -- evaluate mock-chatlog/raw-data/support-refund-short.csv --no-llm
+
+# Type checking and linting
+npx tsc --noEmit
+npm run lint
+
+# Smoke tests
+npm run smoke:admission      # Test 5-channel admission pipeline (no LLM)
+npm run smoke:e2e:clean      # End-to-end smoke test (requires .env)
+
+# Background job worker (optional)
+npm run jobs:work:once
+```
+
+---
 
 ## Documentation
-
-Root documentation is intentionally minimal. Use [docs/README.md](docs/README.md) as the document index.
-
-Important entries:
 
 - [Engineering status](docs/engineering-status.md)
 - [Quality-loop roadmap](docs/roadmap-quality-loop.md)
@@ -142,32 +570,4 @@ Important entries:
 - [Design guidelines](docs/design-guidelines.md)
 - [Changelog](docs/changelog.md)
 
-Agent rules remain in [AGENTS.md](AGENTS.md).
-
-## Environment
-
-Zeval-first variables are preferred:
-
-```bash
-ZEVAL_JUDGE_API_KEY=...
-ZEVAL_JUDGE_BASE_URL=...
-ZEVAL_JUDGE_MODEL=...
-ZEVAL_DATABASE_ADAPTER=local-json
-```
-
-Legacy `SILICONFLOW_*`, `ZERORE_*`, and `x-zerore-*` compatibility paths still exist for older fixtures and local data.
-
-## Project Structure
-
-```text
-app/                    Next.js app routes and API handlers
-src/pipeline/           evaluation pipeline and metrics
-src/copilot/            Chat skill registry and orchestrator
-src/components/         workbench, datasets, remediation and shell UI
-src/remediation/        remediation Skill bundle builder and store
-src/validation/         replay / offline validation runner
-src/workbench/          baseline store abstraction
-src/eval-datasets/      case pool and sample batch storage
-docs/                   project documentation index and long-form docs
-eval-system-概述/        product research, PRDs and historical planning notes
-```
+Agent rules: [AGENTS.md](AGENTS.md)
