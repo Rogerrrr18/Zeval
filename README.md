@@ -49,9 +49,39 @@ zeval evaluate           ← parse → enrich → objective + subjective metrics
 
 ## Installation
 
+### Option A — Global CLI Install (Recommended for CLI-only use)
+
+Install `zeval` as a global command in one step — no repo clone needed:
+
+```bash
+npm install -g https://raw.githubusercontent.com/Rogerrrr18/Zeval_2.0/zeval-2.1/zeval-eval-system-2.1.0.tgz
+```
+
+Verify it works:
+
+```bash
+zeval --version   # → 2.1.0
+zeval --help
+```
+
+Then create a `.env` file anywhere you'll run commands from:
+
+```bash
+# .env — minimum required
+ZEVAL_JUDGE_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+ZEVAL_JUDGE_BASE_URL=https://api.siliconflow.cn/v1
+ZEVAL_JUDGE_MODEL=Qwen/Qwen3-7B
+```
+
+> **Tip:** `zeval` reads `.env` from the current working directory automatically.
+
+---
+
+### Option B — Full Project Install (CLI + Web UI)
+
 ```bash
 # 1. Clone and install dependencies
-git clone https://github.com/Rogerrrr18/Zeval_2.0.git
+git clone https://github.com/Rogerrrr18/Zeval_2.0.git -b zeval-2.1
 cd Zeval_2.0
 npm install
 
@@ -74,20 +104,29 @@ That's it. You're ready to go.
 
 ## Quick Start — CLI
 
-The fastest way to evaluate a chatlog file:
+The fastest way to evaluate a chatlog file.
+
+**If installed globally** (Option A):
 
 ```bash
-# Run evaluation on the included sample file (no LLM, objective metrics only)
-npm run zeval -- evaluate mock-chatlog/raw-data/support-refund-short.csv --no-llm
+# Run evaluation on a chatlog file (no LLM, objective metrics only — fast)
+zeval evaluate your-chatlog.csv --no-llm
 
-# Run full evaluation with LLM judge (requires ZEVAL_JUDGE_API_KEY in .env)
-npm run zeval -- evaluate mock-chatlog/raw-data/support-refund-short.csv
+# Run with full LLM judge (requires ZEVAL_JUDGE_API_KEY in .env)
+zeval evaluate your-chatlog.csv
 
 # See all saved runs
-npm run zeval -- runs list
+zeval runs list
 
 # Inspect a specific run
-npm run zeval -- runs show <run-id>
+zeval runs show <run-id>
+```
+
+**If using the full project** (Option B), prefix commands with `npm run zeval --`:
+
+```bash
+npm run zeval -- evaluate mock-chatlog/raw-data/support-refund-short.csv --no-llm
+npm run zeval -- runs list
 ```
 
 You should see output like:
