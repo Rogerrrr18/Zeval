@@ -13,7 +13,6 @@
   ],
   "scripts": {
     "build:cli": "tsup",
-    "prepare": "tsup",
     "zeval": "node --import tsx src/cli/index.ts",
     "dev": "next dev",
     "build": "next build",
