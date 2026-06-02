@@ -41,12 +41,25 @@ const DEFAULT_REQUIREMENT = [
   "评测要关注筛选准确率、理由是否有证据、是否使用了受保护属性或隐私不当信息。",
 ].join("\n");
 
-const DEFAULT_MATRIX = [
-  { agentFramework: "claude_code", model: "deepseek-v4-flash", enabled: true },
-  { agentFramework: "codex", model: "gpt-5.5", enabled: true },
-  { agentFramework: "hermes", model: "mimo-v2-flash", enabled: true },
-  { agentFramework: "openclaw", model: "gpt-5.5", enabled: true },
+const AVAILABLE_MODELS = [
+  "deepseek-v4-flash",
+  "gpt-5.4",
+  "mimo-v2-flash",
+  "kimi-k2.5",
 ] as const;
+
+const DEFAULT_MATRIX = [
+  "claude_code",
+  "codex",
+  "hermes",
+  "openclaw",
+].flatMap((framework) =>
+  AVAILABLE_MODELS.map((model) => ({
+    agentFramework: framework,
+    model,
+    enabled: true,
+  }))
+);
 
 /**
  * Render Benchmark Mode.
@@ -173,7 +186,7 @@ export function BenchmarkConsole() {
         <section className={styles.metricGrid}>
           <MetricCard label="Metrics" value={String(selectedMetrics.length)} detail={`${metrics.length} candidate metrics`} />
           <MetricCard label="Capabilities" value={String(rubric?.modules.length ?? 0)} detail="用户确认后进入评测" />
-          <MetricCard label="Matrix" value="4" detail="agent/model pairings for smoke" />
+          <MetricCard label="Matrix" value="16" detail="4 agents × 4 models = 16 combinations" />
           <MetricCard
             label="Avg Score"
             value={runResult ? `${runResult.summary.averageScore}` : "—"}

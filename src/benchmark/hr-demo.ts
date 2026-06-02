@@ -11,6 +11,7 @@ import { createDatasetStore } from "@/eval-datasets/storage";
 import { getHrAdapter } from "@/benchmark/adapters";
 import { mapWithConcurrency } from "@/lib/concurrency";
 import type {
+  AgentFrameworkId,
   BenchmarkAgentSubmission,
   BenchmarkCase,
   BenchmarkMatrixCell,
@@ -21,12 +22,27 @@ import type {
 import type { AgentAdapterConfig } from "@/benchmark/adapters";
 
 const HR_DEMO_DIR = "examples/benchmarks/hr-resume-screening";
+const AVAILABLE_MODELS = [
+  "deepseek-v4-flash",
+  "gpt-5.4",
+  "mimo-v2-flash",
+  "kimi-k2.5",
+] as const;
+
 const DEFAULT_MATRIX: BenchmarkMatrixCell[] = [
-  { agentFramework: "claude_code", model: "deepseek-v4-flash", enabled: true, timeoutMs: 120000, maxTurns: 30 },
-  { agentFramework: "codex", model: "gpt-5.5", enabled: true, timeoutMs: 120000, maxTurns: 30 },
-  { agentFramework: "hermes", model: "mimo-v2-flash", enabled: true, timeoutMs: 120000, maxTurns: 30 },
-  { agentFramework: "openclaw", model: "gpt-5.5", enabled: true, timeoutMs: 120000, maxTurns: 30 },
-];
+  "claude_code",
+  "codex",
+  "hermes",
+  "openclaw",
+].flatMap((framework) =>
+  AVAILABLE_MODELS.map((model) => ({
+    agentFramework: framework as AgentFrameworkId,
+    model,
+    enabled: true,
+    timeoutMs: 120000,
+    maxTurns: 30,
+  }))
+);
 
 export type RunHrDemoBenchmarkInput = {
   approvedMetricKeys: string[];
@@ -135,7 +151,7 @@ function buildTaskPackage(rubric: BenchmarkRubricSet): BenchmarkTaskPackage {
 
 function buildAdapterConfig(input: RunHrDemoBenchmarkInput): AgentAdapterConfig {
   const apiKey = input.apiKey ?? process.env.AGENT_API_KEY ?? process.env.ZEVAL_JUDGE_API_KEY ?? "";
-  const baseUrl = input.baseUrl ?? process.env.AGENT_BASE_URL ?? "http://www.opcrouter.online";
+  const baseUrl = input.baseUrl ?? process.env.AGENT_BASE_URL ?? "http://www.opcrouter.online/v1";
   return {
     apiKey,
     baseUrl,
