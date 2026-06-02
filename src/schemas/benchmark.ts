@@ -56,4 +56,8 @@ export const benchmarkHrDemoRunRequestSchema = z.object({
     }),
   ).optional(),
   persistCases: z.boolean().optional().default(false),
+  /** Override API key for agent calls (defaults to AGENT_API_KEY env). */
+  apiKey: z.string().optional(),
+  /** Override base URL for agent calls (defaults to AGENT_BASE_URL env). */
+  baseUrl: z.string().optional(),
 });

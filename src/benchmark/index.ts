@@ -10,3 +10,4 @@ export * from "./runner";
 export * from "./case-admission";
 export * from "./copilot";
 export * from "./hr-demo";
+export * from "./adapters";

@@ -1,5 +1,5 @@
 /**
- * @fileoverview Local HR resume-screening benchmark demo runner.
+ * @fileoverview HR resume-screening benchmark with real agent adapters.
  */
 
 import { readFile } from "node:fs/promises";
@@ -8,8 +8,9 @@ import { approveRubricMetrics } from "@/benchmark/rubric";
 import { buildBenchmarkDatasetCaseCandidates, persistBenchmarkDatasetCases } from "@/benchmark/case-admission";
 import { runBenchmarkEvaluation } from "@/benchmark/runner";
 import { createDatasetStore } from "@/eval-datasets/storage";
+import { getHrAdapter } from "@/benchmark/adapters";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import type {
-  AgentFrameworkId,
   BenchmarkAgentSubmission,
   BenchmarkCase,
   BenchmarkMatrixCell,
@@ -17,19 +18,24 @@ import type {
   BenchmarkRunResult,
   BenchmarkTaskPackage,
 } from "@/benchmark/types";
+import type { AgentAdapterConfig } from "@/benchmark/adapters";
 
 const HR_DEMO_DIR = "examples/benchmarks/hr-resume-screening";
 const DEFAULT_MATRIX: BenchmarkMatrixCell[] = [
-  { agentFramework: "claude_code", model: "deepseek-v4-flash", enabled: true, timeoutMs: 600000, maxTurns: 30 },
-  { agentFramework: "codex", model: "gpt-5.5", enabled: true, timeoutMs: 600000, maxTurns: 30 },
-  { agentFramework: "hermes", model: "gpt-5.4-mini", enabled: true, timeoutMs: 600000, maxTurns: 30 },
-  { agentFramework: "openclaw", model: "mimo-v2-flash", enabled: true, timeoutMs: 600000, maxTurns: 30 },
+  { agentFramework: "claude_code", model: "deepseek-v4-flash", enabled: true, timeoutMs: 120000, maxTurns: 30 },
+  { agentFramework: "codex", model: "gpt-5.5", enabled: true, timeoutMs: 120000, maxTurns: 30 },
+  { agentFramework: "hermes", model: "gpt-5.4-mini", enabled: true, timeoutMs: 120000, maxTurns: 30 },
+  { agentFramework: "openclaw", model: "mimo-v2-flash", enabled: true, timeoutMs: 120000, maxTurns: 30 },
 ];
 
 export type RunHrDemoBenchmarkInput = {
   approvedMetricKeys: string[];
   matrix?: BenchmarkMatrixCell[];
   persistCases?: boolean;
+  /** Override API key for agent calls (defaults to AGENT_API_KEY env). */
+  apiKey?: string;
+  /** Override base URL for agent calls (defaults to AGENT_BASE_URL env). */
+  baseUrl?: string;
 };
 
 export type RunHrDemoBenchmarkResult = {
@@ -43,9 +49,10 @@ export type RunHrDemoBenchmarkResult = {
 };
 
 /**
- * Run the local HR resume screening demo with deterministic mock submissions.
- * This validates the Benchmark Mode scoring and case admission path before
- * wiring real Agent adapters.
+ * Run the HR resume screening benchmark with REAL agent adapters.
+ *
+ * Each enabled agent framework in the matrix is called via the
+ * OpenAI-compatible API endpoint. No mock submissions are used.
  */
 export async function runHrDemoBenchmark(
   input: RunHrDemoBenchmarkInput,
@@ -55,7 +62,18 @@ export async function runHrDemoBenchmark(
   const task = buildTaskPackage(approvedRubric);
   const matrix = (input.matrix?.length ? input.matrix : DEFAULT_MATRIX).filter((item) => item.enabled);
   const runId = `benchmark_hr_demo_${Date.now()}`;
-  const submissions = buildMockSubmissions(runId, task, cases, matrix);
+
+  const adapterConfig = buildAdapterConfig(input);
+
+  // Run real agent submissions with controlled concurrency
+  const submissions = await runRealAgentSubmissions({
+    runId,
+    task,
+    cases,
+    matrix,
+    adapterConfig,
+  });
+
   const result = await runBenchmarkEvaluation({
     runId,
     task,
@@ -115,85 +133,91 @@ function buildTaskPackage(rubric: BenchmarkRubricSet): BenchmarkTaskPackage {
   };
 }
 
-function buildMockSubmissions(
-  runId: string,
-  task: BenchmarkTaskPackage,
-  cases: BenchmarkCase[],
-  matrix: BenchmarkMatrixCell[],
-): BenchmarkAgentSubmission[] {
-  const submissions: BenchmarkAgentSubmission[] = [];
-  for (const matrixCell of matrix) {
-    for (const taskCase of cases) {
-      const parsedOutput = buildMockOutput(matrixCell.agentFramework, taskCase);
-      const rawOutput = JSON.stringify(parsedOutput);
-      submissions.push({
-        submissionId: `${runId}_${matrixCell.agentFramework}_${slug(matrixCell.model)}_${taskCase.caseId}`,
-        runId,
-        benchmarkId: task.benchmarkId,
-        taskId: task.taskId,
-        caseId: taskCase.caseId,
-        agentFramework: matrixCell.agentFramework,
-        model: matrixCell.model,
-        status: "completed",
-        rawOutput,
-        parsedOutput,
-        startedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-        durationMs: resolveMockDuration(matrixCell.agentFramework),
-        artifacts: {
-          evaluatorResults: {
-            tool_call_success: {
-              score: 5,
-              reason: "No external tool was required for the fixture run.",
-              evidence: [],
-              confidence: 1,
-            },
-          },
-        },
-      });
-    }
-  }
-  return submissions;
-}
-
-function buildMockOutput(
-  agentFramework: AgentFrameworkId,
-  taskCase: BenchmarkCase,
-): Record<string, unknown> {
-  const expectedDecision = String(taskCase.expected.decision ?? "reject");
-  const shouldMiss = agentFramework === "openclaw" && taskCase.caseId === "hr_sample_002";
-  const shouldOverReject = agentFramework === "hermes" && taskCase.caseId === "hr_sample_001";
-  const decision = shouldMiss || shouldOverReject
-    ? invertDecision(expectedDecision)
-    : expectedDecision;
-
+function buildAdapterConfig(input: RunHrDemoBenchmarkInput): AgentAdapterConfig {
+  const apiKey = input.apiKey ?? process.env.AGENT_API_KEY ?? process.env.ZEVAL_JUDGE_API_KEY ?? "";
+  const baseUrl = input.baseUrl ?? process.env.AGENT_BASE_URL ?? "http://www.opcrouter.online";
   return {
-    decision,
-    reason: decision === "select"
-      ? "The candidate shows role-relevant experience and enough evidence for the requested responsibilities."
-      : "The candidate lacks enough direct evidence for the core requirements in the job description.",
-    evidence: extractEvidence(taskCase),
+    apiKey,
+    baseUrl,
+    timeoutMs: 120000,
+    maxRetries: 2,
   };
 }
 
-function extractEvidence(taskCase: BenchmarkCase): string[] {
-  const resume = String(taskCase.input.resume ?? "");
-  const jobDescription = String(taskCase.input.job_description ?? "");
-  return [
-    resume.split(/[.;\n]/).find((part) => part.trim().length > 20)?.trim() ?? resume.slice(0, 120),
-    jobDescription.split(/[.;\n]/).find((part) => part.trim().length > 20)?.trim() ?? jobDescription.slice(0, 120),
-  ].filter(Boolean);
+type SubmissionJob = {
+  matrixCell: BenchmarkMatrixCell;
+  taskCase: BenchmarkCase;
+};
+
+async function runRealAgentSubmissions(input: {
+  runId: string;
+  task: BenchmarkTaskPackage;
+  cases: BenchmarkCase[];
+  matrix: BenchmarkMatrixCell[];
+  adapterConfig: AgentAdapterConfig;
+}): Promise<BenchmarkAgentSubmission[]> {
+  // Build all jobs
+  const jobs: SubmissionJob[] = [];
+  for (const matrixCell of input.matrix) {
+    for (const taskCase of input.cases) {
+      jobs.push({ matrixCell, taskCase });
+    }
+  }
+
+  // Use concurrency limit from first matrix cell or default
+  const concurrency = input.matrix[0]?.concurrency ?? 2;
+
+  console.info(`[hr-demo] Running ${jobs.length} real agent submissions with concurrency=${concurrency}`);
+
+  const results = await mapWithConcurrency(
+    jobs,
+    concurrency,
+    async (job) => {
+      const { matrixCell, taskCase } = job;
+      try {
+        const adapter = getHrAdapter(matrixCell.agentFramework);
+        const submission = await adapter.submit(taskCase, {
+          runId: input.runId,
+          benchmarkId: input.task.benchmarkId,
+          taskId: input.task.taskId,
+          matrixCell,
+        }, input.adapterConfig);
+        console.info(`[hr-demo] ✓ ${matrixCell.agentFramework}/${matrixCell.model} case=${taskCase.caseId} decision=${String(submission.parsedOutput?.decision ?? "unknown")}`);
+        return submission;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[hr-demo] ✗ ${matrixCell.agentFramework}/${matrixCell.model} case=${taskCase.caseId} error=${message}`);
+        return buildFailedSubmission(input.runId, input.task, matrixCell, taskCase, message);
+      }
+    },
+  );
+
+  return results;
 }
 
-function invertDecision(decision: string): string {
-  return decision === "select" ? "reject" : "select";
-}
-
-function resolveMockDuration(agentFramework: AgentFrameworkId): number {
-  if (agentFramework === "claude_code") return 14000;
-  if (agentFramework === "codex") return 18000;
-  if (agentFramework === "hermes") return 11000;
-  return 22000;
+function buildFailedSubmission(
+  runId: string,
+  task: BenchmarkTaskPackage,
+  matrixCell: BenchmarkMatrixCell,
+  taskCase: BenchmarkCase,
+  error: string,
+): BenchmarkAgentSubmission {
+  return {
+    submissionId: `${runId}_${matrixCell.agentFramework}_${slug(matrixCell.model)}_${taskCase.caseId}`,
+    runId,
+    benchmarkId: task.benchmarkId,
+    taskId: task.taskId,
+    caseId: taskCase.caseId,
+    agentFramework: matrixCell.agentFramework,
+    model: matrixCell.model,
+    status: "failed",
+    rawOutput: "",
+    error,
+    startedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+    durationMs: 0,
+    artifacts: {},
+  };
 }
 
 function slug(value: string): string {
