@@ -14,9 +14,8 @@ import styles from "./appShell.module.css";
 
 const NAV_ITEMS = [
   { label: "总览", href: "/", match: "/", group: "Project" },
-  { label: "评估", href: "/workbench", match: "/workbench", group: "Quality Loop" },
-  { label: "案例校准", href: "/datasets", match: "/datasets", group: "Quality Loop" },
   { label: "Benchmark", href: "/benchmark", match: "/benchmark", group: "Quality Loop" },
+  { label: "案例校准", href: "/datasets", match: "/datasets", group: "Quality Loop" },
   { label: "合成补样本", href: "/synthesize", match: "/synthesize", group: "Quality Loop" },
   { label: "修复验证", href: "/remediation-packages", match: "/remediation-packages", group: "Quality Loop" },
   { label: "Copilot", href: "/chat", match: "/chat", group: "Assistants" },
@@ -178,8 +177,8 @@ export function AppShell({ children, subheader }: AppShellProps) {
           </div>
           <div className={styles.topBarActions}>
             <span className={styles.projectBadge} title={activeProject.description ?? activeProject.name}>{activeProject.name}</span>
-            <Link href="/workbench" className={styles.evaluateButton}>
-              Evaluate
+            <Link href="/benchmark" className={styles.evaluateButton}>
+              Benchmark
             </Link>
           </div>
         </header>

@@ -43,8 +43,8 @@ export function kv(key: string, value: string | number): void {
 }
 
 /** Multi-row label/value table */
-export function table(rows: Array<[string, string | number]>, padKeyTo = 30): void {
-  for (const [key, value] of rows) {
+export function table(rows: Array<[string, string | number] | [string]>, padKeyTo = 30): void {
+  for (const [key, value = ""] of rows) {
     if (key === "") {
       console.log();
       continue;

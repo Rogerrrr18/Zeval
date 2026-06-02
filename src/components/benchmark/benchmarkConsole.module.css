@@ -206,6 +206,12 @@
   gap: 12px;
 }
 
+.layoutWide {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.85fr) minmax(420px, 1.15fr);
+  gap: 12px;
+}
+
 .panel {
   min-width: 0;
   padding: 16px;
@@ -366,9 +372,329 @@
   line-height: 1.7;
 }
 
+.warningList {
+  display: grid;
+  gap: 6px;
+}
+
+.warningList span {
+  padding: 9px 12px;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.08);
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:global(html[data-theme="dark"]) .warningList span {
+  border-color: rgb(251 191 36 / 0.2);
+  background: rgb(251 191 36 / 0.08);
+  color: #fbbf24;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field span,
+.switchLine span,
+.counter {
+  color: var(--bm-ink-3);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  border: 1px solid var(--bm-line);
+  border-radius: 6px;
+  background: var(--bm-bg-2);
+  color: var(--bm-ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.field input {
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.field textarea {
+  min-height: 178px;
+  padding: 10px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+:global(html[data-theme="dark"]) .field input,
+:global(html[data-theme="dark"]) .field textarea {
+  border-color: rgb(255 255 255 / 0.08);
+  background: rgb(255 255 255 / 0.035);
+  color: #f8fafc;
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: rgba(124, 58, 237, 0.45);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.09);
+}
+
+.switchLine {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.switchLine input,
+.metricToggle input {
+  accent-color: var(--bm-accent);
+}
+
+.rubricStack {
+  display: grid;
+  gap: 10px;
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.rubricModule {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--bm-line-2);
+  border-radius: 6px;
+  background: var(--bm-bg-2);
+}
+
+:global(html[data-theme="dark"]) .rubricModule {
+  border-color: rgb(255 255 255 / 0.06);
+  background: rgb(255 255 255 / 0.025);
+}
+
+.rubricModuleHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rubricModuleHeader strong {
+  color: var(--bm-ink);
+  font-size: 13px;
+}
+
+.rubricModuleHeader span,
+.rubricModule p {
+  color: var(--bm-ink-3);
+  font-size: 12px;
+}
+
+.rubricModule p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.metricList {
+  display: grid;
+  gap: 7px;
+}
+
+.metricToggle {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid var(--bm-line-2);
+  border-radius: 6px;
+  background: var(--bm-bg);
+  cursor: pointer;
+}
+
+:global(html[data-theme="dark"]) .metricToggle {
+  border-color: rgb(255 255 255 / 0.06);
+  background: rgb(255 255 255 / 0.03);
+}
+
+.metricToggle:hover {
+  border-color: rgba(124, 58, 237, 0.3);
+  background: rgba(124, 58, 237, 0.045);
+}
+
+.metricToggle strong {
+  display: block;
+  overflow: hidden;
+  color: var(--bm-ink);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metricToggle small {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--bm-ink-3);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metricToggle em {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(45, 212, 191, 0.1);
+  color: #0f766e;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 760;
+}
+
+:global(html[data-theme="dark"]) .metricToggle em {
+  background: rgb(45 212 191 / 0.12);
+  color: #5eead4;
+}
+
+.leaderboardTable {
+  overflow: hidden;
+  border: 1px solid var(--bm-line-2);
+  border-radius: 6px;
+}
+
+.leaderboardHead,
+.leaderboardRow {
+  display: grid;
+  grid-template-columns: 58px minmax(120px, 0.9fr) minmax(140px, 1fr) 80px 70px;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.leaderboardHead {
+  background: var(--bm-bg-3);
+  color: var(--bm-ink-3);
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.leaderboardRow {
+  border-top: 1px solid var(--bm-line-2);
+  color: var(--bm-ink-2);
+  font-size: 12px;
+}
+
+.leaderboardRow span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leaderboardRow strong,
+.leaderboardRow b {
+  color: var(--bm-ink);
+}
+
+.leaderboardRow em {
+  width: fit-content;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--bm-bg-3);
+  color: var(--bm-ink-2);
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.barList {
+  display: grid;
+  gap: 10px;
+}
+
+.barRow {
+  display: grid;
+  gap: 5px;
+}
+
+.barRow div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.barRow span {
+  overflow: hidden;
+  color: var(--bm-ink-2);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barRow strong {
+  color: var(--bm-ink);
+  font-size: 12px;
+}
+
+.barRow i {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bm-bg-3);
+}
+
+.barRow i span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #14b8a6, #7c3aed);
+}
+
+.summaryList {
+  display: grid;
+  gap: 8px;
+}
+
+.summaryList span {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--bm-line-2);
+  color: var(--bm-ink-3);
+  font-size: 12px;
+}
+
+.summaryList span:last-child {
+  border-bottom: 0;
+}
+
+.summaryList strong {
+  color: var(--bm-ink);
+  font-size: 14px;
+}
+
 @media (max-width: 980px) {
   .metricGrid,
-  .layout {
+  .layout,
+  .layoutWide {
     grid-template-columns: 1fr;
   }
 
@@ -379,8 +705,29 @@
 
 @media (max-width: 620px) {
   .tableHead,
-  .tableRow {
+  .tableRow,
+  .leaderboardHead,
+  .leaderboardRow {
     grid-template-columns: minmax(140px, 1fr) 52px 52px 70px;
     padding: 0 8px;
+  }
+
+  .leaderboardHead span:first-child,
+  .leaderboardRow strong:first-child {
+    display: none;
+  }
+
+  .leaderboardHead,
+  .leaderboardRow {
+    grid-template-columns: minmax(86px, 0.9fr) minmax(96px, 1fr) 58px 52px;
+  }
+
+  .metricToggle {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+
+  .metricToggle em {
+    grid-column: 2;
+    width: fit-content;
   }
 }

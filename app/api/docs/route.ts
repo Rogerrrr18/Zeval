@@ -34,6 +34,26 @@ const OPENAPI_SPEC = {
         },
       },
     },
+    "/api/benchmarks/rubric": {
+      post: {
+        summary: "Draft a capability-based benchmark rubric",
+        description: "从真实业务需求生成候选 rubric。所有 metric 默认需要用户审核确认后才进入评测。",
+        responses: {
+          "200": { description: "Rubric draft response" },
+          "400": { description: "Invalid request" },
+        },
+      },
+    },
+    "/api/benchmarks/hr-demo": {
+      post: {
+        summary: "Run the local HR resume-screening benchmark demo",
+        description: "使用本地 HR fixture 和模拟 Agent 输出验证 Benchmark Mode runner、排行榜和 case 候选链路。",
+        responses: {
+          "200": { description: "Benchmark run result" },
+          "400": { description: "Invalid request" },
+        },
+      },
+    },
     "/api/traces/ingest": {
       post: {
         summary: "Ingest OTel GenAI semconv-compatible traces",

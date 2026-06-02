@@ -1,0 +1,48 @@
+benchmarkId: benchmark_hr_resume_screening
+taskId: hr_resume_screening_v1
+version: 0.1.0
+title: HR Resume Screening
+domain: hr
+difficulty: medium
+description: >
+  Select or reject a candidate for a role using a job description and resume.
+  The agent must return structured JSON and support the decision with evidence.
+
+inputSchema:
+  type: object
+  required:
+    - job_description
+    - resume
+  properties:
+    job_description:
+      type: string
+    resume:
+      type: string
+    role:
+      type: string
+
+outputSchema:
+  type: object
+  required:
+    - decision
+    - reason
+    - evidence
+  properties:
+    decision:
+      enum: [select, reject]
+    reason:
+      type: string
+    evidence:
+      type: array
+      items:
+        type: string
+
+evaluation:
+  rubric: rubrics/hr-screening-rubric.json
+  humanLabelRequired: true
+  primaryMetric: decision_accuracy
+
+agent:
+  maxTurns: 30
+  timeoutMs: 600000
+
