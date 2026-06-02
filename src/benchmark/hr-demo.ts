@@ -25,7 +25,6 @@ const HR_DEMO_DIR = "examples/benchmarks/hr-resume-screening";
 const AVAILABLE_MODELS = [
   "deepseek-v4-flash",
   "gpt-5.4",
-  "mimo-v2-flash",
   "kimi-k2.5",
 ] as const;
 

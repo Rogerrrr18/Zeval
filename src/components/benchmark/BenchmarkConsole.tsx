@@ -44,7 +44,6 @@ const DEFAULT_REQUIREMENT = [
 const AVAILABLE_MODELS = [
   "deepseek-v4-flash",
   "gpt-5.4",
-  "mimo-v2-flash",
   "kimi-k2.5",
 ] as const;
 
@@ -186,7 +185,7 @@ export function BenchmarkConsole() {
         <section className={styles.metricGrid}>
           <MetricCard label="Metrics" value={String(selectedMetrics.length)} detail={`${metrics.length} candidate metrics`} />
           <MetricCard label="Capabilities" value={String(rubric?.modules.length ?? 0)} detail="用户确认后进入评测" />
-          <MetricCard label="Matrix" value="16" detail="4 agents × 4 models = 16 combinations" />
+          <MetricCard label="Matrix" value="12" detail="4 agents × 3 models = 12 combinations" />
           <MetricCard
             label="Avg Score"
             value={runResult ? `${runResult.summary.averageScore}` : "—"}
