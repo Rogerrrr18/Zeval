@@ -94,7 +94,7 @@ async function callOpenAiCompatibleChat(
   config: AgentAdapterConfig,
 ): Promise<{ raw: string }> {
   const timeoutMs = config.timeoutMs ?? 120000;
-  const maxRetries = config.maxRetries ?? 2;
+  const maxRetries = config.maxRetries ?? 3;
   const baseUrl = config.baseUrl.replace(/\/$/, "");
 
   for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
@@ -121,6 +121,15 @@ async function callOpenAiCompatibleChat(
 
       clearTimeout(timer);
 
+      // Handle rate limiting with longer backoff before parsing body
+      if (response.status === 429) {
+        const retryAfter = Math.min(parseInt(response.headers.get("retry-after") ?? "5", 10), 30);
+        const backoffMs = retryAfter * 1000 || Math.min(2000 * Math.pow(2, attempt - 1), 30000);
+        console.warn(`[adapter] 429 rate limited (model=${model}), waiting ${backoffMs}ms before retry ${attempt}/${maxRetries}`);
+        await sleep(backoffMs);
+        continue;
+      }
+
       const payload = (await response.json()) as OpenAiChatResponse;
 
       if (!response.ok) {
@@ -140,11 +149,15 @@ async function callOpenAiCompatibleChat(
     } catch (error) {
       clearTimeout(timer);
       const message = error instanceof Error ? error.message : String(error);
+      // Don't retry on client-side errors (4xx except 429)
+      if (message.includes("API error: 4") && !message.includes("429")) {
+        throw new Error(`Agent call failed: ${message}`);
+      }
       if (attempt === maxRetries) {
         throw new Error(`Agent call failed after ${maxRetries} attempts: ${message}`);
       }
       // Exponential backoff before retry
-      await sleep(Math.min(1000 * Math.pow(2, attempt - 1), 8000));
+      await sleep(Math.min(2000 * Math.pow(2, attempt - 1), 15000));
     }
   }
 

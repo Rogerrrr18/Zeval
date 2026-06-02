@@ -181,7 +181,8 @@ async function runRealAgentSubmissions(input: {
   }
 
   // Use concurrency limit from first matrix cell or default
-  const concurrency = input.matrix[0]?.concurrency ?? 2;
+  // Cap at 2 to avoid rate-limiting on shared API endpoints
+  const concurrency = Math.min(input.matrix[0]?.concurrency ?? 2, 2);
 
   console.info(`[hr-demo] Running ${jobs.length} real agent submissions with concurrency=${concurrency}`);
 
