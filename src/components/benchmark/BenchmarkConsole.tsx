@@ -44,8 +44,8 @@ const DEFAULT_REQUIREMENT = [
 const DEFAULT_MATRIX = [
   { agentFramework: "claude_code", model: "deepseek-v4-flash", enabled: true },
   { agentFramework: "codex", model: "gpt-5.5", enabled: true },
-  { agentFramework: "hermes", model: "gpt-5.4-mini", enabled: true },
-  { agentFramework: "openclaw", model: "mimo-v2-flash", enabled: true },
+  { agentFramework: "hermes", model: "mimo-v2-flash", enabled: true },
+  { agentFramework: "openclaw", model: "gpt-5.5", enabled: true },
 ] as const;
 
 /**

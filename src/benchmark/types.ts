@@ -159,7 +159,6 @@ export type AgentFrameworkId = "claude_code" | "codex" | "hermes" | "openclaw";
 export type BenchmarkModelId =
   | "deepseek-v4-flash"
   | "gpt-5.5"
-  | "gpt-5.4-mini"
   | "mimo-v2-flash"
   | (string & {});
 

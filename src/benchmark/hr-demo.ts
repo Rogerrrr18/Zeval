@@ -24,8 +24,8 @@ const HR_DEMO_DIR = "examples/benchmarks/hr-resume-screening";
 const DEFAULT_MATRIX: BenchmarkMatrixCell[] = [
   { agentFramework: "claude_code", model: "deepseek-v4-flash", enabled: true, timeoutMs: 120000, maxTurns: 30 },
   { agentFramework: "codex", model: "gpt-5.5", enabled: true, timeoutMs: 120000, maxTurns: 30 },
-  { agentFramework: "hermes", model: "gpt-5.4-mini", enabled: true, timeoutMs: 120000, maxTurns: 30 },
-  { agentFramework: "openclaw", model: "mimo-v2-flash", enabled: true, timeoutMs: 120000, maxTurns: 30 },
+  { agentFramework: "hermes", model: "mimo-v2-flash", enabled: true, timeoutMs: 120000, maxTurns: 30 },
+  { agentFramework: "openclaw", model: "gpt-5.5", enabled: true, timeoutMs: 120000, maxTurns: 30 },
 ];
 
 export type RunHrDemoBenchmarkInput = {
