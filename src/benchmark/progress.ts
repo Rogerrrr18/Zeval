@@ -11,6 +11,7 @@ import type {
   BenchmarkModelId,
   BenchmarkRunResult,
 } from "@/benchmark/types";
+import { persistBenchmarkRunSnapshot } from "@/benchmark/progress-artifacts";
 
 export type BenchmarkProgressPhase =
   | "preparing"
@@ -57,6 +58,7 @@ export type BenchmarkDatasetProgressSummary = {
 export type BenchmarkProgressSnapshot = {
   runId: string;
   phase: BenchmarkProgressPhase;
+  updatedAt?: string;
   totalSubmissions: number;
   completedSubmissions: number;
   failedSubmissions: number;
@@ -110,6 +112,7 @@ class BenchmarkProgressTracker {
       recentItems: [],
       events: [],
     });
+    this.persist(runId);
     this.listeners.set(runId, new Set());
   }
 
@@ -128,8 +131,9 @@ class BenchmarkProgressTracker {
   update(runId: string, patch: Partial<BenchmarkProgressSnapshot>): void {
     const current = this.snapshots.get(runId);
     if (!current) return;
-    const next = { ...current, ...patch };
+    const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
     this.snapshots.set(runId, next);
+    this.persist(runId);
     this.listeners.get(runId)?.forEach((listener) => listener(next));
   }
 
@@ -169,9 +173,24 @@ class BenchmarkProgressTracker {
     return this.snapshots.get(runId);
   }
 
+  restoreSnapshot(snapshot: BenchmarkProgressSnapshot): void {
+    this.snapshots.set(snapshot.runId, snapshot);
+    if (!this.listeners.has(snapshot.runId)) {
+      this.listeners.set(snapshot.runId, new Set());
+    }
+  }
+
   cleanup(runId: string): void {
     this.snapshots.delete(runId);
     this.listeners.delete(runId);
+  }
+
+  private persist(runId: string): void {
+    const snapshot = this.snapshots.get(runId);
+    if (!snapshot) return;
+    void persistBenchmarkRunSnapshot(snapshot).catch(() => {
+      // Progress streaming should not fail just because disk persistence did.
+    });
   }
 }
 

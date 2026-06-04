@@ -5,6 +5,11 @@
 import { approveRubricMetrics } from "@/benchmark/rubric";
 import { runBenchmarkEvaluation } from "@/benchmark/runner";
 import { benchmarkProgress } from "@/benchmark/progress";
+import {
+  persistBenchmarkGenericRunArtifact,
+  readBenchmarkRunArtifact,
+  type BenchmarkGenericRunArtifact,
+} from "@/benchmark/progress-artifacts";
 import { parseJsonObjectFromLlmOutput, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
 import type {
   BenchmarkAgentSubmission,
@@ -23,6 +28,7 @@ export type RunGenericBenchmarkInput = {
   requirementText: string;
   rubric: BenchmarkRubricSet;
   dataset: BenchmarkDatasetSnapshot;
+  resumeRunId?: string;
 };
 
 const DEFAULT_MATRIX: BenchmarkMatrixCell[] = [
@@ -51,6 +57,13 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
   const cases = buildCasesFromDataset(task, input.dataset);
   const matrix = DEFAULT_MATRIX;
   const totalMetrics = cases.length * matrix.length * approvedMetricKeys.length;
+  const resumeArtifact = input.resumeRunId
+    ? (await readBenchmarkRunArtifact(input.resumeRunId))?.genericRun
+    : (await readBenchmarkRunArtifact(input.runId))?.genericRun;
+  const reusableArtifact = isReusableGenericArtifact(resumeArtifact, input.requirementText, task)
+    ? resumeArtifact
+    : null;
+  const metricResultsForArtifact = dedupeMetricResults(reusableArtifact?.metricResults ?? []);
 
   benchmarkProgress.init(input.runId, matrix, cases.length);
   benchmarkProgress.update(input.runId, {
@@ -79,12 +92,23 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
     title: "案例构建完成",
     detail: `已从上传数据中构建 ${cases.length} 个评测案例；当前 MVP 为控制耗时最多抽取前 ${MAX_DATASET_CASES} 个 session。`,
   });
+  if (reusableArtifact) {
+    benchmarkProgress.addEvent(input.runId, {
+      phase: "building_cases",
+      status: "completed",
+      title: "发现可复用断点",
+      detail: `将复用 ${reusableArtifact.submissions.filter((item) => item.status === "completed").length} 条被测输出和 ${metricResultsForArtifact.length} 条指标评审结果。`,
+    });
+  }
+  await persistGenericArtifact(input.runId, input.requirementText, task, cases, reusableArtifact?.submissions ?? [], metricResultsForArtifact);
 
   const submissions = await buildSubmissions({
     runId: input.runId,
     task,
     cases,
     matrix,
+    existingSubmissions: reusableArtifact?.submissions ?? [],
+    metricResultsForArtifact,
   });
 
   benchmarkProgress.update(input.runId, {
@@ -107,12 +131,32 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
     evaluatorContext: {
       llmJudge: createLlmJudge(),
     },
+    existingMetricResults: metricResultsForArtifact,
+    onMetricReused: (metricResult) => {
+      const snap = benchmarkProgress.getSnapshot(input.runId);
+      if (!snap) return;
+      benchmarkProgress.update(input.runId, {
+        evaluatedMetrics: snap.evaluatedMetrics + 1,
+      });
+      benchmarkProgress.addEvent(input.runId, {
+        phase: "evaluating",
+        status: "completed",
+        title: "复用指标结果",
+        detail: `${metricResult.metricKey} 已从上次中断 run 中复用，无需重新调用评测模型。`,
+        caseId: metricResult.caseId,
+        metricName: metricResult.metricKey,
+        score: metricResult.score,
+        evidence: metricResult.evidence.slice(0, 3),
+      });
+    },
     onMetricEvaluated: (metricResult) => {
       const snap = benchmarkProgress.getSnapshot(input.runId);
       if (!snap) return;
       benchmarkProgress.update(input.runId, {
         evaluatedMetrics: snap.evaluatedMetrics + 1,
       });
+      upsertMetricResult(metricResultsForArtifact, metricResult);
+      void persistGenericArtifact(input.runId, input.requirementText, task, cases, submissions, metricResultsForArtifact);
       addMetricEvaluationEvent(input.runId, metricResult);
     },
   });
@@ -124,6 +168,7 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
     detail: `平均分 ${result.summary.averageScore.toFixed(1)}%，共生成 ${result.summary.metricResultCount} 条指标评审结果。`,
   });
   benchmarkProgress.setResult(input.runId, result);
+  await persistGenericArtifact(input.runId, input.requirementText, task, cases, submissions, result.metricResults);
   return { task, result };
 }
 
@@ -223,11 +268,41 @@ async function buildSubmissions(input: {
   task: BenchmarkTaskPackage;
   cases: BenchmarkCase[];
   matrix: BenchmarkMatrixCell[];
+  existingSubmissions?: BenchmarkAgentSubmission[];
+  metricResultsForArtifact: BenchmarkMetricEvaluationResult[];
 }): Promise<BenchmarkAgentSubmission[]> {
   const submissions: BenchmarkAgentSubmission[] = [];
+  const existingByKey = new Map(
+    (input.existingSubmissions ?? [])
+      .filter((submission) => submission.status === "completed")
+      .map((submission) => [submissionCacheKey(submission.agentFramework, submission.model, submission.caseId), submission]),
+  );
 
   for (const matrixCell of input.matrix) {
     for (const taskCase of input.cases) {
+      const existingSubmission = existingByKey.get(submissionCacheKey(matrixCell.agentFramework, matrixCell.model, taskCase.caseId));
+      if (existingSubmission) {
+        submissions.push(existingSubmission);
+        markSubmissionDone(input.runId, matrixCell, taskCase, true, existingSubmission.durationMs);
+        benchmarkProgress.addEvent(input.runId, {
+          phase: "submitting",
+          status: "completed",
+          title: "复用被测输出",
+          detail: `案例 ${taskCase.caseId} 已从上次中断 run 中复用，无需重新调用被测模型。`,
+          caseId: taskCase.caseId,
+          evidence: extractOutputEvidence(existingSubmission.parsedOutput ?? {}),
+        });
+        await persistGenericArtifact(
+          input.runId,
+          input.task.requirementText,
+          input.task,
+          input.cases,
+          submissions,
+          input.metricResultsForArtifact,
+        );
+        continue;
+      }
+
       benchmarkProgress.addItem(input.runId, {
         agentFramework: matrixCell.agentFramework,
         model: matrixCell.model,
@@ -292,6 +367,14 @@ async function buildSubmissions(input: {
         };
         submissions.push(submission);
         markSubmissionDone(input.runId, matrixCell, taskCase, true, submission.durationMs);
+        await persistGenericArtifact(
+          input.runId,
+          input.task.requirementText,
+          input.task,
+          input.cases,
+          submissions,
+          input.metricResultsForArtifact,
+        );
         benchmarkProgress.addEvent(input.runId, {
           phase: "submitting",
           status: "completed",
@@ -318,6 +401,14 @@ async function buildSubmissions(input: {
           durationMs: Date.now() - startedMs,
         });
         markSubmissionDone(input.runId, matrixCell, taskCase, false);
+        await persistGenericArtifact(
+          input.runId,
+          input.task.requirementText,
+          input.task,
+          input.cases,
+          submissions,
+          input.metricResultsForArtifact,
+        );
         benchmarkProgress.addEvent(input.runId, {
           phase: "submitting",
           status: "failed",
@@ -330,6 +421,65 @@ async function buildSubmissions(input: {
   }
 
   return submissions;
+}
+
+async function persistGenericArtifact(
+  runId: string,
+  requirementText: string,
+  task: BenchmarkTaskPackage,
+  cases: BenchmarkCase[],
+  submissions: BenchmarkAgentSubmission[],
+  metricResults: BenchmarkMetricEvaluationResult[],
+): Promise<void> {
+  await persistBenchmarkGenericRunArtifact(runId, {
+    requirementText,
+    task,
+    cases,
+    submissions,
+    metricResults: dedupeMetricResults(metricResults),
+  });
+}
+
+function isReusableGenericArtifact(
+  artifact: BenchmarkGenericRunArtifact | null | undefined,
+  requirementText: string,
+  task: BenchmarkTaskPackage,
+): artifact is BenchmarkGenericRunArtifact {
+  return Boolean(
+    artifact &&
+    artifact.requirementText === requirementText &&
+    artifact.task.rubric.rubricId === task.rubric.rubricId &&
+    artifact.task.taskId === task.taskId,
+  );
+}
+
+function upsertMetricResult(
+  results: BenchmarkMetricEvaluationResult[],
+  nextResult: BenchmarkMetricEvaluationResult,
+): void {
+  const key = metricCacheKey(nextResult);
+  const existingIndex = results.findIndex((item) => metricCacheKey(item) === key);
+  if (existingIndex >= 0) {
+    results[existingIndex] = nextResult;
+  } else {
+    results.push(nextResult);
+  }
+}
+
+function dedupeMetricResults(results: BenchmarkMetricEvaluationResult[]): BenchmarkMetricEvaluationResult[] {
+  const byKey = new Map<string, BenchmarkMetricEvaluationResult>();
+  for (const result of results) {
+    byKey.set(metricCacheKey(result), result);
+  }
+  return [...byKey.values()];
+}
+
+function metricCacheKey(result: BenchmarkMetricEvaluationResult): string {
+  return `${result.submissionId}::${result.metricKey}`;
+}
+
+function submissionCacheKey(agentFramework: string, model: string, caseId: string): string {
+  return `${agentFramework}::${model}::${caseId}`;
 }
 
 /**

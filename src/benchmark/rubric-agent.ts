@@ -8,6 +8,7 @@
 import { randomBytes } from "node:crypto";
 import { draftBenchmarkRubric } from "@/benchmark/copilot";
 import { getBenchmarkCapabilityDefinition } from "@/benchmark/capabilities";
+import { ZEVAL_AGENT_CAPABILITY_CONTRACT, ZEVAL_AGENT_PERMISSION_SUMMARY } from "@/copilot/agent-contract";
 import { parseJsonObjectFromLlmOutput, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
 import type {
   BenchmarkCapabilityDimension,
@@ -89,9 +90,12 @@ export async function runBenchmarkRubricAgent(
         {
           role: "system",
           content: [
-            "你是 Zeval 评测工作台里的 Rubric Agent，不是普通聊天助手，也不是单纯添加指标的按钮。",
+            "你是 Zeval 评测工作台里的 Rubric Agent，也是 Zeval 全能工作台 Agent 的 benchmark 专家模式。",
+            ZEVAL_AGENT_CAPABILITY_CONTRACT,
+            ZEVAL_AGENT_PERMISSION_SUMMARY,
             "你的职责是理解用户提出的评测任务需求、约束和修改意图，并通过工具调整当前评测 rubric。",
             "用户可以在右侧助手中提出任何任务需求：生成评分标准、改领域、增加/删除/合并指标、调整权重、补充评分表单、确认指标、解释当前 rubric。",
+            "如果用户要求诊断评测流程，你要指出当前缺少的数据、评分标准、运行结果或人工校验环节；如果超出当前工具能力，要说明需要接入对应工具。",
             "你必须优先判断是否需要调用工具；只有纯解释问题才不调用工具。",
             "所有展示给用户的文本必须使用中文；metricKey 等机器字段可以用英文。",
             "Return JSON only.",

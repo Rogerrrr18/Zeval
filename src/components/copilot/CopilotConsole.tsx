@@ -404,10 +404,10 @@ export function CopilotConsole() {
         <div className={styles.chatPanel}>
           <header className={styles.header}>
             <div>
-              <p className={styles.headerKicker}>Zeval Chat</p>
+              <p className={styles.headerKicker}>Zeval Agent</p>
               <h2 className={styles.title}>{activeChannel.title}</h2>
               <p className={styles.sub}>
-                {turns.length} turns · {attachedFileName ? `attached ${attachedRows?.length ?? 0} rows` : "no attachment"}
+                推理 · 工具调度 · 诊断 · {turns.length} turns · {attachedFileName ? `attached ${attachedRows?.length ?? 0} rows` : "no attachment"}
               </p>
             </div>
           </header>
@@ -415,11 +415,20 @@ export function CopilotConsole() {
           <section className={styles.transcript} ref={transcriptRef}>
             {turns.length === 0 ? (
               <div className={styles.welcome}>
-                <strong>开始一个 channel</strong>
-                <p>问产品、跑评估、沉淀调优包都可以在这里继续。</p>
+                <strong>全能 Agent 控制台</strong>
+                <p>它可以规划任务、调用已接入工具、诊断系统状态、跑评测实验，并把结果沉淀成调优闭环。</p>
+                <div className={styles.capabilityGrid}>
+                  <span>Reasoning</span>
+                  <span>Tools</span>
+                  <span>Diagnosis</span>
+                  <span>Workflow</span>
+                </div>
                 <div className={styles.suggest}>
-                  <button onClick={() => void send("你好，你能做什么？")}>
-                    你好，你能做什么？
+                  <button onClick={() => void send("诊断一下当前 Agent 的权限、工具和工作流状态")}>
+                    诊断当前 Agent 状态
+                  </button>
+                  <button onClick={() => void send("你现在拥有哪些工具权限？如果我要你操作窗口和外部工具，还需要接入什么？")}>
+                    查看工具权限边界
                   </button>
                   <button onClick={() => void send("帮我看下这周客服 agent 的表现")}>
                     帮我看下这周客服 agent 的表现

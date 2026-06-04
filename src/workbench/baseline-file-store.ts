@@ -9,7 +9,7 @@ import { maybeWorkspacePath } from "@/workspaces/paths";
 import type { WorkbenchBaselineStore } from "@/workbench/baseline-store";
 import type { WorkbenchBaselineIndexRow, WorkbenchBaselineLookup, WorkbenchBaselineSnapshot } from "@/workbench/types";
 
-const BASELINE_ROOT = path.join("mock-chatlog", "baselines");
+const BASELINE_ROOT = path.join(".zeval-db", "workbench-baselines");
 
 /**
  * Filesystem-backed workbench baseline store.

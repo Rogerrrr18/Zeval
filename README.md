@@ -125,7 +125,7 @@ zeval runs show <run-id>
 **If using the full project** (Option B), prefix commands with `npm run zeval --`:
 
 ```bash
-npm run zeval -- evaluate mock-chatlog/raw-data/support-refund-short.csv --no-llm
+npm run zeval -- evaluate your-chatlog.csv --no-llm
 npm run zeval -- runs list
 ```
 
@@ -570,7 +570,6 @@ bin/
 eval-runs/                  Saved evaluate result artifacts (auto-created)
 eval-datasets/              Dataset pool: bad cases, good cases, sample batches
 artifacts/                  Remediation packages (auto-created)
-mock-chatlog/               Sample chatlog files for testing
 docs/                       Project documentation
 ```
 
@@ -584,7 +583,7 @@ npm run dev                  # Start web UI at http://localhost:3000
 
 # CLI
 npm run zeval -- --help      # Show all CLI commands
-npm run zeval -- evaluate mock-chatlog/raw-data/support-refund-short.csv --no-llm
+npm run zeval -- evaluate your-chatlog.csv --no-llm
 
 # Type checking and linting
 npx tsc --noEmit

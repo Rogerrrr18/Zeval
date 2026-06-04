@@ -243,7 +243,7 @@ export async function runEvaluatePipeline(
   let artifactPath: string | undefined;
   if (options.persistArtifact ?? Boolean(options.artifactBaseName)) {
     const artifactBaseName = sanitizeArtifactBaseName(options.artifactBaseName ?? options.runId);
-    const artifactDirectory = path.join("mock-chatlog", "enriched-data");
+    const artifactDirectory = path.join(".zeval-db", "enriched-data");
     artifactPath = path.join(artifactDirectory, `${artifactBaseName}.enriched.csv`);
     await mkdir(artifactDirectory, { recursive: true });
     await writeFile(artifactPath, enrichedCsv, "utf8");

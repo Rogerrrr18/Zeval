@@ -5,7 +5,7 @@
 import { randomBytes } from "node:crypto";
 import { computeNormalizedTranscriptHash } from "@/eval-datasets/case-transcript-hash";
 import type { DatasetStore } from "@/eval-datasets/storage/dataset-store";
-import type { DatasetCaseRecord } from "@/eval-datasets/storage/types";
+import type { DatasetCaseRecord, DatasetCaseHumanVerdict, DatasetCaseReviewStatus } from "@/eval-datasets/storage/types";
 import type {
   BenchmarkDatasetCaseCandidate,
   BenchmarkMetricEvaluationResult,
@@ -20,6 +20,34 @@ export type BuildBenchmarkCaseCandidatesOptions = {
 export type PersistBenchmarkCasesResult = {
   createdCaseIds: string[];
   skippedDuplicates: number;
+  admittedCases: Array<{
+    caseId: string;
+    source: NonNullable<DatasetCaseRecord["source"]>;
+    caseSetType: DatasetCaseRecord["caseSetType"];
+    reviewStatus: DatasetCaseReviewStatus;
+    metricKey: string;
+    benchmarkCaseId: string;
+    decision?: BenchmarkHumanReviewDecision;
+  }>;
+};
+
+export type BenchmarkHumanReviewDecision = "accepted" | "rejected" | "needs_evidence";
+
+export type BenchmarkHumanReviewInput = {
+  submissionId: string;
+  metricKey: string;
+  decision: BenchmarkHumanReviewDecision;
+  reviewer?: string;
+  note?: string;
+  reviewedAt?: string;
+};
+
+type BenchmarkDatasetCaseCandidateWithReview = BenchmarkDatasetCaseCandidate & {
+  humanDecision?: BenchmarkHumanReviewDecision;
+  humanVerdict?: DatasetCaseHumanVerdict;
+  reviewer?: string;
+  reviewNotes?: string;
+  reviewStatus?: DatasetCaseReviewStatus;
 };
 
 /**
@@ -48,6 +76,65 @@ export function buildBenchmarkDatasetCaseCandidates(
 }
 
 /**
+ * Build dataset candidates from explicit human review decisions in the
+ * Benchmark Notebook. These decisions are the bridge from metric-level
+ * evaluation into Zeval's admission channels.
+ */
+export function buildBenchmarkDatasetCaseCandidatesFromReviews(
+  runResult: BenchmarkRunResult,
+  reviews: BenchmarkHumanReviewInput[],
+): BenchmarkDatasetCaseCandidate[] {
+  const byKey = new Map(runResult.metricResults.map((result) => [metricResultKey(result), result]));
+  const candidates: BenchmarkDatasetCaseCandidateWithReview[] = [];
+
+  for (const review of reviews) {
+    const result = byKey.get(metricResultKey(review));
+    if (!result || result.status === "skipped" || result.status === "unsupported") {
+      continue;
+    }
+
+    const humanPassed = inferHumanPassed(result, review.decision);
+    const reviewedAt = review.reviewedAt ?? new Date().toISOString();
+    const reviewedResult: BenchmarkMetricEvaluationResult = {
+      ...result,
+      humanLabel: {
+        score: humanPassed ? Math.max(result.score, result.normalizedScore) : Math.min(result.score, result.normalizedScore),
+        passed: humanPassed,
+        reason: humanReviewDecisionReason(review.decision, result),
+        evidence: review.note?.trim() || result.evidence[0],
+        reviewer: review.reviewer?.trim() || "benchmark-reviewer",
+        labeledAt: reviewedAt,
+      },
+      needsHumanReview: review.decision === "needs_evidence",
+      status: review.decision === "needs_evidence" ? "needs_human_review" : "scored",
+    };
+    const admission = resolveHumanReviewAdmission(result, review.decision);
+    const baseCandidate = buildCandidate(runResult, reviewedResult, admission.caseSetType);
+
+    candidates.push({
+      ...baseCandidate,
+      source: admission.source,
+      humanDecision: review.decision,
+      humanVerdict: admission.humanVerdict,
+      reviewer: review.reviewer?.trim() || "benchmark-reviewer",
+      reviewNotes: review.note?.trim(),
+      reviewStatus: admission.reviewStatus,
+      metadata: {
+        ...baseCandidate.metadata,
+        humanReviewDecision: review.decision,
+        humanReviewNote: review.note?.trim(),
+        humanReviewedAt: reviewedAt,
+        humanReviewer: review.reviewer?.trim() || "benchmark-reviewer",
+        humanReviewRequired: review.decision === "needs_evidence",
+        ...(admission.source === "manual_fp" ? { false_positive: true } : {}),
+      },
+    });
+  }
+
+  return candidates;
+}
+
+/**
  * Persist benchmark candidates into the existing Zeval dataset store.
  */
 export async function persistBenchmarkDatasetCases(
@@ -56,9 +143,11 @@ export async function persistBenchmarkDatasetCases(
   baselineVersion: string,
 ): Promise<PersistBenchmarkCasesResult> {
   const createdCaseIds: string[] = [];
+  const admittedCases: PersistBenchmarkCasesResult["admittedCases"] = [];
   let skippedDuplicates = 0;
 
   for (const candidate of candidates) {
+    const reviewedCandidate = candidate as BenchmarkDatasetCaseCandidateWithReview;
     const normalizedTranscriptHash = computeNormalizedTranscriptHash(candidate.transcript);
     const duplicate = await store.checkDuplicate({
       normalizedTranscriptHash,
@@ -72,6 +161,7 @@ export async function persistBenchmarkDatasetCases(
 
     const now = new Date().toISOString();
     const caseId = allocateDatasetCaseId(candidate.caseSetType);
+    const reviewStatus = reviewedCandidate.reviewStatus ?? "auto_captured";
     const record: DatasetCaseRecord = {
       caseId,
       caseSetType: candidate.caseSetType,
@@ -90,7 +180,14 @@ export async function persistBenchmarkDatasetCases(
       suggestedAction: candidate.caseSetType === "badcase"
         ? "Inspect the failed metric, compare against the gold case, and tune the agent framework/model configuration."
         : "Use this case as a regression guard for future benchmark runs.",
-      reviewStatus: "auto_captured",
+      humanVerdict: reviewedCandidate.humanVerdict,
+      reviewNotes: reviewedCandidate.reviewNotes,
+      reviewer: reviewedCandidate.reviewer,
+      reviewedAt: reviewedCandidate.humanDecision && reviewedCandidate.humanDecision !== "needs_evidence" ? now : undefined,
+      reviewStatus,
+      manualOverrides: candidate.source === "manual_fp"
+        ? [{ type: "false_positive", note: reviewedCandidate.reviewNotes, createdAt: now }]
+        : undefined,
       capabilityDimension: candidate.capability,
       sourceRunId: candidate.metadata.runId as string | undefined,
       harvestedAt: now,
@@ -112,9 +209,18 @@ export async function persistBenchmarkDatasetCases(
 
     await store.createCase(record);
     createdCaseIds.push(caseId);
+    admittedCases.push({
+      caseId,
+      source: candidate.source,
+      caseSetType: candidate.caseSetType,
+      reviewStatus,
+      metricKey: candidate.metricKey,
+      benchmarkCaseId: candidate.caseId,
+      decision: reviewedCandidate.humanDecision,
+    });
   }
 
-  return { createdCaseIds, skippedDuplicates };
+  return { createdCaseIds, skippedDuplicates, admittedCases };
 }
 
 function buildCandidate(
@@ -202,6 +308,54 @@ function resolveCandidateSource(
     return "manual_gold";
   }
   return caseSetType === "badcase" ? "auto_tp" : "auto_tn";
+}
+
+function resolveHumanReviewAdmission(
+  result: BenchmarkMetricEvaluationResult,
+  decision: BenchmarkHumanReviewDecision,
+): {
+  caseSetType: "badcase" | "goodcase";
+  source: BenchmarkDatasetCaseCandidate["source"];
+  humanVerdict?: DatasetCaseHumanVerdict;
+  reviewStatus: DatasetCaseReviewStatus;
+} {
+  if (decision === "needs_evidence") {
+    return {
+      caseSetType: result.passed ? "goodcase" : "badcase",
+      source: "auto_uncertainty",
+      humanVerdict: "unclear",
+      reviewStatus: "auto_captured",
+    };
+  }
+
+  if (decision === "accepted") {
+    return result.passed
+      ? { caseSetType: "goodcase", source: "manual_gold", reviewStatus: "gold_candidate" }
+      : { caseSetType: "badcase", source: "auto_tp", humanVerdict: "valid_bad_case", reviewStatus: "human_reviewed" };
+  }
+
+  return result.passed
+    ? { caseSetType: "badcase", source: "auto_disagreement", humanVerdict: "valid_bad_case", reviewStatus: "human_reviewed" }
+    : { caseSetType: "goodcase", source: "manual_fp", humanVerdict: "false_positive", reviewStatus: "human_reviewed" };
+}
+
+function inferHumanPassed(result: BenchmarkMetricEvaluationResult, decision: BenchmarkHumanReviewDecision): boolean {
+  if (decision === "accepted") return result.passed;
+  if (decision === "rejected") return !result.passed;
+  return result.passed;
+}
+
+function humanReviewDecisionReason(
+  decision: BenchmarkHumanReviewDecision,
+  result: BenchmarkMetricEvaluationResult,
+): string {
+  if (decision === "accepted") return `Human reviewer accepted the evaluator verdict: ${result.reason}`;
+  if (decision === "rejected") return `Human reviewer rejected the evaluator verdict: ${result.reason}`;
+  return `Human reviewer requested more evidence before activation: ${result.reason}`;
+}
+
+function metricResultKey(input: { submissionId: string; metricKey: string }): string {
+  return `${input.submissionId}:${input.metricKey}`;
 }
 
 function allocateDatasetCaseId(caseSetType: "badcase" | "goodcase"): string {

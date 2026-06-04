@@ -5,8 +5,6 @@ import { readZevalEnvValue } from "@/lib/siliconflow";
 import { saveOnlineEvalRun } from "@/lib/onlineEvalRunStore";
 import { runEvaluatePipeline } from "@/pipeline/evaluateRun";
 import {
-  DEMO_MOCK_REPLY_API,
-  replayAssistantRowsWithDemoMock,
   replayAssistantRowsWithHttpApi,
   resolveReplyEndpoint,
 } from "@/online-eval/replayAssistant";
@@ -62,16 +60,15 @@ export async function POST(request: Request) {
 
     const baseUrl =
       body.replyApiBaseUrl?.trim() ||
-      readZevalEnvValue(["SILICONFLOW_CUSTOMER_API_URL", "ZEVAL_CUSTOMER_API_URL"])?.trim() ||
-      "http://127.0.0.1:4200";
+      readZevalEnvValue(["SILICONFLOW_CUSTOMER_API_URL", "ZEVAL_CUSTOMER_API_URL"])?.trim();
+    if (!baseUrl) {
+      return NextResponse.json({ error: "请提供真实客户回复 API 地址。Mock reply API 默认值已移除。" }, { status: 400 });
+    }
     const replyEndpoint = resolveReplyEndpoint(baseUrl);
 
-    const replayedRows =
-      replyEndpoint === DEMO_MOCK_REPLY_API
-        ? await replayAssistantRowsWithDemoMock(rawRows)
-        : await replayAssistantRowsWithHttpApi(rawRows, replyEndpoint, {
-            timeoutMs: body.replyTimeoutMs,
-          });
+    const replayedRows = await replayAssistantRowsWithHttpApi(rawRows, replyEndpoint, {
+      timeoutMs: body.replyTimeoutMs,
+    });
 
     const runId = body.runId ?? `online_${Date.now()}`;
     const scenarioId = body.scenarioId ?? baselineEvaluate?.scenarioEvaluation?.scenarioId;

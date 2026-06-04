@@ -2133,7 +2133,7 @@ function StepPackage(props: StepPackageProps) {
             </button>
           </div>
           <p className={styles.baselineHint}>
-            baseline 会写入 <code>{"mock-chatlog/baselines/<customerId>/"}</code>，在线评测页可直接选择。
+            baseline 会写入 <code>{".zeval-db/workbench-baselines/<customerId>/"}</code>，在线评测页可直接选择。
           </p>
         </div>
       </section>

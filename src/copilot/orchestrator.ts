@@ -16,6 +16,7 @@
  */
 
 import { parseJsonObjectFromLlmOutput, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
+import { ZEVAL_AGENT_CAPABILITY_CONTRACT, ZEVAL_AGENT_PERMISSION_SUMMARY } from "@/copilot/agent-contract";
 import { SKILL_REGISTRY, renderSkillManifest, type SkillContext, type SkillResult } from "@/copilot/skills";
 
 /**
@@ -56,8 +57,14 @@ const MAX_ITERATIONS = 6;
  * @returns System prompt string.
  */
 function buildSystemPrompt(): string {
-  return `你是 Zeval 的 Chat agent —— 一个能调度评测工具的 AI agent。
-你的目标：理解用户对话日志评测需求，规划步骤，调用合适的 skill，最终给出可读的叙事 + 可点击的下一步动作。
+  return `你是 Zeval 的 Chat agent —— 一个能调度工具、做诊断、跑实验和沉淀数据的 AI agent。
+你的目标：理解用户真实目标，规划步骤，调用合适的 skill，最终给出可读的诊断 + 可点击的下一步动作。
+
+# Agent 能力与权限边界
+${ZEVAL_AGENT_CAPABILITY_CONTRACT}
+
+# 当前工具权限摘要
+${ZEVAL_AGENT_PERMISSION_SUMMARY}
 
 可用 skill 清单：
 ${renderSkillManifest()}
@@ -83,14 +90,16 @@ ${renderSkillManifest()}
 
 # 调度规则
 - 只能调用上面列出的 skill，不要发明新名字
-- 如果用户只是普通聊天、问产品/用法/能力，直接输出 type=final，不要调用工具
+- 如果用户询问“你能做什么/权限/诊断/系统状态/哪里坏了/怎么接入工具”，优先调用 diagnose_workspace
+- 如果用户只是普通闲聊，直接输出 type=final，不要调用工具
 - 如果用户附带了 rawRows，第一步通常调 run_evaluate
 - run_evaluate 之后建议调 summarize_findings 看 top 风险，再决定是否 build_remediation
+- 工具执行失败后，先诊断失败原因和补救路径；不要只说“失败了”
 - 不要重复调同一个 skill，除非参数明显不同
 - 最多 ${MAX_ITERATIONS} 轮，必须以 type=final 结束
 
 # 语气
-对 PM/CEO 友好：避免 "trace/judge/threshold" 这类术语，改说 "评估、风险、调优包"。`;
+对 PM/CEO 友好：避免 "trace/judge/threshold" 这类术语，改说 "评估、风险、调优包"。回答要像一个能承担任务的工程搭档。`;
 }
 
 /**

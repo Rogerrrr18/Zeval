@@ -14,13 +14,6 @@ const csvParserApi = resolveInteropModule(csvParser);
 const goldSetFileStoreApi = resolveInteropModule(goldSetFileStore);
 const goldSetScaffoldApi = resolveInteropModule(goldSetScaffold);
 
-const DEFAULT_FIXTURES = [
-  "mock-chatlog/raw-data/ecommerce-angry-escalation.csv",
-  "mock-chatlog/raw-data/long-dialog-emotional-rp.csv",
-  "mock-chatlog/raw-data/support-refund-short.csv",
-  "mock-chatlog/raw-data/tech-onboarding-faq.csv",
-];
-
 void main().catch((error) => {
   console.error("[gold:expand:fixtures] failed", error);
   process.exitCode = 1;
@@ -36,7 +29,10 @@ async function main(): Promise<void> {
   const targetCount = Number(getFlagValue(args, "--target-count") ?? "12");
   const assignee = getFlagValue(args, "--assignee");
   const reviewer = getFlagValue(args, "--reviewer") ?? "reviewer";
-  const fixtures = getFlagValue(args, "--fixtures")?.split(",").map((item) => item.trim()).filter(Boolean) ?? DEFAULT_FIXTURES;
+  const fixtures = getFlagValue(args, "--fixtures")?.split(",").map((item) => item.trim()).filter(Boolean) ?? [];
+  if (fixtures.length === 0) {
+    throw new Error("--fixtures is required. Built-in mock fixture defaults were removed.");
+  }
   const currentCases = await goldSetFileStoreApi.readGoldSetCases(version);
   const needed = Math.max(0, targetCount - currentCases.length);
   if (needed === 0) {
@@ -110,7 +106,7 @@ function buildFixtureCandidates(
         caseId: `fixture_${fileBase}_${sessionId}_w${String(index + 1).padStart(2, "0")}`,
         sceneId: inferSceneId(fileBase),
         sessionId,
-        tags: ["source:fixture", `fixture:${fileBase}`, `window:${index + 1}`],
+        tags: ["source:external", `input:${fileBase}`, `window:${index + 1}`],
         rawRows: windowRows,
         notes: `Generated from fixture ${fixturePath}, session ${sessionId}, window ${index + 1}. Needs human review.`,
       };

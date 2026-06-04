@@ -1,4 +1,5 @@
 import { benchmarkProgress } from "@/benchmark/progress";
+import { readBenchmarkRunStatus } from "@/benchmark/progress-recovery";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +17,17 @@ export async function GET(request: Request) {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
-    start(controller) {
+    async start(controller) {
       controller.enqueue(encoder.encode(":heartbeat\n\n"));
+
+      const recovered = await readBenchmarkRunStatus(runId);
+      if (recovered.snapshot && recovered.source !== "memory") {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(recovered.snapshot)}\n\n`));
+        if (recovered.snapshot.phase === "completed" || recovered.snapshot.phase === "failed") {
+          controller.close();
+          return;
+        }
+      }
 
       const unsubscribe = benchmarkProgress.subscribe(runId, (snapshot) => {
         try {

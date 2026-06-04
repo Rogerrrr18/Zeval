@@ -10,6 +10,7 @@ export async function POST(request: Request) {
       requirementText?: string;
       rubric?: BenchmarkRubricSet;
       dataset?: BenchmarkDatasetSnapshot;
+      resumeRunId?: string;
     };
 
     if (!body.requirementText?.trim() || !body.rubric) {
@@ -25,13 +26,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const runId = `benchmark_generic_${Date.now()}`;
+    const runId = body.resumeRunId?.startsWith("benchmark_generic_")
+      ? body.resumeRunId
+      : `benchmark_generic_${Date.now()}`;
 
     void runGenericBenchmarkStreaming({
       runId,
       requirementText: body.requirementText,
       rubric: body.rubric,
       dataset: body.dataset,
+      resumeRunId: body.resumeRunId,
     }).catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
       benchmarkProgress.setPhase(runId, "failed", message);

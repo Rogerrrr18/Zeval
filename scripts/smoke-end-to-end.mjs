@@ -1,16 +1,16 @@
 /**
  * End-to-end smoke: raw CSV -> evaluate -> save baseline -> remediation package -> replay + offline validation -> agent run.
- * Requires: next dev on 127.0.0.1:3010, mock customer api on 127.0.0.1:4200.
+ * Requires: next dev on 127.0.0.1:3010 and an explicit customer reply API.
  */
 import { readFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 
 const BASE = process.env.SMOKE_BASE_URL || "http://127.0.0.1:3010";
-const RAW_CSV = process.env.SMOKE_RAW_CSV || "mock-chatlog/raw-data/support-refund-short.csv";
+const RAW_CSV = process.env.SMOKE_RAW_CSV;
 const SCENARIO_ID = process.env.SMOKE_SCENARIO_ID || "toB-customer-support";
 const CUSTOMER_ID = process.env.SMOKE_CUSTOMER_ID || "smoke_e2e";
-const REPLY_API = process.env.SMOKE_REPLY_API || "http://127.0.0.1:4100";
+const REPLY_API = process.env.SMOKE_REPLY_API;
 const DEFAULT_ONBOARDING_ANSWERS = {
   primary_channel: "Web chat",
   has_human_handoff: "yes, escalation_keyword indicates handoff risk",
@@ -47,6 +47,12 @@ function parseCsv(csv) {
 }
 
 async function main() {
+  if (!RAW_CSV) {
+    throw new Error("SMOKE_RAW_CSV is required. Mock chatlog defaults were removed.");
+  }
+  if (!REPLY_API) {
+    throw new Error("SMOKE_REPLY_API is required. Mock reply API defaults were removed.");
+  }
   const csvPath = path.resolve(process.cwd(), RAW_CSV);
   const csv = await readFile(csvPath, "utf8");
   const rawRows = parseCsv(csv);

@@ -15,9 +15,20 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type Dispatch,
+  type MouseEvent as ReactMouseEvent,
+  type SetStateAction,
+} from "react";
 import Link from "next/link";
 import type {
+  BenchmarkCaseScore,
+  BenchmarkMetricEvaluationResult,
   BenchmarkRubricMetric,
   BenchmarkRubricScoreLevel,
   BenchmarkRubricSet,
@@ -28,6 +39,8 @@ import { approveRubricMetrics, cloneRubric, toggleMetricApproval } from "@/bench
 import type {
   BenchmarkDatasetSnapshot,
   BenchmarkChatTurn,
+  BenchmarkHumanReviewRecord,
+  BenchmarkRunHistoryItem,
   BenchmarkWorkspaceSession,
   BenchmarkWorkspaceViewMode,
 } from "@/benchmark/session-store";
@@ -60,6 +73,13 @@ type StartBenchmarkRunResponse = {
   error?: string;
 };
 
+type BenchmarkRunStatusResponse = {
+  source?: "memory" | "artifact" | "none";
+  stale?: boolean;
+  snapshot?: BenchmarkProgressSnapshot | null;
+  error?: string;
+};
+
 type BenchmarkRubricAgentResponse = {
   reply?: string;
   requirementText?: string;
@@ -70,6 +90,25 @@ type BenchmarkRubricAgentResponse = {
 };
 
 type BenchmarkDataUploadState = "idle" | "uploading" | "ready" | "error";
+
+type BenchmarkAdmitCasesResponse = {
+  savedCount?: number;
+  savedCaseIds?: string[];
+  skippedDuplicates?: number;
+  acceptedBySource?: Record<string, number>;
+  admittedCases?: Array<{
+    caseId: string;
+    source: string;
+    caseSetType: "goodcase" | "badcase";
+    reviewStatus: string;
+    metricKey: string;
+    benchmarkCaseId: string;
+    decision?: HumanReviewDecision;
+  }>;
+  candidateCount?: number;
+  error?: string;
+  detail?: string;
+};
 
 const DEFAULT_COPILOT_TURNS: ChatTurn[] = [
   { kind: "ai", text: "你好，我是 Zeval 评测 Agent。你可以直接告诉我评测任务、业务约束或想调整的评分标准，我会调用工具生成、修改、确认或解释当前 rubric。" },
@@ -135,12 +174,14 @@ function hasChineseText(value: string): boolean {
 }
 
 function humanizeMetricKey(metricKey: string): string {
-  return metricKey
+  const translatedParts = metricKey
     .split(/[_-]+/)
     .filter(Boolean)
     .map((part) => {
       const normalized = part.toLowerCase();
       const wordMap: Record<string, string> = {
+        overall: "整体",
+        compliance: "合规",
         task: "任务",
         success: "完成",
         decision: "决策",
@@ -161,15 +202,28 @@ function humanizeMetricKey(metricKey: string): string {
         safe: "安全",
         business: "业务",
         acceptance: "可接受",
+        evidence: "证据",
+        coverage: "覆盖",
+        quality: "质量",
       };
-      return wordMap[normalized] ?? "指标";
+      return wordMap[normalized] ?? part;
     })
-    .join("");
+    .filter((part) => !["metric", "indicator", "rubric"].includes(part.toLowerCase()));
+  return translatedParts.length ? translatedParts.join("") : metricKey;
 }
 
 function metricDisplayName(metric: BenchmarkRubricMetric): string {
   if (hasChineseText(metric.displayName)) return metric.displayName;
   return METRIC_NAME_ZH[metric.metricKey] ?? humanizeMetricKey(metric.metricKey);
+}
+
+function buildMetricDisplayNameMap(rubric: BenchmarkRubricSet | null): Map<string, string> {
+  const metricNameMap = new Map<string, string>();
+  if (!rubric) return metricNameMap;
+  for (const metric of rubric.modules.flatMap((module) => module.metrics)) {
+    metricNameMap.set(metric.metricKey, metricDisplayName(metric));
+  }
+  return metricNameMap;
 }
 
 function capabilityDisplayName(capability: string, fallback: string): string {
@@ -275,6 +329,10 @@ function createBenchmarkSession(projectId: string): BenchmarkSession {
     copilotTurns: [...DEFAULT_COPILOT_TURNS],
     selectedFileId: null,
     dataset: null,
+    runResult: null,
+    progress: null,
+    runHistory: [],
+    humanReviewRecords: [],
   };
 }
 
@@ -294,10 +352,14 @@ function readBenchmarkSessions(projectId: string): BenchmarkSession[] {
         title: session.title === "新评测会话" ? "新评测任务" : session.title,
         rubric: session.rubric ? localizeRubricForDisplay(session.rubric) : null,
         dataset: session.dataset ?? null,
+        runResult: session.runResult ?? session.runHistory?.[0]?.result ?? null,
+        progress: session.progress ?? session.runHistory?.[0]?.progress ?? null,
+        runHistory: session.runHistory ?? [],
+        humanReviewRecords: session.humanReviewRecords ?? [],
         copilotTurns: Array.isArray(session.copilotTurns) && session.copilotTurns.length > 0
           ? session.copilotTurns
           : [...DEFAULT_COPILOT_TURNS],
-        viewMode: "rubric",
+        viewMode: session.viewMode ?? "rubric",
       }));
   } catch {
     return [];
@@ -331,7 +393,11 @@ async function fetchRemoteBenchmarkSessions(projectId: string): Promise<{
             title: session.title === "新评测会话" ? "新评测任务" : session.title,
             rubric: session.rubric ? localizeRubricForDisplay(session.rubric) : null,
             dataset: session.dataset ?? null,
-            viewMode: "rubric",
+            runResult: session.runResult ?? session.runHistory?.[0]?.result ?? null,
+            progress: session.progress ?? session.runHistory?.[0]?.progress ?? null,
+            runHistory: session.runHistory ?? [],
+            humanReviewRecords: session.humanReviewRecords ?? [],
+            viewMode: session.viewMode ?? "rubric",
           }))
         : [],
       activeSessionId: payload.activeSessionId ?? null,
@@ -434,6 +500,8 @@ export function NotebookLayout() {
   const [dataUploadError, setDataUploadError] = useState("");
   const [runResult, setRunResult] = useState<BenchmarkRunResult | null>(null);
   const [progress, setProgress] = useState<BenchmarkProgressSnapshot | null>(null);
+  const [runHistory, setRunHistory] = useState<BenchmarkRunHistoryItem[]>([]);
+  const [humanReviewRecords, setHumanReviewRecords] = useState<BenchmarkHumanReviewRecord[]>([]);
   const [runError, setRunError] = useState("");
   const [running, setRunning] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("rubric");
@@ -458,8 +526,10 @@ export function NotebookLayout() {
     setCopilotTurns(session.copilotTurns);
     setSelectedFileId(session.selectedFileId);
     setRunning(false);
-    setProgress(null);
-    setRunResult(null);
+    setProgress(session.progress ?? session.runHistory?.[0]?.progress ?? null);
+    setRunResult(session.runResult ?? session.runHistory?.[0]?.result ?? null);
+    setRunHistory(session.runHistory ?? []);
+    setHumanReviewRecords(session.humanReviewRecords ?? []);
     setRunError("");
   }, []);
 
@@ -515,9 +585,13 @@ export function NotebookLayout() {
               useLlm: true,
               rubric,
               dataset,
-              viewMode: viewMode === "rubric" ? viewMode : "rubric",
+              viewMode,
               copilotTurns,
               selectedFileId,
+              runResult,
+              progress,
+              runHistory,
+              humanReviewRecords,
             }
           : session,
       );
@@ -531,8 +605,12 @@ export function NotebookLayout() {
     activeSessionId,
     copilotTurns,
     dataset,
+    humanReviewRecords,
     requirement,
     rubric,
+    runHistory,
+    runResult,
+    progress,
     selectedFileId,
     sessionHydrated,
     viewMode,
@@ -713,6 +791,7 @@ export function NotebookLayout() {
     setDataUploadError("");
     setRunResult(null);
     setProgress(null);
+    setRunHistory([]);
     setRunError("");
     try {
       const text = await file.text();
@@ -746,7 +825,7 @@ export function NotebookLayout() {
     }
   }
 
-  async function handleRunBenchmark() {
+  async function handleRunBenchmark(resumeRunId?: string) {
     if (!rubric) {
       setRunError("请先生成评分标准。");
       setViewMode("progress");
@@ -782,6 +861,7 @@ export function NotebookLayout() {
           requirementText: requirement,
           rubric,
           dataset,
+          resumeRunId,
         }),
       });
       const data = (await response.json()) as StartBenchmarkRunResponse;
@@ -796,6 +876,7 @@ export function NotebookLayout() {
         setProgress(snapshot);
         if (snapshot.phase === "completed" && snapshot.result) {
           setRunResult(snapshot.result);
+          setRunHistory((prev) => buildNextRunHistory(prev, snapshot.result!, snapshot));
           setRunning(false);
           setViewMode("result");
           source.close();
@@ -808,13 +889,46 @@ export function NotebookLayout() {
         }
       };
       source.onerror = () => {
-        setRunError("进度连接中断，请稍后重试。");
-        setRunning(false);
         source.close();
         runStreamRef.current = null;
+        void recoverBenchmarkRunStatus(data.runId!);
       };
     } catch (error) {
       setRunError(error instanceof Error ? error.message : "启动评测失败");
+      setRunning(false);
+    }
+  }
+
+  async function recoverBenchmarkRunStatus(runId: string) {
+    try {
+      const response = await fetch(`/api/benchmarks/run-status?runId=${encodeURIComponent(runId)}`, {
+        cache: "no-store",
+      });
+      const status = (await response.json()) as BenchmarkRunStatusResponse;
+      if (!response.ok || status.error) {
+        throw new Error(status.error ?? "无法恢复评测进度");
+      }
+
+      if (status.snapshot) {
+        setProgress(status.snapshot);
+        if (status.snapshot.phase === "completed" && status.snapshot.result) {
+          setRunResult(status.snapshot.result);
+          setRunHistory((prev) => buildNextRunHistory(prev, status.snapshot!.result!, status.snapshot!));
+          setRunning(false);
+          setViewMode("result");
+          return;
+        }
+        if (status.snapshot.phase === "failed") {
+          setRunError(status.snapshot.error ?? "评测失败");
+          setRunning(false);
+          return;
+        }
+      }
+
+      setRunError(status.source === "none" ? "进度连接中断，且后端没有找到该 run 的状态。" : "进度连接中断，请稍后重试。");
+      setRunning(false);
+    } catch (error) {
+      setRunError(error instanceof Error ? error.message : "进度连接中断，请稍后重试。");
       setRunning(false);
     }
   }
@@ -1065,10 +1179,27 @@ export function NotebookLayout() {
               />
             )}
             {viewMode === "progress" && (
-              <ProgressWorkspace progress={progress} running={running} error={runError} />
+              <ProgressWorkspace
+                progress={progress}
+                running={running}
+                error={runError}
+                onContinue={() => progress?.runId && void handleRunBenchmark(progress.runId)}
+                onRestart={() => void handleRunBenchmark()}
+              />
             )}
             {viewMode === "result" && runResult && (
-              <ResultWorkspace result={runResult} />
+              <ResultWorkspace
+                result={runResult}
+                rubric={rubric}
+                history={runHistory}
+                humanReviewRecords={humanReviewRecords}
+                onHumanReviewRecordsChange={setHumanReviewRecords}
+                onSelectRun={(item) => {
+                  setRunResult(item.result);
+                  setProgress(item.progress ?? null);
+                  setViewMode("result");
+                }}
+              />
             )}
           </div>
         </main>
@@ -1895,12 +2026,21 @@ function MetricInspector(props: {
   );
 }
 
-function ProgressWorkspace(props: { progress: BenchmarkProgressSnapshot | null; running: boolean; error: string }) {
-  if (props.error) {
+function ProgressWorkspace(props: {
+  progress: BenchmarkProgressSnapshot | null;
+  running: boolean;
+  error: string;
+  onContinue: () => void;
+  onRestart: () => void;
+}) {
+  if (props.error && !props.progress) {
     return (
       <div className={styles.workspaceEmpty}>
         <h2>评测启动失败</h2>
         <p>{props.error}</p>
+        <button type="button" className={styles.progressPrimaryButton} onClick={props.onRestart}>
+          重新评测
+        </button>
       </div>
     );
   }
@@ -1930,9 +2070,33 @@ function ProgressWorkspace(props: { progress: BenchmarkProgressSnapshot | null; 
   return (
     <div className={styles.workspace}>
       <div className={styles.progressHeader}>
-        <h2>评测进度</h2>
+        <div>
+          <h2>评测进度</h2>
+          {props.progress.updatedAt && <p>最近更新: {formatSessionTime(props.progress.updatedAt)}</p>}
+        </div>
         <span className={styles.progressPhase}>{phaseLabel[props.progress.phase]}</span>
       </div>
+
+      {(props.progress.phase === "failed" || props.error) && (
+        <div className={styles.progressFailurePanel}>
+          <div>
+            <strong>评测已中断</strong>
+            <p>{props.progress.error || props.error || "后端评测进程中断，请继续或重新运行。"}</p>
+            <span>
+              已完成 {props.progress.completedSubmissions}/{props.progress.totalSubmissions} 个被测输出，
+              {props.progress.evaluatedMetrics}/{props.progress.totalMetrics} 个指标评审。继续评测会优先复用已落盘的结果。
+            </span>
+          </div>
+          <div className={styles.progressFailureActions}>
+            <button type="button" className={styles.progressPrimaryButton} onClick={props.onContinue} disabled={props.running}>
+              继续评测
+            </button>
+            <button type="button" className={styles.progressSecondaryButton} onClick={props.onRestart} disabled={props.running}>
+              从头重跑
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className={styles.progressBar}>
         <div className={styles.progressFill} style={{ width: `${pct}%` }} />
@@ -2024,7 +2188,9 @@ function ProgressWorkspace(props: { progress: BenchmarkProgressSnapshot | null; 
   );
 }
 
-function metricDisplayNameFromEvent(metricName: string): string {
+function metricDisplayNameFromEvent(metricName: string, metricNameMap?: Map<string, string>): string {
+  const mappedName = metricNameMap?.get(metricName);
+  if (mappedName) return mappedName;
   if (hasChineseText(metricName)) return metricName;
   return METRIC_NAME_ZH[metricName] ?? humanizeMetricKey(metricName);
 }
@@ -2037,15 +2203,179 @@ function agentFrameworkDisplayName(value: string): string {
   return "被测智能体";
 }
 
-function ResultWorkspace(props: { result: BenchmarkRunResult }) {
+function buildNextRunHistory(
+  current: BenchmarkRunHistoryItem[],
+  result: BenchmarkRunResult,
+  progress: BenchmarkProgressSnapshot,
+): BenchmarkRunHistoryItem[] {
+  const item: BenchmarkRunHistoryItem = {
+    runId: result.runId,
+    generatedAt: result.generatedAt,
+    averageScore: result.summary.averageScore,
+    caseCount: result.summary.caseCount,
+    needsHumanReviewCount: result.summary.needsHumanReviewCount,
+    result,
+    progress,
+  };
+  return [item, ...current.filter((row) => row.runId !== result.runId)].slice(0, 8);
+}
+
+function ResultWorkspace(props: {
+  result: BenchmarkRunResult;
+  rubric: BenchmarkRubricSet | null;
+  history: BenchmarkRunHistoryItem[];
+  humanReviewRecords: BenchmarkHumanReviewRecord[];
+  onHumanReviewRecordsChange: Dispatch<SetStateAction<BenchmarkHumanReviewRecord[]>>;
+  onSelectRun: (item: BenchmarkRunHistoryItem) => void;
+}) {
+  const [admitting, setAdmitting] = useState(false);
+  const [admissionMessage, setAdmissionMessage] = useState("");
+  const [admissionError, setAdmissionError] = useState("");
+  const weakestCases = [...props.result.caseScores]
+    .sort((left, right) => left.taskScore - right.taskScore)
+    .slice(0, 6);
+  const weakestMetrics = [...props.result.metricResults]
+    .filter((result) => !result.passed || result.normalizedScore < 70)
+    .sort((left, right) => left.normalizedScore - right.normalizedScore)
+    .slice(0, 8);
+  const reviewQueue = buildHumanReviewQueue(props.result.metricResults);
+  const capabilityGaps = buildCapabilityGapRows(props.result.caseScores);
+  const runReviewRecords = props.humanReviewRecords.filter((record) => record.runId === props.result.runId);
+  const completedReviews = runReviewRecords.filter((record) => record.decision).length;
+  const savedReviews = runReviewRecords.filter((record) => record.savedAt).length;
+  const saveableReviews = runReviewRecords.filter((record) => record.decision && !record.savedAt);
+  const metricNameMap = buildMetricDisplayNameMap(props.rubric);
+
+  function findReview(result: BenchmarkMetricEvaluationResult): BenchmarkHumanReviewRecord | undefined {
+    return runReviewRecords.find((record) => record.submissionId === result.submissionId && record.metricKey === result.metricKey);
+  }
+
+  function updateReview(
+    result: BenchmarkMetricEvaluationResult,
+    patch: Partial<BenchmarkHumanReviewRecord>,
+  ) {
+    props.onHumanReviewRecordsChange((current) => {
+      const key = metricResultKey(result);
+      const existing = current.find(
+        (record) => record.runId === props.result.runId && metricResultKey(record) === key,
+      );
+      const nextRecord: BenchmarkHumanReviewRecord = {
+        runId: props.result.runId,
+        submissionId: result.submissionId,
+        metricKey: result.metricKey,
+        reviewer: existing?.reviewer ?? "benchmark-reviewer",
+        note: existing?.note ?? "",
+        reviewedAt: existing?.reviewedAt,
+        ...existing,
+        ...patch,
+      };
+      return existing
+        ? current.map((record) => (record.runId === props.result.runId && metricResultKey(record) === key ? nextRecord : record))
+        : [...current, nextRecord];
+    });
+  }
+
+  async function admitReviewedCases() {
+    const reviews = saveableReviews.filter((record) => record.decision);
+    if (reviews.length === 0) {
+      setAdmissionError("请先完成至少一条人工判断。");
+      return;
+    }
+
+    setAdmitting(true);
+    setAdmissionError("");
+    setAdmissionMessage("");
+    try {
+      const response = await fetch("/api/benchmarks/admit-cases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baselineVersion: props.result.runId,
+          runResult: props.result,
+          reviews: reviews.map((record) => ({
+            submissionId: record.submissionId,
+            metricKey: record.metricKey,
+            decision: record.decision,
+            reviewer: record.reviewer?.trim() || "benchmark-reviewer",
+            note: record.note?.trim(),
+            reviewedAt: record.reviewedAt ?? new Date().toISOString(),
+          })),
+        }),
+      });
+      const payload = (await response.json()) as BenchmarkAdmitCasesResponse;
+      if (!response.ok) {
+        throw new Error(payload.error ?? payload.detail ?? "入池失败。");
+      }
+
+      const admittedByKey = new Map((payload.admittedCases ?? []).map((item) => [
+        `${item.decision ?? ""}:${item.metricKey}:${item.benchmarkCaseId}`,
+        item,
+      ]));
+      const savedAt = new Date().toISOString();
+      const submittedKeys = new Set(reviews.map((record) => `${record.submissionId}:${record.metricKey}`));
+      props.onHumanReviewRecordsChange((current) => current.map((record) => {
+        if (record.runId !== props.result.runId || !record.decision) return record;
+        if (!submittedKeys.has(`${record.submissionId}:${record.metricKey}`)) return record;
+        const result = props.result.metricResults.find(
+          (item) => item.submissionId === record.submissionId && item.metricKey === record.metricKey,
+        );
+        const admitted = result
+          ? admittedByKey.get(`${record.decision}:${record.metricKey}:${result.caseId}`)
+          : undefined;
+        return {
+          ...record,
+          savedAt,
+          admission: admitted
+            ? {
+                caseId: admitted.caseId,
+                source: admitted.source,
+                caseSetType: admitted.caseSetType,
+                reviewStatus: admitted.reviewStatus,
+              }
+            : record.admission,
+        };
+      }));
+
+      const sourceText = formatAcceptedBySource(payload.acceptedBySource ?? {});
+      setAdmissionMessage(
+        `已保存 ${payload.savedCount ?? 0} 条，重复跳过 ${payload.skippedDuplicates ?? 0} 条${sourceText ? `，${sourceText}` : ""}。`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setAdmissionError(message);
+    } finally {
+      setAdmitting(false);
+    }
+  }
+
   return (
     <div className={styles.workspace}>
       <div className={styles.resultHeader}>
-        <h2>评测结果</h2>
+        <div>
+          <h2>评测结果</h2>
+          <p>Run ID: {props.result.runId}</p>
+        </div>
         <span className={styles.resultScore}>
           平均分: {props.result.summary.averageScore.toFixed(1)}%
         </span>
       </div>
+
+      {props.history.length > 0 && (
+        <div className={styles.runHistoryStrip}>
+          <span>历史评测</span>
+          {props.history.map((item) => (
+            <button
+              key={item.runId}
+              type="button"
+              className={item.runId === props.result.runId ? styles.runHistoryActive : ""}
+              onClick={() => props.onSelectRun(item)}
+            >
+              <strong>{item.averageScore.toFixed(1)}%</strong>
+              <small>{formatSessionTime(item.generatedAt)}</small>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className={styles.leaderboard}>
         {props.result.leaderboard.map((row, i) => (
@@ -2064,6 +2394,498 @@ function ResultWorkspace(props: { result: BenchmarkRunResult }) {
         <div>问题案例: {props.result.summary.badcaseCandidateCount}</div>
         <div>需人工复核: {props.result.summary.needsHumanReviewCount}</div>
       </div>
+
+      <section className={styles.resultSection}>
+        <div className={styles.resultSectionHeader}>
+          <div>
+            <h3>可解释性分析</h3>
+            <p>按案例、指标、证据和置信度拆解分数来源。</p>
+          </div>
+          <span>{weakestMetrics.length} 个重点信号</span>
+        </div>
+
+        <div className={styles.explainGrid}>
+          <div className={styles.explainPanel}>
+            <strong>主要能力短板</strong>
+            {capabilityGaps.length === 0 ? (
+              <p className={styles.explainEmpty}>暂无明显能力短板。</p>
+            ) : (
+              <div className={styles.gapList}>
+                {capabilityGaps.map((gap) => (
+                  <div key={gap.capability} className={styles.gapRow}>
+                    <span>{capabilityDisplayName(gap.capability, gap.capability)}</span>
+                    <strong>{gap.score.toFixed(1)}%</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className={styles.explainPanel}>
+            <strong>最需关注指标</strong>
+            {weakestMetrics.length === 0 ? (
+              <p className={styles.explainEmpty}>所有指标均已通过当前阈值。</p>
+            ) : (
+              <div className={styles.metricExplainList}>
+                {weakestMetrics.map((result) => (
+                  <MetricExplainCard key={metricResultKey(result)} result={result} metricNameMap={metricNameMap} compact />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className={styles.caseExplainList}>
+          {weakestCases.map((caseScore) => (
+            <CaseExplainCard key={caseScore.submissionId} caseScore={caseScore} metricNameMap={metricNameMap} />
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.resultSection}>
+        <div className={styles.resultSectionHeader}>
+          <div>
+            <h3>人工校验队列</h3>
+            <p>人工判断会写入数据池 channel，用于后续 badcase/gold label 校准。</p>
+          </div>
+          <span>{completedReviews}/{reviewQueue.length} 已处理 · {savedReviews} 已入池</span>
+        </div>
+
+        {reviewQueue.length === 0 ? (
+          <div className={styles.reviewEmpty}>当前没有需要人工校验的指标。</div>
+        ) : (
+          <>
+            <div className={styles.reviewToolbar}>
+              <div>
+                <strong>审核出口</strong>
+                <span>认可失败: auto_tp · 驳回失败: manual_fp · 补证据: auto_uncertainty</span>
+              </div>
+              <button type="button" onClick={admitReviewedCases} disabled={admitting || saveableReviews.length === 0}>
+                {admitting ? "保存中..." : `保存入池 (${saveableReviews.length})`}
+              </button>
+            </div>
+            {admissionMessage && <div className={styles.reviewSuccess}>{admissionMessage}</div>}
+            {admissionError && <div className={styles.reviewError}>{admissionError}</div>}
+            <div className={styles.reviewQueue}>
+              {reviewQueue.map((result) => {
+                const key = metricResultKey(result);
+                const review = findReview(result);
+                return (
+                  <div key={key} className={styles.reviewItem}>
+                    <MetricExplainCard result={result} metricNameMap={metricNameMap} />
+                    <div className={styles.reviewActions}>
+                      <div className={styles.reviewStatusLine}>
+                        <span>{review?.decision ? humanReviewDecisionLabel(review.decision) : "待人工判断"}</span>
+                        {review?.admission && (
+                          <b>{sourceDisplayName(review.admission.source)} · {review.admission.caseId}</b>
+                        )}
+                        {!review?.admission && review?.savedAt && <b>重复已跳过</b>}
+                      </div>
+                      <div className={styles.reviewDecisionButtons}>
+                        <button
+                          type="button"
+                          className={review?.decision === "accepted" ? styles.reviewDecisionActive : ""}
+                          onClick={() => updateReview(result, {
+                            decision: "accepted",
+                            reviewedAt: new Date().toISOString(),
+                            admission: undefined,
+                            savedAt: undefined,
+                          })}
+                        >
+                          认可
+                        </button>
+                        <button
+                          type="button"
+                          className={review?.decision === "rejected" ? styles.reviewDecisionActive : ""}
+                          onClick={() => updateReview(result, {
+                            decision: "rejected",
+                            reviewedAt: new Date().toISOString(),
+                            admission: undefined,
+                            savedAt: undefined,
+                          })}
+                        >
+                          驳回
+                        </button>
+                        <button
+                          type="button"
+                          className={review?.decision === "needs_evidence" ? styles.reviewDecisionActive : ""}
+                          onClick={() => updateReview(result, {
+                            decision: "needs_evidence",
+                            reviewedAt: new Date().toISOString(),
+                            admission: undefined,
+                            savedAt: undefined,
+                          })}
+                        >
+                          补证据
+                        </button>
+                      </div>
+                      <label className={styles.reviewField}>
+                        <span>审核人</span>
+                        <input
+                          value={review?.reviewer ?? "benchmark-reviewer"}
+                          onChange={(event) => updateReview(result, { reviewer: event.target.value })}
+                        />
+                      </label>
+                      <label className={styles.reviewField}>
+                        <span>人工备注</span>
+                        <textarea
+                          value={review?.note ?? ""}
+                          placeholder="写下你认可/驳回/补证据的依据"
+                          onChange={(event) => updateReview(result, { note: event.target.value })}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
     </div>
   );
+}
+
+type HumanReviewDecision = "accepted" | "rejected" | "needs_evidence";
+
+function buildHumanReviewQueue(results: BenchmarkMetricEvaluationResult[]): BenchmarkMetricEvaluationResult[] {
+  return [...results]
+    .filter((result) =>
+      result.needsHumanReview ||
+      result.status === "needs_human_review" ||
+      !result.passed ||
+      result.confidence < 0.65,
+    )
+    .sort((left, right) => {
+      if (left.status === "needs_human_review" && right.status !== "needs_human_review") return -1;
+      if (right.status === "needs_human_review" && left.status !== "needs_human_review") return 1;
+      return left.normalizedScore - right.normalizedScore;
+    })
+    .slice(0, 24);
+}
+
+function buildCapabilityGapRows(caseScores: BenchmarkCaseScore[]): Array<{ capability: string; score: number }> {
+  const grouped = new Map<string, number[]>();
+  for (const caseScore of caseScores) {
+    for (const capability of caseScore.capabilityScores) {
+      if (!grouped.has(capability.capability)) grouped.set(capability.capability, []);
+      grouped.get(capability.capability)!.push(capability.score);
+    }
+  }
+  return [...grouped.entries()]
+    .map(([capability, scores]) => ({
+      capability,
+      score: scores.reduce((sum, score) => sum + score, 0) / Math.max(1, scores.length),
+    }))
+    .sort((left, right) => left.score - right.score)
+    .slice(0, 5);
+}
+
+function CaseExplainCard(props: { caseScore: BenchmarkCaseScore; metricNameMap: Map<string, string> }) {
+  const failed = props.caseScore.metricResults
+    .filter((result) => !result.passed || result.status === "needs_human_review")
+    .sort((left, right) => left.normalizedScore - right.normalizedScore)
+    .slice(0, 3);
+  return (
+    <article className={styles.caseExplainCard}>
+      <div className={styles.caseExplainHeader}>
+        <div>
+          <strong>{props.caseScore.caseId}</strong>
+          <span>{agentFrameworkDisplayName(props.caseScore.agentFramework)} · {props.caseScore.model}</span>
+        </div>
+        <b>{props.caseScore.taskScore.toFixed(1)}%</b>
+      </div>
+      {failed.length === 0 ? (
+        <p className={styles.explainEmpty}>该案例没有失败指标。</p>
+      ) : (
+        <div className={styles.metricExplainList}>
+          {failed.map((result) => (
+            <MetricExplainCard key={metricResultKey(result)} result={result} metricNameMap={props.metricNameMap} compact />
+          ))}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function MetricExplainCard(props: {
+  result: BenchmarkMetricEvaluationResult;
+  metricNameMap: Map<string, string>;
+  compact?: boolean;
+}) {
+  const statusText = props.result.status === "needs_human_review"
+    ? "需人工复核"
+    : props.result.passed
+      ? "通过"
+      : "未通过";
+  return (
+    <article className={`${styles.metricExplainCard} ${props.compact ? styles.metricExplainCardCompact : ""}`}>
+      <div className={styles.metricExplainHeader}>
+        <div>
+          <strong>{metricDisplayNameFromEvent(props.result.metricKey, props.metricNameMap)}</strong>
+          <span>{props.result.caseId}</span>
+        </div>
+        <b>{props.result.normalizedScore.toFixed(1)}%</b>
+      </div>
+      <div className={styles.metricExplainMeta}>
+        <span>{statusText}</span>
+        <span>置信度 {(props.result.confidence * 100).toFixed(0)}%</span>
+        <span>{evaluatorDisplayName(props.result.evaluatorType)}</span>
+      </div>
+      <p>{props.result.reason}</p>
+      {props.result.evidence.length > 0 && (
+        <div className={styles.explainEvidence}>
+          {props.result.evidence.slice(0, props.compact ? 2 : 5).map((item, index) => (
+            <span key={`${props.result.submissionId}-${props.result.metricKey}-${index}`}>{item}</span>
+          ))}
+        </div>
+      )}
+      {!props.compact && (
+        <details className={styles.compareDrawer}>
+          <summary>
+            <span>期望 / 实际对照</span>
+            <b>{buildComparisonSummary(props.result.expected, props.result.actual)}</b>
+          </summary>
+          <ReadableComparison expected={props.result.expected} actual={props.result.actual} />
+        </details>
+      )}
+    </article>
+  );
+}
+
+function ReadableComparison(props: { expected: unknown; actual: unknown }) {
+  return (
+    <div className={styles.readableCompare}>
+      <ReadableValuePanel title="期望" value={props.expected} kind="expected" />
+      <ReadableValuePanel title="实际" value={props.actual} kind="actual" />
+    </div>
+  );
+}
+
+function ReadableValuePanel(props: { title: string; value: unknown; kind: "expected" | "actual" }) {
+  const normalizedValue = normalizeReadableValue(props.value);
+  const blocks = buildReadableBlocks(normalizedValue, props.kind);
+  return (
+    <section className={styles.readablePanel}>
+      <div className={styles.readablePanelTitle}>{props.title}</div>
+      <div className={styles.readableBlocks}>
+        {blocks.map((block, index) => (
+          <div key={`${props.title}-${block.label}-${index}`} className={styles.readableBlock}>
+            <span>{block.label}</span>
+            {Array.isArray(block.value) ? (
+              <ul>
+                {block.value.map((item, itemIndex) => (
+                  <li key={`${props.title}-${block.label}-${itemIndex}`}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>{block.value}</p>
+            )}
+          </div>
+        ))}
+      </div>
+      {(Array.isArray(normalizedValue) || isReadableRecord(normalizedValue)) && (
+        <details className={styles.rawJsonDetails}>
+          <summary>原始 JSON</summary>
+          <pre>{formatJsonForDisplay(normalizedValue)}</pre>
+        </details>
+      )}
+    </section>
+  );
+}
+
+function metricResultKey(result: { submissionId: string; metricKey: string }): string {
+  return `${result.submissionId}:${result.metricKey}`;
+}
+
+function humanReviewDecisionLabel(decision: HumanReviewDecision): string {
+  if (decision === "accepted") return "已认可";
+  if (decision === "rejected") return "已驳回";
+  return "需补证据";
+}
+
+function sourceDisplayName(source: string): string {
+  const names: Record<string, string> = {
+    auto_tp: "坏例确认",
+    manual_fp: "误报纠正",
+    auto_fn: "漏报发现",
+    auto_tn: "自动好例",
+    auto_uncertainty: "边界复核",
+    auto_disagreement: "人机分歧",
+    manual_gold: "人工金标",
+    imported: "导入",
+  };
+  return names[source] ?? source;
+}
+
+function formatAcceptedBySource(acceptedBySource: Record<string, number>): string {
+  return Object.entries(acceptedBySource)
+    .filter(([, count]) => count > 0)
+    .map(([source, count]) => `${sourceDisplayName(source)} ${count} 条`)
+    .join("，");
+}
+
+type ReadableBlock = {
+  label: string;
+  value: string | string[];
+};
+
+function buildReadableBlocks(value: unknown, kind: "expected" | "actual"): ReadableBlock[] {
+  const normalizedValue = normalizeReadableValue(value);
+  if (!isReadableRecord(normalizedValue)) {
+    return [{ label: kind === "expected" ? "期望内容" : "实际输出", value: stringifyBrief(normalizedValue) }];
+  }
+
+  return kind === "expected"
+    ? buildExpectedBlocks(normalizedValue)
+    : buildActualBlocks(normalizedValue);
+}
+
+function buildExpectedBlocks(value: Record<string, unknown>): ReadableBlock[] {
+  const blocks: ReadableBlock[] = [];
+  pushStringBlock(blocks, "任务要求", value.requirement);
+  pushAcceptanceCriteria(blocks, value.acceptanceCriteria);
+  pushSourceSummary(blocks, value.sourceSummary);
+  pushRemainingBlocks(blocks, value, new Set(["requirement", "acceptanceCriteria", "sourceSummary"]));
+  return blocks.length ? blocks : [{ label: "期望内容", value: stringifyBrief(value) }];
+}
+
+function buildActualBlocks(value: Record<string, unknown>): ReadableBlock[] {
+  const blocks: ReadableBlock[] = [];
+  const expanded = expandEmbeddedActualJson(value);
+  pushStringBlock(blocks, "决策", expanded.decision);
+  pushStringBlock(blocks, "回答", expanded.answer);
+  pushStringBlock(blocks, "理由", expanded.reason);
+  pushStringBlock(blocks, "备注", expanded.notes);
+  pushListBlock(blocks, "证据", expanded.evidence);
+  pushRemainingBlocks(blocks, expanded, new Set(["decision", "answer", "reason", "notes", "evidence"]));
+  return blocks.length ? blocks : [{ label: "实际输出", value: stringifyBrief(value) }];
+}
+
+function expandEmbeddedActualJson(value: Record<string, unknown>): Record<string, unknown> {
+  const embedded =
+    parseEmbeddedJsonRecord(value.answer) ??
+    parseEmbeddedJsonRecord(value.rawOutput) ??
+    parseEmbeddedJsonRecord(value.output);
+  if (!embedded) return value;
+  return {
+    ...value,
+    ...embedded,
+    answer: typeof embedded.answer === "string" ? embedded.answer : undefined,
+  };
+}
+
+function pushStringBlock(blocks: ReadableBlock[], label: string, value: unknown): void {
+  if (typeof value !== "string" || !value.trim()) return;
+  blocks.push({ label, value: value.trim() });
+}
+
+function pushListBlock(blocks: ReadableBlock[], label: string, value: unknown): void {
+  if (!Array.isArray(value) || value.length === 0) return;
+  blocks.push({ label, value: value.map((item) => stringifyBrief(item)).filter(Boolean).slice(0, 8) });
+}
+
+function pushAcceptanceCriteria(blocks: ReadableBlock[], value: unknown): void {
+  if (!Array.isArray(value) || value.length === 0) return;
+  const criteria = value.map((item) => {
+    if (!isReadableRecord(item)) return stringifyBrief(item);
+    const metric = typeof item.metric === "string" ? item.metric : "指标";
+    const criteriaText = typeof item.criteria === "string" ? item.criteria : stringifyBrief(item.criteria);
+    return `${metric}: ${criteriaText}`;
+  });
+  blocks.push({ label: "验收标准", value: criteria.slice(0, 8) });
+}
+
+function pushSourceSummary(blocks: ReadableBlock[], value: unknown): void {
+  if (!isReadableRecord(value)) return;
+  const summary = Object.entries(value)
+    .map(([key, item]) => `${fieldDisplayName(key)}: ${stringifyBrief(item)}`)
+    .slice(0, 8);
+  if (summary.length > 0) blocks.push({ label: "来源摘要", value: summary });
+}
+
+function pushRemainingBlocks(
+  blocks: ReadableBlock[],
+  value: Record<string, unknown>,
+  consumedKeys: Set<string>,
+): void {
+  for (const [key, item] of Object.entries(value)) {
+    if (consumedKeys.has(key) || item === undefined || item === null) continue;
+    if (Array.isArray(item)) {
+      pushListBlock(blocks, fieldDisplayName(key), item);
+    } else {
+      const text = stringifyBrief(item);
+      if (text !== "无") blocks.push({ label: fieldDisplayName(key), value: text });
+    }
+  }
+}
+
+function fieldDisplayName(key: string): string {
+  const names: Record<string, string> = {
+    sessionId: "会话",
+    messageCount: "消息数",
+    hasTimestamp: "包含时间戳",
+    sourceFileName: "来源文件",
+    transcript: "对话内容",
+    requirement: "任务要求",
+    acceptanceCriteria: "验收标准",
+    sourceSummary: "来源摘要",
+  };
+  return names[key] ?? humanizeMetricKey(key);
+}
+
+function stringifyBrief(value: unknown): string {
+  const normalizedValue = normalizeReadableValue(value);
+  if (normalizedValue !== value) return stringifyBrief(normalizedValue);
+  if (value === undefined || value === null) return "无";
+  if (typeof value === "string") return value.length > 260 ? `${value.slice(0, 260)}...` : value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map((item) => stringifyBrief(item)).join("；");
+  if (isReadableRecord(value)) {
+    return Object.entries(value)
+      .map(([key, item]) => `${fieldDisplayName(key)}: ${stringifyBrief(item)}`)
+      .join("；");
+  }
+  try {
+    const text = JSON.stringify(value);
+    return text.length > 260 ? `${text.slice(0, 260)}...` : text;
+  } catch {
+    return String(value);
+  }
+}
+
+function buildComparisonSummary(expected: unknown, actual: unknown): string {
+  const expectedValue = normalizeReadableValue(expected);
+  const actualValue = normalizeReadableValue(actual);
+  const expectedBlocks = buildReadableBlocks(expectedValue, "expected").length;
+  const actualBlocks = buildReadableBlocks(actualValue, "actual").length;
+  return `${expectedBlocks} 项期望 · ${actualBlocks} 项实际`;
+}
+
+function normalizeReadableValue(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const text = value.trim();
+  if (!text || (!text.startsWith("{") && !text.startsWith("["))) return value;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return value;
+  }
+}
+
+function parseEmbeddedJsonRecord(value: unknown): Record<string, unknown> | null {
+  const parsed = normalizeReadableValue(value);
+  return isReadableRecord(parsed) ? parsed : null;
+}
+
+function formatJsonForDisplay(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function isReadableRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }

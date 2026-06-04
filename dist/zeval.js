@@ -3764,7 +3764,7 @@ function kv(key, value) {
   console.log(`  ${c.dim(`${key}:`)} ${value}`);
 }
 function table(rows, padKeyTo = 30) {
-  for (const [key, value] of rows) {
+  for (const [key, value = ""] of rows) {
     if (key === "") {
       console.log();
       continue;
@@ -9724,7 +9724,7 @@ async function runEvaluatePipeline(rawRows, options) {
   let artifactPath;
   if (options.persistArtifact ?? Boolean(options.artifactBaseName)) {
     const artifactBaseName = sanitizeArtifactBaseName(options.artifactBaseName ?? options.runId);
-    const artifactDirectory = import_node_path8.default.join("mock-chatlog", "enriched-data");
+    const artifactDirectory = import_node_path8.default.join(".zeval-db", "enriched-data");
     artifactPath = import_node_path8.default.join(artifactDirectory, `${artifactBaseName}.enriched.csv`);
     await (0, import_promises5.mkdir)(artifactDirectory, { recursive: true });
     await (0, import_promises5.writeFile)(artifactPath, enrichedCsv, "utf8");
@@ -9842,7 +9842,7 @@ function registerEvaluateCommand(program3) {
       onProgress: (event) => {
         if (event.stage !== lastStage) {
           lastStage = event.stage;
-          spinner.update(`${event.label ?? event.stage}\u2026`);
+          spinner.update(`${event.message ?? event.stage}\u2026`);
         }
       }
     }).catch((e) => {
@@ -9906,8 +9906,8 @@ function registerEvaluateCommand(program3) {
         auto_uncertainty: "Uncertainty",
         auto_disagreement: "Disagreement"
       };
-      kv("total accepted", admission.savedCount);
-      kv("skipped (duplicates)", admission.skippedCount);
+      kv("total accepted", admission.savedCaseIds.length);
+      kv("skipped (duplicates)", admission.skippedDuplicates);
       for (const [src, n] of Object.entries(admission.acceptedBySource ?? {})) {
         if ((n ?? 0) > 0) kv(`  ${LABELS[src] ?? src}`, n);
       }
@@ -9961,8 +9961,8 @@ function registerHarvestCommand(program3) {
     });
     spinner2.succeed("Admission pipeline complete");
     header("Admission Results");
-    kv("total accepted", admission.savedCount);
-    kv("skipped (duplicates)", admission.skippedCount);
+    kv("total accepted", admission.savedCaseIds.length);
+    kv("skipped (duplicates)", admission.skippedDuplicates);
     if ((admission.humanReviewQueueCount ?? 0) > 0) {
       kv("queued for human review", admission.humanReviewQueueCount);
     }
@@ -9976,12 +9976,12 @@ function registerHarvestCommand(program3) {
         }
       }
     }
-    if (admission.savedCount === 0) {
+    if (admission.savedCaseIds.length === 0) {
       console.log();
       warn("No cases admitted \u2014 all candidates may be duplicates or filtered out.");
     }
     console.log();
-    ok(`Harvest complete. ${c.bold(String(admission.savedCount))} case(s) added to the pool.`);
+    ok(`Harvest complete. ${c.bold(String(admission.savedCaseIds.length))} case(s) added to the pool.`);
     console.log(`  ${c.dim("Next: ")} zeval package --run-id ${opts.runId}`);
     console.log();
   });
@@ -10897,7 +10897,7 @@ function registerPackageCommand(program3) {
     if (snap.targetMetrics.length > 0) {
       console.log();
       for (const tm of snap.targetMetrics) {
-        kv(`  target: ${tm.metricKey}`, `${tm.currentValue.toFixed(2)} \u2192 >${tm.targetValue.toFixed(2)}`);
+        kv(`  target: ${tm.metricId}`, `${tm.currentValue.toFixed(2)} \u2192 >${tm.targetValue.toFixed(2)}`);
       }
     }
     console.log();

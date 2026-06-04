@@ -18,7 +18,7 @@ import styles from "./onlineEval.module.css";
 
 const LAST_CUSTOMER_ID_KEY = "zeval:lastCustomerId";
 const LEGACY_LAST_CUSTOMER_ID_KEY = "zerore:lastCustomerId";
-const MOCK_REPLY_API_BASE_URL = "mock://customer-demo";
+const DEFAULT_REPLY_API_BASE_URL = "";
 
 type BaselineIndexRow = {
   runId: string;
@@ -88,7 +88,7 @@ export function OnlineEvalConsole() {
   const [selectedRunId, setSelectedRunId] = useState("");
   const [selectedSampleBatchId, setSelectedSampleBatchId] = useState("");
   const [sourceMode, setSourceMode] = useState<"baseline" | "sampleBatch">("baseline");
-  const [replyApiBaseUrl, setReplyApiBaseUrl] = useState(MOCK_REPLY_API_BASE_URL);
+  const [replyApiBaseUrl, setReplyApiBaseUrl] = useState(DEFAULT_REPLY_API_BASE_URL);
   const [loading, setLoading] = useState(false);
   const [loadingList, setLoadingList] = useState(false);
   const [error, setError] = useState("");
@@ -499,7 +499,7 @@ export function OnlineEvalConsole() {
                       className={styles.input}
                       value={replyApiBaseUrl}
                       onChange={(event) => setReplyApiBaseUrl(event.target.value)}
-                      placeholder={MOCK_REPLY_API_BASE_URL}
+                      placeholder="https://your-customer-api.example.com"
                     />
                   </label>
                 </div>

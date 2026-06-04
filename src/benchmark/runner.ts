@@ -26,10 +26,13 @@ export type RunBenchmarkEvaluationInput = {
   submissions: BenchmarkAgentSubmission[];
   matrix: BenchmarkMatrixCell[];
   evaluatorContext?: BenchmarkEvaluatorContext;
+  existingMetricResults?: BenchmarkMetricEvaluationResult[];
   badcaseThreshold?: number;
   goldencaseThreshold?: number;
   /** Called after each metric is evaluated for progress tracking. */
   onMetricEvaluated?: (result: BenchmarkMetricEvaluationResult) => void;
+  /** Called when a metric result is reused from a previous interrupted run. */
+  onMetricReused?: (result: BenchmarkMetricEvaluationResult) => void;
 };
 
 /**
@@ -45,6 +48,9 @@ export async function runBenchmarkEvaluation(
 
   const approvedMetrics = getApprovedRubricMetrics(input.task.rubric);
   const caseById = new Map(input.cases.map((taskCase) => [taskCase.caseId, taskCase]));
+  const existingMetricByKey = new Map(
+    (input.existingMetricResults ?? []).map((result) => [metricCacheKey(result.submissionId, result.metricKey), result]),
+  );
   const metricResults: BenchmarkMetricEvaluationResult[] = [];
 
   for (const submission of input.submissions) {
@@ -53,6 +59,12 @@ export async function runBenchmarkEvaluation(
       continue;
     }
     for (const metric of approvedMetrics) {
+      const existingMetricResult = existingMetricByKey.get(metricCacheKey(submission.submissionId, metric.metricKey));
+      if (existingMetricResult) {
+        metricResults.push(existingMetricResult);
+        input.onMetricReused?.(existingMetricResult);
+        continue;
+      }
       const metricResult = await evaluateBenchmarkMetric(metric, taskCase, submission, input.evaluatorContext);
       metricResults.push(metricResult);
       input.onMetricEvaluated?.(metricResult);
@@ -204,4 +216,8 @@ function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function metricCacheKey(submissionId: string, metricKey: string): string {
+  return `${submissionId}::${metricKey}`;
 }

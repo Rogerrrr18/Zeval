@@ -5,6 +5,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { BenchmarkRubricSet } from "@/benchmark/types";
+import type { BenchmarkProgressSnapshot } from "@/benchmark/progress";
+import type { BenchmarkRunResult } from "@/benchmark/types";
 import type { RawChatlogRow, UploadFormat } from "@/types/pipeline";
 import type { StructuredTaskMetrics } from "@/types/rich-conversation";
 
@@ -36,6 +38,35 @@ export type BenchmarkDatasetSnapshot = {
   uploadedAt: string;
 };
 
+export type BenchmarkRunHistoryItem = {
+  runId: string;
+  generatedAt: string;
+  averageScore: number;
+  caseCount: number;
+  needsHumanReviewCount: number;
+  result: BenchmarkRunResult;
+  progress?: BenchmarkProgressSnapshot | null;
+};
+
+export type BenchmarkHumanReviewDecision = "accepted" | "rejected" | "needs_evidence";
+
+export type BenchmarkHumanReviewRecord = {
+  runId: string;
+  submissionId: string;
+  metricKey: string;
+  decision?: BenchmarkHumanReviewDecision;
+  reviewer?: string;
+  note?: string;
+  reviewedAt?: string;
+  savedAt?: string;
+  admission?: {
+    caseId: string;
+    source: string;
+    caseSetType: "goodcase" | "badcase";
+    reviewStatus: string;
+  };
+};
+
 export type BenchmarkWorkspaceSession = {
   id: string;
   projectId: string;
@@ -50,6 +81,10 @@ export type BenchmarkWorkspaceSession = {
   copilotTurns: BenchmarkChatTurn[];
   selectedFileId: string | null;
   dataset: BenchmarkDatasetSnapshot | null;
+  runResult?: BenchmarkRunResult | null;
+  progress?: BenchmarkProgressSnapshot | null;
+  runHistory?: BenchmarkRunHistoryItem[];
+  humanReviewRecords?: BenchmarkHumanReviewRecord[];
 };
 
 export type BenchmarkWorkspaceSessionIndex = {
@@ -91,7 +126,6 @@ export async function writeBenchmarkWorkspaceSessions(input: BenchmarkWorkspaceS
     sessions: input.sessions.filter(isBenchmarkWorkspaceSession).map((session) => ({
       ...session,
       projectId,
-      viewMode: "rubric",
     })),
     updatedAt: new Date().toISOString(),
   };
