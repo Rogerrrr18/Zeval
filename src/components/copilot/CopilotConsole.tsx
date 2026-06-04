@@ -503,9 +503,11 @@ export function CopilotConsole() {
                 placeholder="例如：跑评估并告诉我 top 3 风险"
                 rows={2}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
+                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                     event.preventDefault();
-                    void send();
+                    if (input.trim()) {
+                      void send();
+                    }
                   }
                 }}
                 disabled={running}

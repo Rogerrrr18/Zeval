@@ -13,20 +13,18 @@ import { ProjectSwitcher } from "./ProjectSwitcher";
 import styles from "./appShell.module.css";
 
 const NAV_ITEMS = [
-  { label: "总览", href: "/", match: "/", group: "Project" },
-  { label: "Benchmark", href: "/benchmark", match: "/benchmark", group: "Quality Loop" },
-  { label: "案例校准", href: "/datasets", match: "/datasets", group: "Quality Loop" },
-  { label: "合成补样本", href: "/synthesize", match: "/synthesize", group: "Quality Loop" },
-  { label: "修复验证", href: "/remediation-packages", match: "/remediation-packages", group: "Quality Loop" },
-  { label: "Copilot", href: "/chat", match: "/chat", group: "Assistants" },
-  { label: "集成", href: "/integrations", match: "/integrations", group: "Assistants" },
+  { label: "总览", href: "/", match: "/", group: "工作台" },
+  { label: "评测工作台", href: "/benchmark", match: "/benchmark", group: "工作台" },
+  { label: "案例校准", href: "/datasets", match: "/datasets", group: "数据" },
+  { label: "合成补样本", href: "/synthesize", match: "/synthesize", group: "数据" },
+  { label: "修复验证", href: "/remediation-packages", match: "/remediation-packages", group: "数据" },
 ];
 
 const THEME_STORAGE_KEY = "zeval:theme";
 
 type Theme = "light" | "dark";
 
-const DEFAULT_THEME: Theme = "dark";
+const DEFAULT_THEME: Theme = "light";
 const themeListeners = new Set<() => void>();
 
 function readStoredTheme(): Theme {

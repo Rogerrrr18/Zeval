@@ -28,6 +28,8 @@ export type RunBenchmarkEvaluationInput = {
   evaluatorContext?: BenchmarkEvaluatorContext;
   badcaseThreshold?: number;
   goldencaseThreshold?: number;
+  /** Called after each metric is evaluated for progress tracking. */
+  onMetricEvaluated?: (result: BenchmarkMetricEvaluationResult) => void;
 };
 
 /**
@@ -51,7 +53,9 @@ export async function runBenchmarkEvaluation(
       continue;
     }
     for (const metric of approvedMetrics) {
-      metricResults.push(await evaluateBenchmarkMetric(metric, taskCase, submission, input.evaluatorContext));
+      const metricResult = await evaluateBenchmarkMetric(metric, taskCase, submission, input.evaluatorContext);
+      metricResults.push(metricResult);
+      input.onMetricEvaluated?.(metricResult);
     }
   }
 

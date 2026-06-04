@@ -149,7 +149,7 @@ ZEVAL_BASE_URL=http://localhost:3010 \\
 const FEATURES = [
   { icon: "📊", title: "10 项 DeepEval 指标", desc: "faithfulness / hallucination / answerRelevancy / contextualRelevancy / toolCorrectness / knowledgeRetention / toxicity / bias / roleAdherence / taskCompletion" },
   { icon: "📈", title: "历史 baseline 趋势叠加", desc: "同一客户多次评估自动形成情绪、目标达成、bad case 与业务 KPI 趋势" },
-  { icon: "🤖", title: "LLM 合成", desc: "DeepEval Synthesizer 等价物，自动批量生成评测样本" },
+  { icon: "◆", title: "LLM 合成", desc: "DeepEval Synthesizer 等价物，自动批量生成评测样本" },
   { icon: "🛠️", title: "调优包", desc: "命中 bad case 自动产出 Claude Code / Codex 可读的 Skill 文件夹" },
   { icon: "🔁", title: "基线回放", desc: "validation-runs 对照实验，确保改进不回退" },
   { icon: "📦", title: "OpenAPI 自描述", desc: "GET /api/docs 拿到完整 OpenAPI 3.0 spec" },

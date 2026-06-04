@@ -7,6 +7,7 @@
  */
 
 import { buildBaseAdapter } from "./base-adapter";
+import { createZevalAgentAdapter } from "./zeval-agent";
 import type { AgentAdapter } from "./types";
 
 const HR_SYSTEM_PROMPT = [
@@ -162,6 +163,13 @@ export function createOpenClawAdapter(): AgentAdapter {
 }
 
 /**
+ * Zeval Agent adapter — 使用 Zeval Agent Loop（多轮工具调用架构）
+ */
+export function createZevalAdapter(): AgentAdapter {
+  return createZevalAgentAdapter();
+}
+
+/**
  * Registry of all HR resume-screening adapters.
  */
 export const HR_ADAPTER_REGISTRY: Record<string, () => AgentAdapter> = {
@@ -169,6 +177,7 @@ export const HR_ADAPTER_REGISTRY: Record<string, () => AgentAdapter> = {
   codex: createCodexAdapter,
   hermes: createHermesAdapter,
   openclaw: createOpenClawAdapter,
+  zeval: createZevalAdapter,
 };
 
 /**

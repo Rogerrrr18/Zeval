@@ -4,7 +4,6 @@
 
 import { randomBytes } from "node:crypto";
 import {
-  BENCHMARK_CAPABILITIES,
   BENCHMARK_METRIC_POOL,
   getBenchmarkCapabilityDefinition,
 } from "@/benchmark/capabilities";
@@ -15,6 +14,19 @@ import type {
   BenchmarkRubricModule,
   BenchmarkRubricSet,
 } from "@/benchmark/types";
+
+const EVALUATOR_LABELS_ZH: Record<string, string> = {
+  exact_match: "精确匹配",
+  regex_match: "格式匹配",
+  numeric_tolerance: "数值容差",
+  f1_match: "覆盖率匹配",
+  code_exec: "代码执行",
+  unit_test: "单元测试",
+  environment_state_test: "环境状态检测",
+  llm_judge: "模型评审",
+  human_label: "人工标注",
+  hybrid: "混合评估",
+};
 
 export type BuildRubricDraftInput = {
   title: string;
@@ -92,26 +104,26 @@ export function validateApprovedRubric(rubric: BenchmarkRubricSet): string[] {
   const errors: string[] = [];
   const approved = getApprovedRubricMetrics(rubric);
   if (rubric.approvalStatus !== "approved") {
-    errors.push("Rubric must be approved by the user before running benchmark evaluation.");
+    errors.push("评分标准必须先由用户确认，才能运行评测。");
   }
   if (approved.length === 0) {
-    errors.push("Rubric has no approved metrics.");
+    errors.push("评分标准中没有已确认指标。");
   }
 
   const seen = new Set<string>();
   for (const metric of approved) {
     if (seen.has(metric.metricKey)) {
-      errors.push(`Duplicate metric key: ${metric.metricKey}`);
+      errors.push(`指标标识重复：${metric.metricKey}`);
     }
     seen.add(metric.metricKey);
     if (metric.weight <= 0) {
-      errors.push(`Metric ${metric.metricKey} must have positive weight.`);
+      errors.push(`指标「${metric.displayName}」的权重必须大于 0。`);
     }
     if (metric.scale.max <= metric.scale.min) {
-      errors.push(`Metric ${metric.metricKey} has invalid scoring scale.`);
+      errors.push(`指标「${metric.displayName}」的分值范围不合法。`);
     }
     if (metric.scale.passThreshold < metric.scale.min || metric.scale.passThreshold > metric.scale.max) {
-      errors.push(`Metric ${metric.metricKey} pass threshold is outside the scoring scale.`);
+      errors.push(`指标「${metric.displayName}」的通过阈值超出分值范围。`);
     }
   }
 
@@ -187,6 +199,67 @@ function slug(value: string): string {
 }
 
 /**
+ * Deep clone a rubric so edits don’t mutate the original draft.
+ */
+export function cloneRubric(rubric: BenchmarkRubricSet): BenchmarkRubricSet {
+  return {
+    ...rubric,
+    modules: rubric.modules.map((module) => ({
+      ...module,
+      metrics: module.metrics.map((metric) => ({
+        ...metric,
+        scale: { ...metric.scale },
+        config: metric.config ? { ...metric.config } : undefined,
+        failureTags: [...metric.failureTags],
+      })),
+    })),
+  };
+}
+
+/**
+ * Update a single metric in a rubric and return a new rubric instance.
+ */
+export function updateRubricMetric(
+  rubric: BenchmarkRubricSet,
+  metricKey: string,
+  patch: Partial<Omit<BenchmarkRubricMetric, "metricKey">>,
+  now = new Date().toISOString(),
+): BenchmarkRubricSet {
+  return {
+    ...rubric,
+    updatedAt: now,
+    modules: rubric.modules.map((module) => ({
+      ...module,
+      metrics: module.metrics.map((metric) =>
+        metric.metricKey === metricKey ? { ...metric, ...patch } : metric,
+      ),
+    })),
+  };
+}
+
+/**
+ * Toggle a metric’s approval status between candidate/approved.
+ */
+export function toggleMetricApproval(
+  rubric: BenchmarkRubricSet,
+  metricKey: string,
+  now = new Date().toISOString(),
+): BenchmarkRubricSet {
+  return {
+    ...rubric,
+    updatedAt: now,
+    modules: rubric.modules.map((module) => ({
+      ...module,
+      metrics: module.metrics.map((metric) =>
+        metric.metricKey === metricKey
+          ? { ...metric, approvalStatus: metric.approvalStatus === "approved" ? "candidate" : "approved" as const }
+          : metric,
+      ),
+    })),
+  };
+}
+
+/**
  * Render a compact human-readable rubric outline for review screens.
  */
 export function renderRubricReviewMarkdown(rubric: BenchmarkRubricSet): string {
@@ -195,19 +268,20 @@ export function renderRubricReviewMarkdown(rubric: BenchmarkRubricSet): string {
     "",
     rubric.description,
     "",
-    `Status: ${rubric.approvalStatus}`,
+    `状态：${rubric.approvalStatus === "approved" ? "已确认" : rubric.approvalStatus === "rejected" ? "已拒绝" : "待确认"}`,
     "",
   ];
 
-  for (const module of rubric.modules) {
-    lines.push(`## ${module.displayName}`);
-    lines.push(module.description);
+  for (const rubricModule of rubric.modules) {
+    lines.push(`## ${rubricModule.displayName}`);
+    lines.push(rubricModule.description);
     lines.push("");
-    for (const metric of module.metrics) {
-      lines.push(`- ${metric.metricKey} [${metric.approvalStatus}]`);
-      lines.push(`  - evaluator: ${metric.evaluatorType}`);
-      lines.push(`  - weight: ${metric.weight}`);
-      lines.push(`  - description: ${metric.description}`);
+    for (const metric of rubricModule.metrics) {
+      const status = metric.approvalStatus === "approved" ? "已确认" : metric.approvalStatus === "rejected" ? "已拒绝" : "待确认";
+      lines.push(`- ${metric.displayName} [${status}]`);
+      lines.push(`  - 评估方式：${EVALUATOR_LABELS_ZH[metric.evaluatorType] ?? metric.evaluatorType}`);
+      lines.push(`  - 权重：${metric.weight}`);
+      lines.push(`  - 说明：${metric.description}`);
     }
     lines.push("");
   }

@@ -1,8 +1,32 @@
 :root {
-  --background: #030712;
-  --foreground: #eef5ff;
+  --background: #f6f8fb;
+  --foreground: #111827;
   --font-geist-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", Arial,
     Helvetica, sans-serif;
+  --zeval-bg: #f6f8fb;
+  --zeval-bg-2: #eef3f8;
+  --zeval-panel: rgb(255 255 255 / 0.88);
+  --zeval-panel-strong: #ffffff;
+  --zeval-panel-soft: rgb(248 250 252 / 0.86);
+  --zeval-line: rgb(17 24 39 / 0.1);
+  --zeval-line-strong: rgb(14 116 144 / 0.34);
+  --zeval-text: #111827;
+  --zeval-text-2: #475569;
+  --zeval-muted: #738196;
+  --zeval-cyan: #0e7490;
+  --zeval-blue: #2563eb;
+  --zeval-teal: #0f766e;
+  --zeval-success: #16a34a;
+  --zeval-warning: #d97706;
+  --zeval-danger: #e11d48;
+  --zeval-radius: 8px;
+  --zeval-shadow: 0 18px 48px rgb(15 23 42 / 0.09);
+  --zeval-focus: 0 0 0 3px rgb(14 116 144 / 0.16);
+}
+
+html[data-theme="dark"] {
+  --background: #030712;
+  --foreground: #eef5ff;
   --zeval-bg: #030712;
   --zeval-bg-2: #050b18;
   --zeval-panel: rgb(8 13 27 / 0.82);
@@ -19,7 +43,6 @@
   --zeval-success: #22c55e;
   --zeval-warning: #fbbf24;
   --zeval-danger: #fb7185;
-  --zeval-radius: 8px;
   --zeval-shadow: 0 22px 70px rgb(0 0 0 / 0.28);
   --zeval-focus: 0 0 0 3px rgb(103 232 249 / 0.18);
 }
@@ -60,10 +83,10 @@ body {
   flex-direction: column;
   color: var(--foreground);
   background:
-    radial-gradient(circle at 12% -8%, rgb(103 232 249 / 0.08), transparent 28rem),
-    radial-gradient(circle at 88% 0%, rgb(45 212 191 / 0.06), transparent 26rem),
-    linear-gradient(rgb(103 232 249 / 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(103 232 249 / 0.025) 1px, transparent 1px),
+    radial-gradient(circle at 16% -8%, rgb(14 116 144 / 0.08), transparent 28rem),
+    radial-gradient(circle at 88% 0%, rgb(37 99 235 / 0.055), transparent 26rem),
+    linear-gradient(rgb(15 23 42 / 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(15 23 42 / 0.026) 1px, transparent 1px),
     var(--background);
   background-size: auto, auto, 44px 44px, 44px 44px, auto;
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
@@ -113,7 +136,7 @@ textarea {
 }
 
 * {
-  scrollbar-color: rgb(103 232 249 / 0.36) rgb(15 23 42 / 0.45);
+  scrollbar-color: rgb(14 116 144 / 0.34) rgb(226 232 240 / 0.76);
 }
 
 ::-webkit-scrollbar {
@@ -122,17 +145,17 @@ textarea {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgb(15 23 42 / 0.42);
+  background: rgb(226 232 240 / 0.76);
 }
 
 ::-webkit-scrollbar-thumb {
-  border: 2px solid rgb(15 23 42 / 0.42);
+  border: 2px solid rgb(226 232 240 / 0.76);
   border-radius: 999px;
-  background: rgb(103 232 249 / 0.34);
+  background: rgb(14 116 144 / 0.34);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(103 232 249 / 0.5);
+  background: rgb(14 116 144 / 0.5);
 }
 
 /* Dark mode: applied globally via data-theme on <html> from chat theme toggle */
@@ -149,6 +172,19 @@ html[data-theme="dark"] body {
     #030712;
   background-size: auto, auto, 44px 44px, 44px 44px, auto;
   color: var(--zeval-text);
+}
+
+html[data-theme="dark"] * {
+  scrollbar-color: rgb(103 232 249 / 0.36) rgb(15 23 42 / 0.45);
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: rgb(15 23 42 / 0.42);
+}
+
+html[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  border-color: rgb(15 23 42 / 0.42);
+  background: rgb(103 232 249 / 0.34);
 }
 
 html[data-theme="light"] body {

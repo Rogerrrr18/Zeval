@@ -50,6 +50,12 @@ export type BenchmarkScoringScale = {
   passThreshold: number;
 };
 
+export type BenchmarkRubricScoreLevel = {
+  score: number;
+  label: string;
+  description: string;
+};
+
 export type BenchmarkEvaluatorConfig = {
   /**
    * Dot path into the normalized agent output. Example: "parsed.decision".
@@ -79,6 +85,10 @@ export type BenchmarkEvaluatorConfig = {
    * Rubric prompt or natural language criteria for llm_judge/human_label.
    */
   criteria?: string;
+  /**
+   * Structured scoring form shown to users and used as judge guidance.
+   */
+  rubricForm?: BenchmarkRubricScoreLevel[];
   /**
    * Child metric keys for hybrid metrics.
    */
@@ -154,7 +164,7 @@ export type BenchmarkCase = {
   metadata?: Record<string, unknown>;
 };
 
-export type AgentFrameworkId = "claude_code" | "codex" | "hermes" | "openclaw";
+export type AgentFrameworkId = "claude_code" | "codex" | "hermes" | "openclaw" | "zeval" | "zeval_advanced";
 
 export type BenchmarkModelId =
   | "deepseek-v4-flash"

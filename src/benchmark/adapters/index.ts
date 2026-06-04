@@ -5,3 +5,4 @@
 export * from "./types";
 export * from "./base-adapter";
 export * from "./hr-resume-screening";
+export * from "./zeval-agent";

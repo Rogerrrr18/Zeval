@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
-import { runHrDemoBenchmark } from "@/benchmark/hr-demo";
+import { runHrDemoStreaming } from "@/benchmark/hr-demo-streaming";
 import { benchmarkHrDemoRunRequestSchema } from "@/schemas/benchmark";
 
 /**
- * Run the local HR resume-screening benchmark smoke test.
+ * Run the HR resume-screening benchmark with real-time progress.
+ *
+ * Returns immediately with a runId. The frontend should then open an
+ * SSE stream to /api/benchmarks/hr-demo-stream?runId={runId} to
+ * receive live progress updates.
  */
 export async function POST(request: Request) {
   try {
@@ -15,8 +19,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await runHrDemoBenchmark(parsed.data);
-    return NextResponse.json(result);
+    const runId = `benchmark_hr_demo_${Date.now()}`;
+
+    // Start benchmark in background; it will emit progress events
+    void runHrDemoStreaming({
+      runId,
+      approvedMetricKeys: parsed.data.approvedMetricKeys,
+      matrix: parsed.data.matrix,
+      persistCases: parsed.data.persistCases,
+      apiKey: parsed.data.apiKey,
+      baseUrl: parsed.data.baseUrl,
+    }).catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const { benchmarkProgress } = require("@/benchmark/progress");
+      benchmarkProgress.setPhase(runId, "failed", message);
+    });
+
+    return NextResponse.json({ runId });
   } catch (error) {
     const message = error instanceof Error ? error.message : "HR demo benchmark 未知错误";
     return NextResponse.json({ error: message }, { status: 500 });
