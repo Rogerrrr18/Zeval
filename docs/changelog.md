@@ -55,8 +55,7 @@
 - 新增根目录 `DESIGN.md`，用于约束后续 UI 风格基线。
 - 新增根目录 `\.env.example`，用于 GitHub 上传与环境变量模板说明。
 - 新增根目录 `项目方案说明（PM版）.md`，用于 PM 侧完整理解项目方案。
-- 新增根目录 `指标变量表.csv`，用于统一沉淀指标变量、中文名、含义、计算方法与关联指标。
-- 新增 `eval-system-概述/1-评测集构建.md`，用于定义评测集构建、baseline、跑分方案与 success 指标。
+- 曾使用根目录指标表与早期方案文档沉淀指标定义；这些研究资产后续已从工程仓库移除，当前以代码 schema、`docs/` 与 `eval-datasets/` 为准。
 - 新增 `eval-datasets/` 目录骨架，作为第一阶段文件系统版评测集存储结构。
 - 新增评测集存储抽象层：
   - `src/eval-datasets/storage/dataset-store.ts`

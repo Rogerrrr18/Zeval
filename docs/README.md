@@ -18,6 +18,6 @@ This directory is the main documentation home for Zeval. The repository root now
 
 - [Seed user interview template](seed-user-interview-template.md)：customer discovery script and objection handling.
 
-## Product Research Folder
+## Product Research
 
-Longer product and market notes remain in [`eval-system-概述/`](../eval-system-概述/). Treat that folder as research material, not the canonical engineering entrypoint.
+Early product-research drafts and archived demo materials have been removed from the engineering repo. Keep new product notes in this `docs/` directory when they need to stay close to implementation.
