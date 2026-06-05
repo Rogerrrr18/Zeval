@@ -23,7 +23,7 @@ import type {
   DbSubjectiveSignal,
   DbSuggestion,
 } from "@/db/schema";
-import type { EnrichedChatlogRow, EvaluateResponse, IntentRunLog, ObjectiveMetrics } from "@/types/pipeline";
+import type { EnrichedChatlogRow, EvaluateResponse, ObjectiveMetrics } from "@/types/pipeline";
 
 export type EvaluationProjectionOptions = {
   projectId: string;

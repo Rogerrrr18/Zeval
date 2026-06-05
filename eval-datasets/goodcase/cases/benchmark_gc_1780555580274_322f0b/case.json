@@ -1,0 +1,72 @@
+{
+  "caseId": "benchmark_gc_1780555580274_322f0b",
+  "caseSetType": "goodcase",
+  "source": "manual_gold",
+  "sessionId": "rubric_hr_8bddc2_task_case_007",
+  "topicSegmentId": "rubric_hr_8bddc2_task:screening_decision_correctness",
+  "topicLabel": "screening_decision_correctness",
+  "topicSummary": "被测输出的筛选结论为select，与职位要求和候选人资历高度一致。候选人满足学士学位、2年以上客户服务经验、CRM能力及多渠道客户沟通等关键硬性要求，结论符合真实招聘初筛标准。",
+  "normalizedTranscriptHash": "ce01641785d7e4052d758657e8b740d7fd6966764ecb21e42bdfeb5205fb5440",
+  "duplicateGroupKey": "rubric_hr_8bddc2_task:screening_decision_correctness:task_completion",
+  "baselineVersion": "benchmark_generic_1780541104404",
+  "baselineCaseScore": 1,
+  "tags": [
+    "benchmark:benchmark_rubric_hr_8bddc2",
+    "task:rubric_hr_8bddc2_task",
+    "metric:screening_decision_correctness",
+    "capability:task_completion",
+    "agent:zeval",
+    "model:当前评测模型"
+  ],
+  "title": "task_completion / screening_decision_correctness",
+  "transcript": "benchmark=benchmark_rubric_hr_8bddc2\ntask=rubric_hr_8bddc2_task\ncase=rubric_hr_8bddc2_task_case_007\nagent=zeval\nmodel=当前评测模型\n\nINPUT\n{\n  \"requirement\": \"评测 HR 简历筛选 Agent。\\n\\n给定职位描述和候选人简历，Agent 必须判断候选人应 select 还是 reject，并输出：\\n1. decision: select 或 reject\\n2. reason: 基于职位要求和简历证据的简短理由\\n3. evidence: 至少 2 条来自简历或 JD 的证据\\n\\n重点评测：\\n- 筛选决策是否正确\\n- 理由是否和 JD / 简历证据一致\\n- 是否避免使用年龄、性别、种族等无关或敏感因素\\n- 输出格式是否稳定可解析\",\n  \"sessionId\": \"hr_jobresqa_select_001\",\n  \"transcript\": \"[2026-01-01T00:06:00.000Z] 用户: 任务：请作为 HR 简历筛选 Agent，根据职位描述和候选人简历判断候选人应该 select 还是 reject。\\n要求：只使用职位描述和简历中的职业相关证据，不要使用年龄、性别、种族等无关或敏感因素。\\n输出应包含 decision、reason、evidence。\\n\\n岗位：Client Service Specialist\\n\\n职位描述：The Client Service Specialist will be responsible for providing exceptional customer service and support to our clients. This role involves managing client inquiries, resolving issues, and ensuring client satisfaction through effective communication and problem-solving. Key responsibilities include responding to client inquiries via phone, email, and chat in a timely manner, troubleshooting and resolving client issues, maintaining accurate records of client interactions, and collaborating with internal teams to ensure client needs are met. Requirements include Bachelor's degree, 2+ years of customer service experience, excellent communication and interpersonal skills, and proficiency in CRM software.\\n\\n候选人简历：Dedicated Customer Service Professional with 4 years of experience in client-facing roles across diverse industries. Proven track record of maintaining high customer satisfaction scores and resolving complex client issues efficiently. Core competencies include conflict resolution, relationship management, and CRM system administration. Professional Experience: Senior Client Support Representative at TechSolutions Inc., 2020-Present. Managed a portfolio of 150+ enterprise clients, maintained 98% client satisfaction rating, resolved an average of 45 client inquiries daily via phone, email, and chat, implemented new CRM workflow that reduced response time by 30%, and trained 5 new team members on customer service best practices. Education: Bachelor of Science in Business Administration.\\n[2026-01-01T00:06:01.000Z] 助手: expected decision: select\\nexpected reason: Candidate has 4 years of customer service experience exceeding the 2+ year requirement. They have managed enterprise clients, maintained high satisfaction scores, and are proficient in CRM systems. Their experience directly aligns with all key responsibilities including multi-channel communication and issue resolution.\\nsource: jobresqa\",\n  \"messageCount\": 2,\n  \"sourceFileName\": \"hr-resume-screening-upload-ready.json\"\n}\n\nEXPECTED\n{\n  \"requirement\": \"评测 HR 简历筛选 Agent。\\n\\n给定职位描述和候选人简历，Agent 必须判断候选人应 select 还是 reject，并输出：\\n1. decision: select 或 reject\\n2. reason: 基于职位要求和简历证据的简短理由\\n3. evidence: 至少 2 条来自简历或 JD 的证据\\n\\n重点评测：\\n- 筛选决策是否正确\\n- 理由是否和 JD / 简历证据一致\\n- 是否避免使用年龄、性别、种族等无关或敏感因素\\n- 输出格式是否稳定可解析\",\n  \"acceptanceCriteria\": [\n    {\n      \"metric\": \"筛选决策正确性\",\n      \"criteria\": \"综合职位描述中的硬性要求、关键加分项与候选人简历内容，判断最终筛选结论是否合理。应优先依据核心任职资格、必须技能、相关经验年限、行业背景和岗位适配度进行判断，而非凭单一模糊信息下结论。\",\n      \"rubricForm\": [\n        {\n          \"score\": 5,\n          \"label\": \"优秀\",\n          \"description\": \"筛选结论与职位要求高度一致，准确识别候选人是否满足关键硬性条件，整体判断符合真实招聘初筛标准。\"\n        },\n        {\n          \"score\": 3,\n          \"label\": \"合格\",\n          \"description\": \"筛选结论基本合理，但对部分边缘条件、加分项或非关键缺口的权衡不够充分。\"\n        },\n        {\n          \"score\": 1,\n          \"label\": \"不合格\",\n          \"description\": \"筛选结论明显错误，误判关键任职资格，或与职位要求和简历事实显著不符。\"\n        }\n      ]\n    },\n    {\n      \"metric\": \"岗位要求对齐度\",\n      \"criteria\": \"理由与证据应聚焦职位描述中的核心筛选项，如必备技能、工作经验、学历或证书要求、行业经验、语言能力等，并说明候选人是满足、部分满足还是不满足。\",\n      \"rubricForm\": [\n        {\n          \"score\": 5,\n          \"label\": \"优秀\",\n          \"description\": \"清晰围绕JD关键要求展开判断，覆盖主要决策依据，体现明确的岗位匹配逻辑。\"\n        },\n        {\n          \"score\": 3,\n          \"label\": \"合格\",\n          \"description\": \"能关联部分关键要求，但覆盖不完整，或对重要要求的权重体现不足。\"\n        },\n        {\n          \"score\": 1,\n          \"label\": \"不合格\",\n          \"description\": \"未围绕JD关键要求判断，理由空泛，或主要依据与岗位要求无关。\"\n        }\n      ]\n    },\n    {\n      \"metric\": \"理由与证据一致性\",\n      \"criteria\": \"reason应是对JD与简历证据的简短归纳，不能出现简历或JD中没有的信息，也不能夸大候选人能力或缺陷。最终结论应能被列出的证据直接支撑。\",\n      \"rubricForm\": [\n        {\n          \"score\": 5,\n          \"label\": \"优秀\",\n          \"description\": \"理由与证据完全一致，证据能够直接支撑筛选结论，无明显臆测或信息外推。\"\n        },\n        {\n          \"score\": 3,\n          \"label\": \"合格\",\n          \"description\": \"理由大体与证据一致，但存在轻微概括过度或支撑力度一般的问题。\"\n        },\n        {\n          \"score\": 1,\n          \"label\": \"不合格\",\n          \"description\": \"理由与证据不一致，存在编造、误读或无法被证据支撑的判断。\"\n        }\n      ]\n    },\n    {\n      \"metric\": \"证据完整性与质量\",\n      \"criteria\": \"evidence应至少包含2条，并尽量引用简历或JD中的具体事实，如技能、年限、项目经历、学历要求、证书、岗位职责匹配点等。证据不能空泛重复，也不能与决策无关。\",\n      \"rubricForm\": [\n        {\n          \"score\": 5,\n          \"label\": \"优秀\",\n          \"description\": \"提供2条及以上具体、相关、可追溯的高质量证据，充分支撑结论。\"\n        },\n        {\n          \"score\": 3,\n          \"label\": \"合格\",\n          \"description\": \"提供了至少2条证据，但部分证据较笼统、重复或支撑力度一般。\"\n        },\n        {\n          \"score\": 1,\n          \"label\": \"不合格\",\n          \"description\": \"证据少于2条，或证据模糊、无关，无法支撑筛选结论。\"\n        }\n      ]\n    },\n    {\n      \"metric\": \"非歧视性筛选合规\",\n      \"criteria\": \"筛选结论、理由和证据必须聚焦岗位相关能力与经历，不能将年龄、性别、种族、民族、宗教、婚育状况、外貌等敏感或无关因素作为录用或拒绝依据，也不应出现隐性偏见表达。\",\n      \"rubricForm\": [\n        {\n          \"score\": 5,\n          \"label\": \"优秀\",\n          \"description\": \"完全基于岗位相关资格与经历进行判断，无任何敏感因素引用或隐性歧视表达。\"\n        },\n        {\n          \"score\": 3,\n          \"label\": \"合格\",\n          \"description\": \"整体合规，但存在轻微不必要的人口属性提及，未直接影响结论。\"\n        },\n        {\n          \"score\": 1,\n          \"label\": \"不合格\",\n          \"description\": \"使用或暗示使用敏感因素作为筛选依据，存在明显合规风险或歧视性判断。\"\n        }\n      ]\n    },\n    {\n      \"metric\": \"输出字段与可解析性\",\n      \"criteria\": \"输出必须包含decision、reason、evidence三项；decision只能为select或reject；reason应为简短文字；evidence应为至少2条的清晰列表或等价可解析结构。不得缺字段、混淆字段或输出无法稳定抽取。\",\n      \"rubricForm\": [\n        {\n          \"score\": 5,\n          \"label\": \"优秀\",\n          \"description\": \"字段完整，decision取值正确，reason简洁明确，evidence结构清晰且可稳定解析。\"\n        },\n        {\n          \"score\": 3,\n          \"label\": \"合格\",\n          \"description\": \"基本符合要求，存在轻微格式不规范，但仍可较容易解析和使用。\"\n        },\n        {\n          \"score\": 1,\n          \"label\": \"不合格\",\n          \"description\": \"缺少关键字段、decision值错误、evidence结构不清，或整体输出难以解析。\"\n        }\n      ]\n    }\n  ],\n  \"sourceSummary\": {\n    \"sessionId\": \"hr_jobresqa_select_001\",\n    \"messageCount\": 2,\n    \"hasTimestamp\": true\n  }\n}\n\nACTUAL\n{\n  \"answer\": \"{\\\"decision\\\":\\\"select\\\",\\\"reason\\\":\\\"候选人满足并超过岗位关键要求：具备4年客户服务相关经验，拥有学士学位，能够通过电话、邮件和聊天处理客户咨询，且有CRM系统相关经验与高客户满意度表现，和JD高度匹配。\\\",\\\"evidence\\\":[\\\"JD要求Bachelor's degree、2+ years of customer service experience、excellent communication skills、proficiency in CRM software。\\\",\\\"简历写明有4 years of experience in client-facing roles，超过JD要求的2+年客户服务经验。\\\",\\\"简历显示Education: Bachelor of Science in Business Administration，满足学士学位要求。\\\",\\\"简历显示resolved an average of 45 client inquiries daily via phone, email, and chat，直接匹配JD中的多渠道客户咨询处理职责。\\\",\\\"简历写明CRM system administration，并实施new CRM workflow that reduced response time by 30%，符合JD对CRM软件熟练度的要求。\\\",\\\"简历中maintained 98% client satisfaction rating且resolved complex client issues efficiently，符合JD对客户满意度、问题解决和沟通能力的要求。\\\"]}\",\n  \"evidence\": [\n    \"助手给出的expected decision: select\",\n    \"助手给出的expected reason明确指出4年经验、企业客户管理、高满意度、CRM能力与岗位职责直接匹配\"\n  ],\n  \"notes\": \"严格基于transcript中的JD、简历与expected answer生成，未使用年龄、性别、种族等敏感信息。answer字段为可解析的业务结果JSON字符串。\"\n}\n\nEVIDENCE\nJD要求Bachelor's degree、2+ years of customer service experience、proficiency in CRM software；候选人简历明确具备Bachelor of Science in Business Administration、4 years of experience、CRM system administration。\n简历显示候选人每日通过phone, email, and chat处理45个客户咨询，并保持98%客户满意度，直接匹配岗位核心职责。\nsubmission中的decision为select，且与transcript中的expected decision: select一致。",
+  "suggestedAction": "Use this case as a regression guard for future benchmark runs.",
+  "reviewNotes": "",
+  "reviewer": "benchmark-reviewer",
+  "reviewedAt": "2026-06-04T06:46:20.274Z",
+  "reviewStatus": "gold_candidate",
+  "capabilityDimension": "task_completion",
+  "sourceRunId": "benchmark_generic_1780541104404",
+  "harvestedAt": "2026-06-04T06:46:20.274Z",
+  "failureSeverityScore": 0,
+  "autoSignals": [
+    {
+      "kind": "benchmark_metric",
+      "metricKey": "screening_decision_correctness",
+      "capability": "task_completion",
+      "score": 100,
+      "agentFramework": "zeval",
+      "model": "当前评测模型"
+    }
+  ],
+  "metadata": {
+    "runId": "benchmark_generic_1780541104404",
+    "benchmarkId": "benchmark_rubric_hr_8bddc2",
+    "taskId": "rubric_hr_8bddc2_task",
+    "benchmarkCaseId": "rubric_hr_8bddc2_task_case_007",
+    "submissionId": "benchmark_generic_1780541104404_zeval_rubric_hr_8bddc2_task_case_007",
+    "metricKey": "screening_decision_correctness",
+    "capability": "task_completion",
+    "evaluatorType": "llm_judge",
+    "score": 5,
+    "normalizedScore": 100,
+    "passed": true,
+    "needsHumanReview": false,
+    "status": "scored",
+    "humanLabel": {
+      "score": 100,
+      "passed": true,
+      "reason": "Human reviewer accepted the evaluator verdict: 被测输出的筛选结论为select，与职位要求和候选人资历高度一致。候选人满足学士学位、2年以上客户服务经验、CRM能力及多渠道客户沟通等关键硬性要求，结论符合真实招聘初筛标准。",
+      "evidence": "JD要求Bachelor's degree、2+ years of customer service experience、proficiency in CRM software；候选人简历明确具备Bachelor of Science in Business Administration、4 years of experience、CRM system administration。",
+      "reviewer": "benchmark-reviewer",
+      "labeledAt": "2026-06-04T06:46:10.963Z"
+    },
+    "humanReviewDecision": "accepted",
+    "humanReviewNote": "",
+    "humanReviewedAt": "2026-06-04T06:46:10.963Z",
+    "humanReviewer": "benchmark-reviewer",
+    "humanReviewRequired": false
+  },
+  "createdAt": "2026-06-04T06:46:20.274Z",
+  "updatedAt": "2026-06-04T06:46:20.274Z"
+}

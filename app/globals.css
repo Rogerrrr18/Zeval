@@ -24,29 +24,6 @@
   --zeval-focus: 0 0 0 3px rgb(14 116 144 / 0.16);
 }
 
-html[data-theme="dark"] {
-  --background: #030712;
-  --foreground: #eef5ff;
-  --zeval-bg: #030712;
-  --zeval-bg-2: #050b18;
-  --zeval-panel: rgb(8 13 27 / 0.82);
-  --zeval-panel-strong: rgb(15 23 42 / 0.92);
-  --zeval-panel-soft: rgb(15 23 42 / 0.56);
-  --zeval-line: rgb(148 163 184 / 0.16);
-  --zeval-line-strong: rgb(103 232 249 / 0.32);
-  --zeval-text: #f8fbff;
-  --zeval-text-2: #b7c4d8;
-  --zeval-muted: #708197;
-  --zeval-cyan: #67e8f9;
-  --zeval-blue: #60a5fa;
-  --zeval-teal: #2dd4bf;
-  --zeval-success: #22c55e;
-  --zeval-warning: #fbbf24;
-  --zeval-danger: #fb7185;
-  --zeval-shadow: 0 22px 70px rgb(0 0 0 / 0.28);
-  --zeval-focus: 0 0 0 3px rgb(103 232 249 / 0.18);
-}
-
 html[data-theme="light"] {
   --background: #f7f9fc;
   --foreground: #0f172a;
@@ -156,35 +133,6 @@ textarea {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(14 116 144 / 0.5);
-}
-
-/* Dark mode: applied globally via data-theme on <html> from chat theme toggle */
-html[data-theme="dark"] {
-  color-scheme: dark;
-}
-
-html[data-theme="dark"] body {
-  background:
-    radial-gradient(circle at 12% -8%, rgb(103 232 249 / 0.08), transparent 28rem),
-    radial-gradient(circle at 88% 0%, rgb(45 212 191 / 0.06), transparent 26rem),
-    linear-gradient(rgb(103 232 249 / 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(103 232 249 / 0.025) 1px, transparent 1px),
-    #030712;
-  background-size: auto, auto, 44px 44px, 44px 44px, auto;
-  color: var(--zeval-text);
-}
-
-html[data-theme="dark"] * {
-  scrollbar-color: rgb(103 232 249 / 0.36) rgb(15 23 42 / 0.45);
-}
-
-html[data-theme="dark"] ::-webkit-scrollbar-track {
-  background: rgb(15 23 42 / 0.42);
-}
-
-html[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  border-color: rgb(15 23 42 / 0.42);
-  background: rgb(103 232 249 / 0.34);
 }
 
 html[data-theme="light"] body {

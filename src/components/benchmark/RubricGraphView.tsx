@@ -12,7 +12,7 @@
 
 import { useMemo, useRef, useState, useEffect } from "react";
 import type { BenchmarkRubricMetric, BenchmarkRubricModule, BenchmarkRubricSet } from "@/benchmark/types";
-import styles from "./benchmarkConsole.module.css";
+import styles from "./rubricGraphView.module.css";
 
 /* ── Types ──────────────────────────────────────────────────────────── */
 

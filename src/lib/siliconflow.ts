@@ -38,10 +38,14 @@ type SiliconFlowLogContext = {
   runId?: string;
   sessionId?: string;
   segmentId?: string;
+  /** Optional per-stage model override. */
+  model?: string;
   /** Override default judge temperature for deterministic extraction stages. */
   temperature?: number;
   /** Optional seed for deterministic outputs (intent extraction, etc.). */
   seed?: number;
+  /** Provider-specific request extensions, for example search/deep-research flags. */
+  providerOptions?: Record<string, unknown>;
 };
 
 /**
@@ -57,8 +61,9 @@ export async function requestSiliconFlowChatCompletion(
   const config = getSiliconFlowRuntimeConfig();
   const apiKey = config.apiKey;
   const baseUrl = config.baseUrl;
-  const modelVariants = buildModelVariants(config.model);
-  const providerRequestVariants = buildProviderRequestVariants(config.model, messages);
+  const primaryModel = context.model?.trim() || config.model;
+  const modelVariants = buildModelVariants(primaryModel);
+  const providerRequestVariants = buildProviderRequestVariants(primaryModel, messages);
 
   if (!isUsableApiKey(apiKey)) {
     throw new Error("未配置有效的 ZEVAL_JUDGE_API_KEY / SILICONFLOW_API_KEY，请不要使用 YOUR_API_KEY_HERE 占位符。");
@@ -109,6 +114,7 @@ export async function requestSiliconFlowChatCompletion(
         top_p: ZEVAL_JUDGE_TOP_P,
         max_tokens: ZEVAL_JUDGE_MAX_TOKENS,
         ...(jsonModeEnabled ? { response_format: { type: "json_object" } } : {}),
+        ...(context.providerOptions ?? {}),
       };
       if (typeof context.seed === "number") {
         requestBody.seed = context.seed;

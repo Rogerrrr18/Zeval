@@ -97,7 +97,14 @@ export async function listOnlineEvalRuns(): Promise<OnlineEvalRunSummary[]> {
         const text = await readFile(path.join(RUNS_DIR, file), "utf8");
         const record = JSON.parse(text) as OnlineEvalRunRecord;
         // Strip the large evaluate payload before returning.
-        const { evaluate: _evaluate, ...summary } = record;
+        const summary: OnlineEvalRunSummary = {
+          runId: record.runId,
+          createdAt: record.createdAt,
+          replyEndpoint: record.replyEndpoint,
+          replayedRowCount: record.replayedRowCount,
+          baselineRunId: record.baselineRunId,
+          sampleBatchId: record.sampleBatchId,
+        };
         summaries.push(summary);
       } catch {
         // Skip corrupted files.

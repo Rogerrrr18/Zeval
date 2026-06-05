@@ -10,8 +10,6 @@
  */
 
 import type {
-  BenchmarkCapabilityScore,
-  BenchmarkLeaderboardRow,
   BenchmarkMetricEvaluationResult,
   BenchmarkRunResult,
 } from "@/benchmark/types";
@@ -127,12 +125,7 @@ function generateLeaderboardReport(result: BenchmarkRunResult, format: string): 
     ``,
     `| 排名 | Agent 框架 | 模型 | 平均分数 | 通过率 | 案例数 |`,
     `|------|-----------|------|---------|--------|--------|`,
-    ...board.map((row, i) => {
-      const capScores = row.capabilityScores
-        .map((c) => `${c.capability}: ${(c.score * 100).toFixed(0)}%`)
-        .join(", ");
-      return `| ${i + 1} | ${row.agentFramework} | ${row.model} | ${(row.averageScore * 100).toFixed(1)}% | ${(row.passRate * 100).toFixed(1)}% | ${row.caseCount} |`;
-    }),
+    ...board.map((row, i) => `| ${i + 1} | ${row.agentFramework} | ${row.model} | ${(row.averageScore * 100).toFixed(1)}% | ${(row.passRate * 100).toFixed(1)}% | ${row.caseCount} |`),
     ``,
     "## 能力维度明细",
     ...board.flatMap((row) => [

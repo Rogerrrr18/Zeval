@@ -10,10 +10,8 @@
 import type {
   BenchmarkAgentSubmission,
   BenchmarkCase,
-  BenchmarkCapabilityDimension,
   BenchmarkMetricEvaluationResult,
   BenchmarkRubricMetric,
-  BenchmarkRunResult,
   BenchmarkTaskPackage,
 } from "@/benchmark/types";
 

@@ -49,7 +49,14 @@ export async function POST(request: Request) {
     const candidates = buildBenchmarkDatasetCaseCandidatesFromReviews(
       parsedBody.data.runResult as BenchmarkRunResult,
       reviews,
-    );
+    ).map((candidate) => ({
+      ...candidate,
+      metadata: {
+        ...candidate.metadata,
+        projectId: context.projectId,
+        workspaceId: context.workspaceId,
+      },
+    }));
     const persisted = await persistBenchmarkDatasetCases(
       store,
       candidates,
@@ -64,6 +71,7 @@ export async function POST(request: Request) {
       acceptedBySource,
       admittedCases: persisted.admittedCases,
       candidateCount: candidates.length,
+      projectId: context.projectId,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

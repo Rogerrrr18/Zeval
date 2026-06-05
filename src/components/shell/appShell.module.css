@@ -34,7 +34,7 @@
 .brandRow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   min-height: 42px;
   padding: 0 4px 10px;
@@ -167,86 +167,6 @@
   border-top: 1px solid var(--zeval-line);
   display: grid;
   gap: 8px;
-}
-
-.themeSwitch {
-  position: relative;
-  width: 58px;
-  height: 30px;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 7px;
-  border: 1px solid var(--zeval-line);
-  border-radius: 999px;
-  background: rgb(148 163 184 / 0.08);
-  color: var(--zeval-text-2);
-  cursor: pointer;
-  transition: border-color 160ms ease, background-color 160ms ease;
-}
-
-.themeSwitch:hover {
-  border-color: var(--zeval-line-strong);
-  background: rgb(148 163 184 / 0.12);
-}
-
-.themeSwitch:focus-visible {
-  outline: 2px solid rgb(103 232 249 / 0.5);
-  outline-offset: 3px;
-}
-
-.themeGlyph {
-  position: relative;
-  z-index: 2;
-  width: 16px;
-  height: 16px;
-  display: inline-grid;
-  place-items: center;
-  color: rgb(148 163 184 / 0.78);
-  transition: color 160ms ease;
-}
-
-.themeGlyph svg {
-  width: 16px;
-  height: 16px;
-  overflow: visible;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.themeGlyphSun svg circle,
-.themeGlyphMoon svg path {
-  fill: currentColor;
-  stroke-width: 1.7;
-}
-
-.themeThumb {
-  position: absolute;
-  z-index: 1;
-  top: 3px;
-  left: 3px;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: rgb(248 250 252 / 0.9);
-  transition: transform 180ms ease, background-color 180ms ease;
-}
-
-.themeSwitchDark .themeThumb {
-  transform: translateX(28px);
-  background: rgb(15 23 42 / 0.9);
-}
-
-.themeSwitch:not(.themeSwitchDark) .themeGlyphSun {
-  color: #f59e0b;
-}
-
-.themeSwitchDark .themeGlyphMoon {
-  color: #93c5fd;
 }
 
 .homeLink {
@@ -459,11 +379,6 @@
     display: none;
   }
 
-  .brandRow {
-    justify-content: flex-end;
-    min-height: 34px;
-  }
-
   .navLink {
     font-size: 12px;
   }
@@ -544,15 +459,5 @@
 :global(html[data-theme="light"]) .homeLink:hover {
   border-color: var(--zeval-line-strong);
   color: var(--zeval-text);
-  background: rgb(8 145 178 / 0.07);
-}
-
-:global(html[data-theme="light"]) .themeSwitch {
-  border-color: var(--zeval-line);
-  background: rgb(15 23 42 / 0.04);
-}
-
-:global(html[data-theme="light"]) .themeSwitch:hover {
-  border-color: var(--zeval-line-strong);
   background: rgb(8 145 178 / 0.07);
 }

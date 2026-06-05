@@ -16,7 +16,6 @@ import type { DatasetStore } from "../src/eval-datasets/storage/dataset-store.ts
 import type {
   DatasetBaselineRecord,
   DatasetCaseRecord,
-  DatasetRunResultRecord,
   DuplicateCheckResult,
   SampleBatchRecord,
 } from "../src/eval-datasets/storage/types.ts";
@@ -39,7 +38,6 @@ const { jaccardTranscriptSimilarity } = resolveInteropModule(transcriptHashModul
 // ── Colours ───────────────────────────────────────────────────────────────────
 const GREEN = "\x1b[32m";
 const RED = "\x1b[31m";
-const YELLOW = "\x1b[33m";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 
@@ -61,17 +59,6 @@ function assert(label: string, actual: unknown, expected: unknown): void {
   }
 }
 
-function assertGte(label: string, actual: number, min: number): void {
-  const ok = actual >= min;
-  if (ok) {
-    console.log(`  ${GREEN}✔${RESET} ${label} (${actual} >= ${min})`);
-    passed++;
-  } else {
-    console.error(`  ${RED}✘ ${label}${RESET}: expected >= ${min}, got ${actual}`);
-    failed++;
-  }
-}
-
 // ── In-memory mock DatasetStore ───────────────────────────────────────────────
 
 function createMockStore(): DatasetStore & { cases: DatasetCaseRecord[] } {
@@ -85,8 +72,8 @@ function createMockStore(): DatasetStore & { cases: DatasetCaseRecord[] } {
       const idx = cases.findIndex((c) => c.caseId === record.caseId);
       if (idx >= 0) cases[idx] = record;
     },
-    async saveBaseline(_record: DatasetBaselineRecord) {},
-    async getBaseline(_caseId: string): Promise<DatasetBaselineRecord | null> {
+    async saveBaseline() {},
+    async getBaseline(): Promise<DatasetBaselineRecord | null> {
       return null;
     },
     async getCaseById(caseId: string): Promise<DatasetCaseRecord | null> {
@@ -95,16 +82,12 @@ function createMockStore(): DatasetStore & { cases: DatasetCaseRecord[] } {
     async listCases(): Promise<DatasetCaseRecord[]> {
       return [...cases];
     },
-    async checkDuplicate(_input: {
-      normalizedTranscriptHash: string;
-      topicLabel: string;
-      baselineCaseScore: number;
-    }): Promise<DuplicateCheckResult> {
+    async checkDuplicate(): Promise<DuplicateCheckResult> {
       return { isDuplicate: false, reason: "none" };
     },
-    async saveRunResult(_record: DatasetRunResultRecord) {},
-    async saveSampleBatch(_record: SampleBatchRecord) {},
-    async getSampleBatch(_id: string): Promise<SampleBatchRecord | null> {
+    async saveRunResult() {},
+    async saveSampleBatch() {},
+    async getSampleBatch(): Promise<SampleBatchRecord | null> {
       return null;
     },
     async listSampleBatches(): Promise<SampleBatchRecord[]> {

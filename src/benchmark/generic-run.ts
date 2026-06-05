@@ -203,6 +203,7 @@ function buildCasesFromDataset(task: BenchmarkTaskPackage, dataset: BenchmarkDat
       metric: metric.displayName,
       criteria: metric.config?.criteria ?? metric.description,
       rubricForm: metric.config?.rubricForm ?? [],
+      references: metric.config?.references ?? [],
     })),
   );
 
@@ -535,6 +536,7 @@ function createLlmJudge(): BenchmarkLlmJudge {
               description: metric.description,
               criteria: metric.config?.criteria,
               rubricForm: metric.config?.rubricForm,
+              references: metric.config?.references ?? [],
               scale: metric.scale,
             },
             caseInput: taskCase.input,

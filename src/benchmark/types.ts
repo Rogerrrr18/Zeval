@@ -56,6 +56,28 @@ export type BenchmarkRubricScoreLevel = {
   description: string;
 };
 
+export type BenchmarkReferenceSourceType =
+  | "paper"
+  | "public_benchmark"
+  | "standard"
+  | "dataset"
+  | "framework"
+  | "documentation"
+  | "research_report";
+
+export type BenchmarkMetricReference = {
+  referenceId?: string;
+  title: string;
+  sourceType: BenchmarkReferenceSourceType;
+  url?: string;
+  authors?: string[];
+  publisher?: string;
+  year?: number;
+  benchmarkName?: string;
+  relevance: string;
+  confidence?: number;
+};
+
 export type BenchmarkEvaluatorConfig = {
   /**
    * Dot path into the normalized agent output. Example: "parsed.decision".
@@ -89,6 +111,10 @@ export type BenchmarkEvaluatorConfig = {
    * Structured scoring form shown to users and used as judge guidance.
    */
   rubricForm?: BenchmarkRubricScoreLevel[];
+  /**
+   * Papers, public benchmarks, standards, or frameworks that justify this metric.
+   */
+  references?: BenchmarkMetricReference[];
   /**
    * Child metric keys for hybrid metrics.
    */
@@ -127,6 +153,7 @@ export type BenchmarkRubricSet = {
   modules: BenchmarkRubricModule[];
   generatedBy: "copilot" | "human" | "template" | "imported";
   approvalStatus: BenchmarkRubricApprovalStatus;
+  researchSummary?: string;
   createdAt: string;
   updatedAt: string;
 };

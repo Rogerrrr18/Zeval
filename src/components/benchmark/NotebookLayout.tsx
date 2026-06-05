@@ -29,6 +29,7 @@ import Link from "next/link";
 import type {
   BenchmarkCaseScore,
   BenchmarkMetricEvaluationResult,
+  BenchmarkMetricReference,
   BenchmarkRubricMetric,
   BenchmarkRubricScoreLevel,
   BenchmarkRubricSet,
@@ -247,6 +248,42 @@ function defaultMetricRubricForm(metric: BenchmarkRubricMetric): BenchmarkRubric
     { score: 3, label: "合格", description: `基本满足「${name}」要求，但存在轻微遗漏或表达不够充分。` },
     { score: 1, label: "不合格", description: `未能满足「${name}」核心要求，存在关键错误、缺失或无证据支撑。` },
   ];
+}
+
+function metricReferences(metric: BenchmarkRubricMetric): BenchmarkMetricReference[] {
+  return metric.config?.references ?? [];
+}
+
+function countUniqueMetricReferences(metrics: BenchmarkRubricMetric[]): number {
+  return new Set(
+    metrics.flatMap((metric) =>
+      metricReferences(metric).map((reference) =>
+        (reference.referenceId ?? reference.url ?? reference.title).trim().toLowerCase(),
+      ),
+    ),
+  ).size;
+}
+
+function referenceSourceDisplayName(sourceType: BenchmarkMetricReference["sourceType"]): string {
+  const names: Record<BenchmarkMetricReference["sourceType"], string> = {
+    paper: "论文",
+    public_benchmark: "公开 Benchmark",
+    standard: "标准",
+    dataset: "数据集",
+    framework: "框架",
+    documentation: "文档",
+    research_report: "研究报告",
+  };
+  return names[sourceType] ?? "来源";
+}
+
+function referenceMeta(reference: BenchmarkMetricReference): string {
+  return [
+    referenceSourceDisplayName(reference.sourceType),
+    reference.benchmarkName,
+    reference.publisher,
+    reference.year ? String(reference.year) : "",
+  ].filter(Boolean).join(" · ");
 }
 
 function localizeRubricForDisplay(rubric: BenchmarkRubricSet): BenchmarkRubricSet {
@@ -1189,6 +1226,7 @@ export function NotebookLayout() {
             )}
             {viewMode === "result" && runResult && (
               <ResultWorkspace
+                projectId={activeProjectId}
                 result={runResult}
                 rubric={rubric}
                 history={runHistory}
@@ -1470,6 +1508,7 @@ function RubricWorkspace(props: {
   const metrics = props.rubric?.modules.flatMap((m) => m.metrics) ?? [];
   const approvedMetrics = metrics.filter((m) => m.approvalStatus === "approved");
   const approvedMetricKeys = approvedMetrics.map((metric) => metric.metricKey);
+  const referenceCount = countUniqueMetricReferences(metrics);
   const reviewedMetricKeys = new Set(approvedMetricKeys);
   const activeMetric = metrics.find((metric) => metric.metricKey === highlightedMetricKey) ?? metrics[0] ?? null;
 
@@ -1522,10 +1561,14 @@ function RubricWorkspace(props: {
             <div>
               <h2>{props.rubric.title}</h2>
               <p>{props.rubric.description}</p>
+              {props.rubric.researchSummary && (
+                <p className={styles.rubricResearchSummary}>{props.rubric.researchSummary}</p>
+              )}
             </div>
             <div className={styles.rubricHeaderMeta}>
               <span>{props.rubric.modules.length} 个能力维度</span>
               <span>{approvedMetrics.length} / {metrics.length} 项指标已确认</span>
+              <span>{referenceCount} 个参考来源</span>
             </div>
           </div>
 
@@ -1735,6 +1778,7 @@ function MetricCard(props: {
   const [weightDraft, setWeightDraft] = useState(String(props.metric.weight));
   const { metric } = props;
   const approved = metric.approvalStatus === "approved";
+  const references = metricReferences(metric);
 
   function commitWeight() {
     const next = clampMetricWeight(Number(weightDraft));
@@ -1758,6 +1802,7 @@ function MetricCard(props: {
         <div className={styles.metricCardFooter}>
           <span>{evaluatorDisplayName(metric.evaluatorType)}</span>
           <span>阈值 {metric.scale.passThreshold}</span>
+          {references.length > 0 && <span>依据 {references.length}</span>}
         </div>
       </div>
       <div className={styles.metricActions} onClick={(event) => event.stopPropagation()}>
@@ -1820,6 +1865,7 @@ function MetricInspector(props: {
   const { metric } = props;
   const approved = metric.approvalStatus === "approved";
   const rubricForm = metric.config?.rubricForm?.length ? metric.config.rubricForm : defaultMetricRubricForm(metric);
+  const references = metricReferences(metric);
 
   function commitWeight() {
     const next = clampMetricWeight(Number(weightDraft));
@@ -1866,7 +1912,10 @@ function MetricInspector(props: {
         <span>分值 {metric.scale.min}-{metric.scale.max}</span>
         <span>阈值 {metric.scale.passThreshold}</span>
         <span>{metric.evidenceRequired ? "需要证据" : "无需证据"}</span>
+        <span>{references.length > 0 ? `依据 ${references.length}` : "依据待补充"}</span>
       </div>
+
+      <MetricReferenceList references={references} />
 
       <div className={styles.metricInspectorWeight}>
         <strong>权重</strong>
@@ -2021,6 +2070,47 @@ function MetricInspector(props: {
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricReferenceList(props: { references: BenchmarkMetricReference[] }) {
+  if (props.references.length === 0) {
+    return (
+      <div className={styles.metricReferencePanel}>
+        <div className={styles.metricReferenceHeader}>
+          <strong>参考依据</strong>
+          <span>待补充</span>
+        </div>
+        <p className={styles.metricReferenceEmpty}>该指标还没有绑定论文、公开 benchmark 或标准来源。</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.metricReferencePanel}>
+      <div className={styles.metricReferenceHeader}>
+        <strong>参考依据</strong>
+        <span>{props.references.length} 项</span>
+      </div>
+      <div className={styles.metricReferenceList}>
+        {props.references.map((reference, index) => (
+          <article key={`${reference.referenceId ?? reference.title}-${index}`} className={styles.metricReferenceItem}>
+            <div className={styles.metricReferenceItemHeader}>
+              {reference.url ? (
+                <a href={reference.url} target="_blank" rel="noreferrer">
+                  {reference.referenceId ?? reference.title}
+                </a>
+              ) : (
+                <strong>{reference.referenceId ?? reference.title}</strong>
+              )}
+              <span>{referenceMeta(reference)}</span>
+            </div>
+            <div className={styles.metricReferenceTitle}>{reference.title}</div>
+            <p>{reference.relevance}</p>
+          </article>
+        ))}
       </div>
     </div>
   );
@@ -2221,6 +2311,7 @@ function buildNextRunHistory(
 }
 
 function ResultWorkspace(props: {
+  projectId: string;
   result: BenchmarkRunResult;
   rubric: BenchmarkRubricSet | null;
   history: BenchmarkRunHistoryItem[];
@@ -2288,7 +2379,10 @@ function ResultWorkspace(props: {
     try {
       const response = await fetch("/api/benchmarks/admit-cases", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-zeval-project-id": props.projectId,
+        },
         body: JSON.stringify({
           baselineVersion: props.result.runId,
           runResult: props.result,

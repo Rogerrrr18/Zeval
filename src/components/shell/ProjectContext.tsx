@@ -3,7 +3,7 @@
  *
  * Wraps the localStorage project store so every component can read/switch the
  * active project without prop drilling.  Also syncs the cookie on mount so the
- * Next.js middleware always has the latest project ID.
+ * Next.js edge proxy always has the latest project ID.
  */
 
 "use client";
@@ -59,13 +59,20 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   const [activeProjectId, setActiveProjectIdState] = useState<string>(DEFAULT_PROJECT.id);
 
   useEffect(() => {
-    const storedProjects = listProjects();
-    const storedId = getActiveProjectId();
-    setProjects(storedProjects);
-    setActiveProjectIdState(storedId);
-    // Sync cookie so the Next.js middleware always has the latest project ID.
-    setActiveProjectId(storedId);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      const storedProjects = listProjects();
+      const storedId = getActiveProjectId();
+      setProjects(storedProjects);
+      setActiveProjectIdState(storedId);
+      // Sync cookie so the Next.js edge proxy always has the latest project ID.
+      setActiveProjectId(storedId);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const activeProject = projects.find((p) => p.id === activeProjectId) ?? projects[0] ?? DEFAULT_PROJECT;
 

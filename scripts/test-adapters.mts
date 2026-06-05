@@ -5,7 +5,7 @@
  */
 
 import { getHrAdapter } from "../src/benchmark/adapters/index";
-import type { BenchmarkCase } from "../src/benchmark/types";
+import type { AgentFrameworkId, BenchmarkCase } from "../src/benchmark/types";
 
 const testCase: BenchmarkCase = {
   caseId: "hr_test_001",
@@ -20,14 +20,18 @@ const testCase: BenchmarkCase = {
 };
 
 const config = {
-  apiKey: "sk-DcsnRTU8nKykcKt10Vc5RdIaRRvWNNf0VE8q9xqcCFmPwRWJ",
-  baseUrl: "http://www.opcrouter.online",
+  apiKey: process.env.ZEVAL_AGENT_API_KEY ?? "",
+  baseUrl: process.env.ZEVAL_AGENT_BASE_URL ?? "",
   timeoutMs: 60000,
   maxRetries: 2,
 };
 
 async function test() {
-  const frameworks = [
+  if (!config.apiKey || !config.baseUrl) {
+    throw new Error("请先设置 ZEVAL_AGENT_API_KEY 和 ZEVAL_AGENT_BASE_URL 再运行 adapter 集成测试。");
+  }
+
+  const frameworks: Array<{ id: AgentFrameworkId; model: string }> = [
     { id: "claude_code", model: "deepseek-v4-flash" },
     { id: "codex", model: "gpt-5.5" },
     { id: "hermes", model: "mimo-v2-flash" },
@@ -47,7 +51,7 @@ async function test() {
         benchmarkId: "test",
         taskId: "test",
         matrixCell: {
-          agentFramework: fw.id as any,
+          agentFramework: fw.id,
           model: fw.model,
           enabled: true,
         },

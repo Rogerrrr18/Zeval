@@ -10,10 +10,13 @@ import {
 import type {
   BenchmarkCapabilityDimension,
   BenchmarkDomain,
+  BenchmarkEvaluatorConfig,
+  BenchmarkMetricReference,
   BenchmarkRubricMetric,
   BenchmarkRubricModule,
   BenchmarkRubricSet,
 } from "@/benchmark/types";
+import { cloneMetricReferences } from "@/benchmark/reference-catalog";
 
 const EVALUATOR_LABELS_ZH: Record<string, string> = {
   exact_match: "精确匹配",
@@ -60,6 +63,7 @@ export function buildRubricDraftFromRequirement(input: BuildRubricDraftInput): B
     modules,
     generatedBy: "template",
     approvalStatus: "candidate",
+    researchSummary: "指标体系参考 HELM、BIG-bench、MT-Bench、IFEval、RAGAS、ToolBench、AgentBench、NIST AI RMF 等公开论文、benchmark 与标准，并按当前任务需求选择能力维度。",
     createdAt: now,
     updatedAt: now,
   };
@@ -185,7 +189,7 @@ function cloneMetric(metric: BenchmarkRubricMetric): BenchmarkRubricMetric {
   return {
     ...metric,
     scale: { ...metric.scale },
-    config: metric.config ? { ...metric.config } : undefined,
+    config: cloneEvaluatorConfig(metric.config),
     failureTags: [...metric.failureTags],
   };
 }
@@ -209,7 +213,7 @@ export function cloneRubric(rubric: BenchmarkRubricSet): BenchmarkRubricSet {
       metrics: module.metrics.map((metric) => ({
         ...metric,
         scale: { ...metric.scale },
-        config: metric.config ? { ...metric.config } : undefined,
+        config: cloneEvaluatorConfig(metric.config),
         failureTags: [...metric.failureTags],
       })),
     })),
@@ -268,9 +272,14 @@ export function renderRubricReviewMarkdown(rubric: BenchmarkRubricSet): string {
     "",
     rubric.description,
     "",
+  ];
+  if (rubric.researchSummary) {
+    lines.push(`依据摘要：${rubric.researchSummary}`, "");
+  }
+  lines.push(
     `状态：${rubric.approvalStatus === "approved" ? "已确认" : rubric.approvalStatus === "rejected" ? "已拒绝" : "待确认"}`,
     "",
-  ];
+  );
 
   for (const rubricModule of rubric.modules) {
     lines.push(`## ${rubricModule.displayName}`);
@@ -282,9 +291,33 @@ export function renderRubricReviewMarkdown(rubric: BenchmarkRubricSet): string {
       lines.push(`  - 评估方式：${EVALUATOR_LABELS_ZH[metric.evaluatorType] ?? metric.evaluatorType}`);
       lines.push(`  - 权重：${metric.weight}`);
       lines.push(`  - 说明：${metric.description}`);
+      const referenceLine = formatMetricReferences(metric.config?.references);
+      if (referenceLine) lines.push(`  - 参考依据：${referenceLine}`);
     }
     lines.push("");
   }
 
   return lines.join("\n");
+}
+
+function cloneEvaluatorConfig(config: BenchmarkEvaluatorConfig | undefined): BenchmarkEvaluatorConfig | undefined {
+  if (!config) return undefined;
+  return {
+    ...config,
+    rubricForm: config.rubricForm ? config.rubricForm.map((level) => ({ ...level })) : undefined,
+    references: cloneMetricReferences(config.references),
+    childMetricKeys: config.childMetricKeys ? [...config.childMetricKeys] : undefined,
+  };
+}
+
+function formatMetricReferences(references: BenchmarkMetricReference[] | undefined): string {
+  if (!references?.length) return "";
+  return references
+    .slice(0, 3)
+    .map((reference) => {
+      const label = reference.referenceId ?? reference.benchmarkName ?? reference.title;
+      const year = reference.year ? `, ${reference.year}` : "";
+      return `${label}${year}`;
+    })
+    .join("；");
 }

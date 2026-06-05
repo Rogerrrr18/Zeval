@@ -9,7 +9,7 @@
  * - 内容提取（文本文件直接读取，未来可扩展为向量化检索）
  */
 
-import { mkdir, readdir, readFile, stat, writeFile, unlink } from "node:fs/promises";
+import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 
 const KNOWLEDGE_BASE_ROOT = path.join("artifacts", "knowledge-base");

@@ -11,26 +11,65 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { BadCaseCluster } from "@/badcase/types";
+import { BENCHMARK_CAPABILITIES } from "@/benchmark/capabilities";
 import { AppShell } from "@/components/shell";
+import { useProject } from "@/components/shell/ProjectContext";
 import type { DatasetCaseRecord, DatasetCaseReviewStatus, DatasetCaseSource } from "@/eval-datasets/storage/types";
+import { DEFAULT_PROJECT, type Project } from "@/lib/projectStore";
 import styles from "./datasetConsole.module.css";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const DATASET_SNAPSHOT_KEY = "zeval.datasets.snapshot.v2";
 
+function datasetSnapshotKey(projectId: string): string {
+  return `${DATASET_SNAPSHOT_KEY}:${projectId}`;
+}
+
 /** Chinese display labels for each admission source. */
 const SOURCE_LABELS: Record<DatasetCaseSource, string> = {
-  auto_tp:          "自动识别-坏案例",
-  auto_fn:          "漏报识别-坏案例",
-  auto_tn:          "抽样-金标正例",
-  auto_uncertainty: "边界案例-待确认",
-  auto_disagreement:"评估器分歧-待确认",
-  manual_gold:      "人工确认-金标",
-  manual_fp:        "人工复审-正例",
+  auto_tp:          "自动识别：坏案例",
+  auto_fn:          "漏报识别：坏案例",
+  auto_tn:          "抽样：金标正例",
+  auto_uncertainty: "边界案例：待确认",
+  auto_disagreement:"评估器分歧：待确认",
+  manual_gold:      "人工确认：金标",
+  manual_fp:        "人工复审：正例",
   synthesized:      "合成样本",
   imported:         "外部导入",
+};
+
+const REVIEW_STATUS_LABELS: Record<DatasetCaseReviewStatus, string> = {
+  auto_captured: "自动捕获",
+  human_reviewed: "人工已审",
+  gold_candidate: "金标候选",
+  gold: "正式金标",
+  regression_active: "回归启用",
+};
+
+const CAPABILITY_NAME_ZH: Record<string, string> = Object.fromEntries(
+  BENCHMARK_CAPABILITIES.map((item) => [item.capability, item.displayName]),
+);
+
+const METRIC_NAME_ZH: Record<string, string> = {
+  task_success: "任务完成度",
+  decision_accuracy: "筛选决策准确率",
+  entity_f1: "关键信息覆盖率",
+  output_schema_valid: "输出格式合规性",
+  reason_alignment: "理由一致性",
+  citation_accuracy: "证据准确性",
+  tool_call_success: "工具调用成功率",
+  runtime_within_budget: "运行效率达标率",
+  policy_safe: "安全与合规性",
+  business_acceptance: "业务可接受度",
+};
+
+const SEVERITY_LABELS: Record<string, string> = {
+  critical: "严重",
+  high: "高",
+  medium: "中",
+  low: "低",
+  info: "提示",
 };
 
 const SOURCE_COLOR: Record<DatasetCaseSource, string> = {
@@ -45,14 +84,6 @@ const SOURCE_COLOR: Record<DatasetCaseSource, string> = {
   imported:         "#6b7280",
 };
 
-const CASE_REVIEW_STATUS_OPTIONS: DatasetCaseReviewStatus[] = [
-  "auto_captured",
-  "human_reviewed",
-  "gold_candidate",
-  "gold",
-  "regression_active",
-];
-
 /**
  * Statuses that indicate a case has cleared the human-review gate and is
  * eligible to participate in benchmark regression runs.
@@ -65,19 +96,23 @@ const POOL_ACTIVE_STATUSES: DatasetCaseReviewStatus[] = [
   "regression_active",
 ];
 
-type Tab = "pool" | "pending";
+type Tab = "pending" | "pool" | "gold";
 
 // ── Response shapes ────────────────────────────────────────────────────────
 
-type ClusterResponse  = { clusters: BadCaseCluster[]; totalCases: number; totalClusters: number };
 type CaseListResponse = { cases: DatasetCaseRecord[]; count: number };
 
 type DatasetSnapshot = {
-  clusters: BadCaseCluster[];
   poolCases: DatasetCaseRecord[];
   pendingCases: DatasetCaseRecord[];
-  selectedScenarioId: string;
+  selectedCapabilityDimension: string;
   notice: string;
+};
+
+type ProjectDatasetStats = {
+  poolCount: number;
+  goldCount: number;
+  pendingCount: number;
 };
 
 // ── Root component ─────────────────────────────────────────────────────────
@@ -86,71 +121,85 @@ type DatasetSnapshot = {
  * Render the dataset browsing + calibration console.
  */
 export function DatasetConsole() {
+  const { projects, activeProject, activeProjectId, switchProject, createProject, deleteProject } = useProject();
   const snapshotHydratedRef = useRef(false);
-  const [clusters, setClusters]               = useState<BadCaseCluster[]>([]);
   const [poolCases, setPoolCases]             = useState<DatasetCaseRecord[]>([]);
   const [pendingCases, setPendingCases]       = useState<DatasetCaseRecord[]>([]);
   const [loading, setLoading]                 = useState(false);
   const [actionCaseId, setActionCaseId]       = useState("");
   const [error, setError]                     = useState("");
   const [notice, setNotice]                   = useState("");
-  const [selectedScenarioId, setSelectedScenarioId] = useState("");
+  const [projectStats, setProjectStats]       = useState<Record<string, ProjectDatasetStats>>({});
+  const [projectStatsLoading, setProjectStatsLoading] = useState(false);
   const [selectedCapabilityDimension, setSelectedCapabilityDimension] = useState("");
-  const [activeTab, setActiveTab]             = useState<Tab>("pool");
+  const [activeTab, setActiveTab]             = useState<Tab>("gold");
+  const [selectedCaseId, setSelectedCaseId]   = useState("");
   // Locally dismissed pending cases (session-only, not persisted).
   const [dismissedIds, setDismissedIds]       = useState<Set<string>>(new Set());
+  const projectHeaders = useMemo(
+    () => ({ "x-zeval-project-id": activeProjectId }),
+    [activeProjectId],
+  );
 
   // ── Snapshot hydration ──────────────────────────────────────────────────
   useEffect(() => {
-    const raw = window.localStorage.getItem(DATASET_SNAPSHOT_KEY);
+    snapshotHydratedRef.current = false;
+    setPoolCases([]);
+    setPendingCases([]);
+    setSelectedCapabilityDimension("");
+    setSelectedCaseId("");
+    setNotice("");
+    setDismissedIds(new Set());
+
+    const raw = window.localStorage.getItem(datasetSnapshotKey(activeProjectId));
     if (!raw) { snapshotHydratedRef.current = true; return; }
     try {
       const snap = JSON.parse(raw) as DatasetSnapshot;
-      setClusters(snap.clusters ?? []);
       setPoolCases(snap.poolCases ?? []);
       setPendingCases(snap.pendingCases ?? []);
-      setSelectedScenarioId(snap.selectedScenarioId ?? "");
+      setSelectedCapabilityDimension(snap.selectedCapabilityDimension ?? "");
       setNotice(snap.notice ?? "");
     } catch {
-      window.localStorage.removeItem(DATASET_SNAPSHOT_KEY);
+      window.localStorage.removeItem(datasetSnapshotKey(activeProjectId));
     } finally {
       snapshotHydratedRef.current = true;
     }
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => {
     if (!snapshotHydratedRef.current) return;
-    const snap: DatasetSnapshot = { clusters, poolCases, pendingCases, selectedScenarioId, notice };
-    window.localStorage.setItem(DATASET_SNAPSHOT_KEY, JSON.stringify(snap));
-  }, [clusters, poolCases, pendingCases, selectedScenarioId, notice]);
+    const snap: DatasetSnapshot = {
+      poolCases,
+      pendingCases,
+      selectedCapabilityDimension,
+      notice,
+    };
+    window.localStorage.setItem(datasetSnapshotKey(activeProjectId), JSON.stringify(snap));
+  }, [activeProjectId, poolCases, pendingCases, selectedCapabilityDimension, notice]);
 
   // ── Data loading ────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [clusterRes, poolRes, fnRes, ucRes] = await Promise.all([
-        fetch("/api/eval-datasets/clusters"),
+      const [poolRes, fnRes, ucRes] = await Promise.all([
         // Pool: ALL cases (badcase + goodcase).
         // Omitting caseSetType so that auto_tn golden positives (goodcase) are
         // included — previously only badcases were fetched, making the TN channel
         // invisible in the UI even when harvest succeeded.
-        fetch("/api/eval-datasets/cases"),
+        fetch("/api/eval-datasets/cases", { headers: projectHeaders }),
         // Pending: FN channel, still in auto_captured / pending
-        fetch("/api/eval-datasets/cases?source=auto_fn"),
+        fetch("/api/eval-datasets/cases?source=auto_fn", { headers: projectHeaders }),
         // Pending: uncertainty channel
-        fetch("/api/eval-datasets/cases?source=auto_uncertainty"),
+        fetch("/api/eval-datasets/cases?source=auto_uncertainty", { headers: projectHeaders }),
       ]);
 
-      const clusterData = (await clusterRes.json())    as Partial<ClusterResponse>  & { error?: string; detail?: string };
       const poolData    = (await poolRes.json())        as Partial<CaseListResponse> & { error?: string; detail?: string };
       const fnData      = (await fnRes.json())          as Partial<CaseListResponse> & { error?: string; detail?: string };
       const ucData      = (await ucRes.json())          as Partial<CaseListResponse> & { error?: string; detail?: string };
 
-      if (!clusterRes.ok) throw new Error(clusterData.detail ?? clusterData.error ?? "加载 cluster 失败");
       if (!poolRes.ok)    throw new Error(poolData.detail    ?? poolData.error    ?? "加载案例池失败");
 
-      setClusters(clusterData.clusters ?? []);
       const allPool = poolData.cases ?? [];
 
       // Pool: only cases that have passed the human-review gate.
@@ -184,59 +233,146 @@ export function DatasetConsole() {
       const goodcasePoolCount = poolFiltered.filter((c) => c.caseSetType === "goodcase").length;
       const badcasePoolCount  = poolFiltered.filter((c) => c.caseSetType === "badcase").length;
       setNotice(
-        `已入池 ${poolFiltered.length} 条（坏案例 ${badcasePoolCount}，金标正例 ${goodcasePoolCount}），待确认 ${pendingMap.size} 条。`,
+        `${activeProject.name}：已入池 ${poolFiltered.length} 条（坏案例 ${badcasePoolCount}，金标正例 ${goodcasePoolCount}），待确认 ${pendingMap.size} 条。`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载数据失败");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeProject.name, projectHeaders]);
 
   useEffect(() => { void loadData(); }, [loadData]);
 
-  // ── Derived data ────────────────────────────────────────────────────────
-  const scenarioOptions = useMemo(
-    () =>
-      [...new Set(poolCases.map((c) => c.scenarioId).filter((v): v is string => Boolean(v)))]
-        .sort()
-        .map((s) => ({ scenarioId: s })),
-    [poolCases],
-  );
-
-  const capabilityOptions = useMemo(
-    () =>
-      [...new Set(poolCases.map((c) => c.capabilityDimension).filter((v): v is string => Boolean(v)))].sort(),
-    [poolCases],
-  );
-
-  const filteredClusters = useMemo(() => {
-    let result = clusters;
-    if (selectedScenarioId) result = result.filter((c) => c.scenarioId === selectedScenarioId);
-    if (selectedCapabilityDimension) {
-      const matchingCaseIds = new Set(
-        poolCases.filter((c) => c.capabilityDimension === selectedCapabilityDimension).map((c) => c.caseId),
-      );
-      result = result.filter((c) => c.items.some((item) => matchingCaseIds.has(item.caseId)));
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProjectStats() {
+      setProjectStatsLoading(true);
+      try {
+        const entries = await Promise.all(
+          projects.map(async (project) => {
+            const headers = { "x-zeval-project-id": project.id };
+            const [poolRes, fnRes, ucRes] = await Promise.all([
+              fetch("/api/eval-datasets/cases", { headers }),
+              fetch("/api/eval-datasets/cases?source=auto_fn", { headers }),
+              fetch("/api/eval-datasets/cases?source=auto_uncertainty", { headers }),
+            ]);
+            const poolData = (await poolRes.json()) as Partial<CaseListResponse>;
+            const fnData = (await fnRes.json()) as Partial<CaseListResponse>;
+            const ucData = (await ucRes.json()) as Partial<CaseListResponse>;
+            const allCases = poolData.cases ?? [];
+            const poolActive = allCases.filter((c) =>
+              POOL_ACTIVE_STATUSES.includes(c.reviewStatus ?? "auto_captured"),
+            );
+            const pendingMap = new Map<string, DatasetCaseRecord>();
+            [...(fnData.cases ?? []), ...(ucData.cases ?? [])].forEach((c) => {
+              if (c.reviewStatus === "auto_captured") pendingMap.set(c.caseId, c);
+            });
+            allCases.forEach((c) => {
+              if (
+                c.reviewStatus === "auto_captured" &&
+                (c.metadata as Record<string, unknown> | undefined)?.humanReviewRequired === true &&
+                !pendingMap.has(c.caseId)
+              ) {
+                pendingMap.set(c.caseId, c);
+              }
+            });
+            return [
+              project.id,
+              {
+                poolCount: poolActive.length,
+                goldCount: poolActive.filter((c) => isGoldCandidateCase(c)).length,
+                pendingCount: pendingMap.size,
+              },
+            ] as const;
+          }),
+        );
+        if (!cancelled) setProjectStats(Object.fromEntries(entries));
+      } catch {
+        if (!cancelled) setProjectStats({});
+      } finally {
+        if (!cancelled) setProjectStatsLoading(false);
+      }
     }
-    return result;
-  }, [clusters, selectedScenarioId, selectedCapabilityDimension, poolCases]);
+    void loadProjectStats();
+    return () => {
+      cancelled = true;
+    };
+  }, [projects]);
 
-  const poolCaseById = useMemo(() => new Map(poolCases.map((c) => [c.caseId, c])), [poolCases]);
+  // ── Derived data ────────────────────────────────────────────────────────
+  const capabilityOptions = useMemo(
+    () => {
+      const options = new Set<string>(BENCHMARK_CAPABILITIES.map((item) => item.capability));
+      [...poolCases, ...pendingCases].forEach((c) => {
+        if (c.capabilityDimension) options.add(c.capabilityDimension);
+      });
+      return [...options].sort((a, b) => capabilityDisplayName(a).localeCompare(capabilityDisplayName(b), "zh-Hans-CN"));
+    },
+    [pendingCases, poolCases],
+  );
 
-  const reviewStats = useMemo(() => {
-    const stats = new Map<DatasetCaseReviewStatus, number>();
-    poolCases.forEach((c) => {
-      const s = c.reviewStatus ?? "auto_captured";
-      stats.set(s, (stats.get(s) ?? 0) + 1);
+  const capabilityCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    [...poolCases, ...pendingCases].forEach((c) => {
+      if (!c.capabilityDimension) return;
+      counts.set(c.capabilityDimension, (counts.get(c.capabilityDimension) ?? 0) + 1);
     });
-    return stats;
-  }, [poolCases]);
+    return counts;
+  }, [pendingCases, poolCases]);
+
+  const coveredCapabilityCount = useMemo(
+    () => [...capabilityCounts.values()].filter((count) => count > 0).length,
+    [capabilityCounts],
+  );
 
   const visiblePending = useMemo(
     () => pendingCases.filter((c) => !dismissedIds.has(c.caseId)),
     [pendingCases, dismissedIds],
   );
+
+  const goldCases = useMemo(
+    () => poolCases.filter((c) => isGoldCandidateCase(c)),
+    [poolCases],
+  );
+
+  useEffect(() => {
+    setProjectStats((prev) => ({
+      ...prev,
+      [activeProjectId]: {
+        poolCount: poolCases.length,
+        goldCount: goldCases.length,
+        pendingCount: pendingCases.length,
+      },
+    }));
+  }, [activeProjectId, goldCases.length, pendingCases.length, poolCases.length]);
+
+  const activeQueueCases = useMemo(() => {
+    const sourceCases = activeTab === "pending"
+      ? visiblePending
+      : activeTab === "gold"
+      ? goldCases
+      : poolCases;
+    return sourceCases.filter((c) => {
+      if (selectedCapabilityDimension && c.capabilityDimension !== selectedCapabilityDimension) return false;
+      return true;
+    });
+  }, [activeTab, goldCases, poolCases, selectedCapabilityDimension, visiblePending]);
+
+  const selectedCase = useMemo(
+    () => activeQueueCases.find((c) => c.caseId === selectedCaseId) ?? activeQueueCases[0] ?? null,
+    [activeQueueCases, selectedCaseId],
+  );
+
+  useEffect(() => {
+    if (!selectedCase) {
+      setSelectedCaseId("");
+      return;
+    }
+    if (selectedCase.caseId !== selectedCaseId) {
+      setSelectedCaseId(selectedCase.caseId);
+    }
+  }, [selectedCase, selectedCaseId]);
 
   // ── Actions ─────────────────────────────────────────────────────────────
 
@@ -262,7 +398,10 @@ export function DatasetConsole() {
 
         const res  = await fetch(`/api/eval-datasets/cases/${encodeURIComponent(caseId)}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...projectHeaders,
+          },
           body: JSON.stringify(body),
         });
         const data = (await res.json()) as { case?: DatasetCaseRecord; error?: string; detail?: string };
@@ -289,7 +428,7 @@ export function DatasetConsole() {
         setActionCaseId("");
       }
     },
-    [],
+    [projectHeaders],
   );
 
   /** Legacy "mark false positive" from pool view (only adds manualOverrides). */
@@ -314,236 +453,357 @@ export function DatasetConsole() {
           <header className={styles.topBar}>
             <div className={styles.titleBlock}>
               <h1>评测集管理</h1>
-              <p>案例池 · 待确认队列 · 人工校准</p>
+              <p>按项目隔离案例池、金标候选、人工待处理队列和后续回归样本。</p>
             </div>
-            <button
-              className={styles.secondaryButton}
-              type="button"
-              disabled={loading}
-              onClick={() => void loadData()}
-            >
-              {loading ? "刷新中…" : "刷新"}
-            </button>
           </header>
-
-          {/* ── Hero stats ── */}
-          <section className={styles.heroGrid}>
-            <article className={styles.heroCard}>
-              <span>已入池案例</span>
-              <strong>{poolCases.length}</strong>
-              <small>参与回归验证</small>
-            </article>
-            <article className={styles.heroCard} style={{ cursor: "pointer" }} onClick={() => setActiveTab("pending")}>
-              <span>待确认</span>
-              <strong style={{ color: visiblePending.length > 0 ? "#f97316" : undefined }}>
-                {visiblePending.length}
-              </strong>
-              <small>FN + 边界案例，点击跳转</small>
-            </article>
-            <article className={styles.heroCard}>
-              <span>回归集</span>
-              <strong>{reviewStats.get("regression_active") ?? 0}</strong>
-              <small>regression_active</small>
-            </article>
-            <article className={styles.heroCard}>
-              <span>金标正例</span>
-              <strong>{poolCases.filter((c) => c.caseSetType === "goodcase").length}</strong>
-              <small>auto_tn · 人工纠偏正例</small>
-            </article>
-          </section>
 
           {error  ? <p className={styles.error}>{error}</p>   : null}
           {notice ? <p className={styles.notice}>{notice}</p> : null}
 
-          {/* ── Tabs ── */}
-          <div className={styles.tabBar}>
-            <button
-              className={activeTab === "pool" ? styles.tabActive : styles.tab}
-              type="button"
-              onClick={() => setActiveTab("pool")}
-            >
-              案例池
-              <span className={styles.tabCount}>{poolCases.length}</span>
-            </button>
-            <button
-              className={activeTab === "pending" ? styles.tabActive : styles.tab}
-              type="button"
-              onClick={() => setActiveTab("pending")}
-            >
-              待确认
-              {visiblePending.length > 0 && (
-                <span className={styles.tabBadge}>{visiblePending.length}</span>
-              )}
-            </button>
-          </div>
+          <ProjectBoard
+            activeProjectId={activeProjectId}
+            creatingDisabled={loading}
+            deletingDisabled={loading}
+            projectStats={projectStats}
+            projectStatsLoading={projectStatsLoading}
+            projects={projects}
+            onCreateProject={(name, description) => {
+              const project = createProject(name, description);
+              switchProject(project.id);
+            }}
+            onDeleteProject={deleteProject}
+            onSwitchProject={switchProject}
+          />
 
-          {/* ── Pool tab ── */}
-          {activeTab === "pool" && (
-            <>
-              <section className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <h2>筛选</h2>
-                  </div>
-                  <div className={styles.formRow}>
-                    <label className={styles.label}>
-                      场景
-                      <select
-                        className={styles.select}
-                        value={selectedScenarioId}
-                        onChange={(e) => setSelectedScenarioId(e.target.value)}
-                      >
-                        <option value="">全部场景</option>
-                        {scenarioOptions.map((o) => (
-                          <option key={o.scenarioId} value={o.scenarioId}>{o.scenarioId}</option>
-                        ))}
-                      </select>
-                    </label>
-                    {capabilityOptions.length > 0 && (
-                      <label className={styles.label}>
-                        能力维度
-                        <select
-                          className={styles.select}
-                          value={selectedCapabilityDimension}
-                          onChange={(e) => setSelectedCapabilityDimension(e.target.value)}
-                        >
-                          <option value="">全部维度</option>
-                          {capabilityOptions.map((dim) => (
-                            <option key={dim} value={dim}>{dim}</option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                  </div>
-                </div>
-                <div className={styles.tagStrip}>
-                  {CASE_REVIEW_STATUS_OPTIONS.map((s) => (
-                    <span className={styles.statusPill} key={s}>
-                      {s}: {reviewStats.get(s) ?? 0}
-                    </span>
-                  ))}
-                </div>
-              </section>
-
-              <section className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <h2>Clusters</h2>
-                  <span className={styles.meta}>{filteredClusters.length} 个</span>
-                </div>
-                <div className={styles.clusterList}>
-                  {filteredClusters.length > 0 ? (
-                    filteredClusters.map((cluster) => (
-                      <details className={styles.clusterCard} key={cluster.clusterId}>
-                        <summary className={styles.clusterSummary}>
-                          <div>
-                            <strong>{cluster.label}</strong>
-                            <p>
-                              rep={cluster.representativeCaseId} · size={cluster.size} ·
-                              avgSeverity={cluster.averageSeverityScore.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className={styles.metaRow}>
-                            {cluster.dominantTags.map((tag) => (
-                              <span className={styles.tagPill} key={`${cluster.clusterId}_${tag}`}>{tag}</span>
-                            ))}
-                          </div>
-                        </summary>
-                        <div className={styles.clusterItems}>
-                          {cluster.items.map((item) => (
-                            <ReadOnlyCaseCard
-                              key={item.caseId}
-                              item={item}
-                              caseRecord={poolCaseById.get(item.caseId)}
-                              markingFalsePositive={actionCaseId === item.caseId}
-                              onMarkFalsePositive={markFalsePositive}
-                            />
-                          ))}
-                        </div>
-                      </details>
-                    ))
-                  ) : (
-                    <div className={styles.empty}>当前没有可展示的 cluster。</div>
-                  )}
-                </div>
-              </section>
-            </>
-          )}
-
-          {/* ── Pending tab ── */}
-          {activeTab === "pending" && (
-            <section className={styles.panel}>
-              <div className={styles.panelHeader}>
-                <div>
-                  <h2>待确认队列</h2>
-                  <p>
-                    这些案例由系统自动发现但置信度不足，需要人工确认后才会进入回归集。
-                    <br />
-                    <strong>漏报（FN）</strong>：系统判 OK，但用户行为信号显示实际有问题。
-                    &nbsp;|&nbsp;
-                    <strong>边界案例</strong>：Judge 置信度 ∈ [0.4, 0.6]，判断不确定。
-                  </p>
-                </div>
-                {dismissedIds.size > 0 && (
-                  <button
-                    className={styles.secondaryButton}
-                    type="button"
-                    onClick={() => setDismissedIds(new Set())}
-                  >
-                    恢复已跳过 ({dismissedIds.size})
-                  </button>
-                )}
+          <section className={styles.datasetWorkspace}>
+            <aside className={styles.queuePane}>
+              <div className={styles.queueTabs}>
+                <QueueTabButton
+                  active={activeTab === "pending"}
+                  count={visiblePending.length}
+                  label="待处理"
+                  onClick={() => setActiveTab("pending")}
+                />
+                <QueueTabButton
+                  active={activeTab === "gold"}
+                  count={goldCases.length}
+                  label="金标候选"
+                  onClick={() => setActiveTab("gold")}
+                />
+                <QueueTabButton
+                  active={activeTab === "pool"}
+                  count={poolCases.length}
+                  label="全部案例"
+                  onClick={() => setActiveTab("pool")}
+                />
               </div>
 
-              {visiblePending.length === 0 ? (
-                <div className={styles.empty}>
-                  {pendingCases.length === 0
-                    ? "暂无待确认案例。运行一次评估后自动生成。"
-                    : `已处理全部 ${pendingCases.length} 条（含 ${dismissedIds.size} 条已跳过）。`}
-                </div>
+              {capabilityOptions.length > 0 && (
+                <label className={styles.filterControl}>
+                  <span>能力维度</span>
+                  <select
+                    className={styles.select}
+                    value={selectedCapabilityDimension}
+                    onChange={(e) => setSelectedCapabilityDimension(e.target.value)}
+                  >
+                    <option value="">全部能力维度</option>
+                    {capabilityOptions.map((dim) => (
+                      <option key={dim} value={dim}>
+                        {capabilityDisplayName(dim)}（{capabilityCounts.get(dim) ?? 0}）
+                      </option>
+                    ))}
+                  </select>
+                  <small className={styles.filterHint}>
+                    当前项目已沉淀 {coveredCapabilityCount} 个维度；括号为该维度案例数。
+                  </small>
+                </label>
+              )}
+
+              <div className={styles.queueMeta}>
+                {loading ? "加载中" : `${activeQueueCases.length} 条`}
+              </div>
+
+              {activeQueueCases.length === 0 ? (
+                <div className={styles.empty}>当前队列没有案例。</div>
               ) : (
-                <div className={styles.pendingList}>
-                  {visiblePending.map((c) => (
-                    <PendingCaseCard
-                      key={c.caseId}
-                      caseRecord={c}
-                      actioning={actionCaseId === c.caseId}
-                      onConfirm={(note) => submitVerdict(c.caseId, "valid_bad_case", note)}
-                      onFalsePositive={(note) => submitVerdict(c.caseId, "false_positive", note)}
-                      onSkip={() => skipPending(c.caseId)}
+                <div className={styles.caseRail}>
+                  {activeQueueCases.map((caseRecord) => (
+                    <CaseRailButton
+                      key={caseRecord.caseId}
+                      active={selectedCase?.caseId === caseRecord.caseId}
+                      caseRecord={caseRecord}
+                      onClick={() => setSelectedCaseId(caseRecord.caseId)}
                     />
                   ))}
                 </div>
               )}
+            </aside>
+
+            <section className={styles.detailPane}>
+              {selectedCase ? (
+                activeTab === "pending" ? (
+                  <PendingCaseCard
+                    caseRecord={selectedCase}
+                    actioning={actionCaseId === selectedCase.caseId}
+                    onConfirm={(note) => submitVerdict(selectedCase.caseId, "valid_bad_case", note)}
+                    onFalsePositive={(note) => submitVerdict(selectedCase.caseId, "false_positive", note)}
+                    onSkip={() => skipPending(selectedCase.caseId)}
+                  />
+                ) : (
+                  <PoolCaseCard
+                    caseRecord={selectedCase}
+                    markingFalsePositive={actionCaseId === selectedCase.caseId}
+                    onMarkFalsePositive={markFalsePositive}
+                  />
+                )
+              ) : (
+                <div className={styles.empty}>选择一个案例查看详情。</div>
+              )}
             </section>
-          )}
+          </section>
         </main>
       </div>
     </AppShell>
   );
 }
 
-// ── Pool: ReadOnlyCaseCard ─────────────────────────────────────────────────
+function ProjectBoard(props: {
+  activeProjectId: string;
+  creatingDisabled: boolean;
+  deletingDisabled: boolean;
+  projectStats: Record<string, ProjectDatasetStats>;
+  projectStatsLoading: boolean;
+  projects: Project[];
+  onCreateProject: (name: string, description?: string) => void;
+  onDeleteProject: (id: string) => void;
+  onSwitchProject: (id: string) => void;
+}) {
+  const {
+    activeProjectId,
+    creatingDisabled,
+    deletingDisabled,
+    projectStats,
+    projectStatsLoading,
+    projects,
+    onCreateProject,
+    onDeleteProject,
+    onSwitchProject,
+  } = props;
+  const [creating, setCreating] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState("");
 
-function ReadOnlyCaseCard(props: {
-  item: BadCaseCluster["items"][number];
-  caseRecord?: DatasetCaseRecord;
+  function submitProject() {
+    const name = projectName.trim();
+    if (!name) return;
+    onCreateProject(name, projectDescription.trim() || undefined);
+    setProjectName("");
+    setProjectDescription("");
+    setCreating(false);
+    setConfirmDeleteId("");
+  }
+
+  return (
+    <section className={styles.projectBoard}>
+      <div className={styles.projectBoardHeader}>
+        <div>
+          <h2>项目管理</h2>
+          <p>每个项目拥有独立数据池；切换项目后，下方案例队列会同步切换。</p>
+        </div>
+        <button
+          className={styles.secondaryButton}
+          type="button"
+          disabled={creatingDisabled}
+          onClick={() => {
+            setCreating((value) => !value);
+            setConfirmDeleteId("");
+          }}
+        >
+          {creating ? "收起新建" : "新建项目"}
+        </button>
+      </div>
+
+      {creating ? (
+        <div className={styles.projectCreateInline}>
+          <input
+            className={styles.input}
+            placeholder="项目名称，例如：HR 简历筛选 Agent"
+            value={projectName}
+            maxLength={48}
+            onChange={(event) => setProjectName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") submitProject();
+              if (event.key === "Escape") {
+                setCreating(false);
+                setProjectName("");
+                setProjectDescription("");
+              }
+            }}
+          />
+          <input
+            className={styles.input}
+            placeholder="项目描述（可选）"
+            value={projectDescription}
+            maxLength={120}
+            onChange={(event) => setProjectDescription(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") submitProject();
+              if (event.key === "Escape") {
+                setCreating(false);
+                setProjectName("");
+                setProjectDescription("");
+              }
+            }}
+          />
+          <button
+            className={styles.primaryButton}
+            type="button"
+            disabled={!projectName.trim()}
+            onClick={submitProject}
+          >
+            创建并切换
+          </button>
+        </div>
+      ) : null}
+
+      <div className={styles.projectList}>
+        {projects.map((project) => {
+          const active = project.id === activeProjectId;
+          const stats = projectStats[project.id];
+          const confirming = confirmDeleteId === project.id;
+          return (
+            <article className={active ? styles.projectCardActive : styles.projectCard} key={project.id}>
+              <button
+                className={styles.projectMainButton}
+                type="button"
+                onClick={() => {
+                  onSwitchProject(project.id);
+                  setConfirmDeleteId("");
+                }}
+              >
+                <span className={styles.projectNameRow}>
+                  <strong>{project.name}</strong>
+                  {active ? <span>当前项目</span> : null}
+                </span>
+                <small>{project.description || "暂无描述"}</small>
+                <span className={styles.projectStatsRow}>
+                  {projectStatsLoading && !stats ? (
+                    <b>统计中</b>
+                  ) : (
+                    <>
+                      <b>已入池 {stats?.poolCount ?? 0}</b>
+                      <b>金标 {stats?.goldCount ?? 0}</b>
+                      <b>待处理 {stats?.pendingCount ?? 0}</b>
+                    </>
+                  )}
+                </span>
+              </button>
+
+              {project.id !== DEFAULT_PROJECT.id ? (
+                <button
+                  className={confirming ? styles.projectDeleteConfirm : styles.projectDeleteButton}
+                  type="button"
+                  disabled={deletingDisabled}
+                  onClick={() => {
+                    if (confirming) {
+                      onDeleteProject(project.id);
+                      setConfirmDeleteId("");
+                      return;
+                    }
+                    setConfirmDeleteId(project.id);
+                  }}
+                >
+                  {confirming ? "确认删除" : "删除"}
+                </button>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function QueueTabButton(props: {
+  active: boolean;
+  count: number;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={props.active ? styles.queueTabActive : styles.queueTab}
+      type="button"
+      onClick={props.onClick}
+    >
+      <span>{props.label}</span>
+      <strong>{props.count}</strong>
+    </button>
+  );
+}
+
+function CaseRailButton(props: {
+  active: boolean;
+  caseRecord: DatasetCaseRecord;
+  onClick: () => void;
+}) {
+  const { active, caseRecord, onClick } = props;
+  const source = caseRecord.source as DatasetCaseSource | undefined;
+  return (
+    <button
+      className={active ? styles.caseRailItemActive : styles.caseRailItem}
+      type="button"
+      onClick={onClick}
+    >
+      <span className={styles.caseRailTitle}>{caseTitle(caseRecord)}</span>
+      <span className={styles.caseRailMeta}>
+        {capabilityDisplayName(caseRecord.capabilityDimension)} · {reviewStatusLabel(caseRecord.reviewStatus)}
+      </span>
+      <span className={styles.caseRailFooter}>
+        {sourceLabel(source, caseRecord.caseSetType)}
+      </span>
+    </button>
+  );
+}
+
+function isGoldCandidateCase(caseRecord: DatasetCaseRecord): boolean {
+  return (
+    caseRecord.reviewStatus === "gold_candidate" ||
+    caseRecord.reviewStatus === "gold" ||
+    caseRecord.source === "manual_gold" ||
+    caseRecord.source === "auto_tn"
+  );
+}
+
+// ── Pool: PoolCaseCard ─────────────────────────────────────────────────────
+
+function PoolCaseCard(props: {
+  caseRecord: DatasetCaseRecord;
   markingFalsePositive: boolean;
   onMarkFalsePositive: (caseId: string, note?: string) => Promise<void>;
 }) {
-  const { item, caseRecord, markingFalsePositive, onMarkFalsePositive } = props;
+  const { caseRecord, markingFalsePositive, onMarkFalsePositive } = props;
+  const [expanded, setExpanded] = useState(false);
   const [showNote, setShowNote] = useState(false);
-  const [note, setNote]         = useState("");
-  const overrides    = caseRecord?.manualOverrides ?? [];
+  const [note, setNote] = useState("");
+  const source = caseRecord.source as DatasetCaseSource | undefined;
+  const metadata = (caseRecord.metadata ?? {}) as Record<string, unknown>;
+  const runId = typeof caseRecord.sourceRunId === "string"
+    ? caseRecord.sourceRunId
+    : typeof metadata.runId === "string"
+    ? metadata.runId
+    : "";
+  const benchmarkCaseId = typeof metadata.benchmarkCaseId === "string" ? metadata.benchmarkCaseId : "";
+  const overrides = caseRecord.manualOverrides ?? [];
   const alreadyMarked = overrides.some((o) => o.type === "false_positive");
-  const signals      = caseRecord?.autoSignals ?? [];
-  const source       = caseRecord?.source;
 
   return (
     <article className={styles.caseCard}>
       <div className={styles.caseHeader}>
         <div>
-          <h3>{item.title}</h3>
-          <p>{item.caseId} · session={item.sessionId} · severity={item.failureSeverityScore.toFixed(2)}</p>
+          <h3>{caseTitle(caseRecord)}</h3>
+          <p>{caseRecord.caseId} · 会话：{caseRecord.sessionId}</p>
         </div>
         <div className={styles.badgeGroup}>
           {source && (
@@ -551,28 +811,42 @@ function ReadOnlyCaseCard(props: {
               className={styles.sourceBadge}
               style={{ backgroundColor: SOURCE_COLOR[source] ?? "#6b7280" }}
             >
-              {SOURCE_LABELS[source] ?? source}
+              {sourceLabel(source, caseRecord.caseSetType)}
             </span>
           )}
-          <span className={styles.severityBadge}>{Math.round(item.failureSeverityScore * 100)}%</span>
+          <span className={styles.statusPill}>{reviewStatusLabel(caseRecord.reviewStatus)}</span>
         </div>
       </div>
+
+      <div className={styles.caseMetaGrid}>
+        <span>类型：{caseSetTypeLabel(caseRecord.caseSetType)}</span>
+        <span>能力：{capabilityDisplayName(caseRecord.capabilityDimension)}</span>
+        <span>指标：{metricDisplayName(caseRecord.topicLabel)}</span>
+        {runId ? <span>评测运行：{runId}</span> : null}
+        {benchmarkCaseId ? <span>评测案例：{benchmarkCaseId}</span> : null}
+      </div>
+
+      {caseRecord.topicSummary ? <p className={styles.actionText}>{caseRecord.topicSummary}</p> : null}
 
       <div className={styles.metaRow}>
-        {item.tags.map((tag) => (
-          <span className={styles.tagPill} key={`${item.caseId}_${tag}`}>{tag}</span>
+        {caseRecord.tags.slice(0, 10).map((tag) => (
+          <span className={styles.tagPill} key={`${caseRecord.caseId}_${tag}`}>{tag}</span>
         ))}
+        {caseRecord.tags.length > 10 ? <span className={styles.tagPill}>+{caseRecord.tags.length - 10}</span> : null}
       </div>
 
-      {signals.length > 0 && (
-        <div className={styles.signalBox}>
-          <strong>命中信号</strong>
-          <ul>{signals.map((s, i) => <li key={i}>{describeSignal(s)}</li>)}</ul>
+      {caseRecord.transcript && (
+        <div className={styles.transcriptBlock}>
+          <button
+            type="button"
+            className={styles.transcriptToggle}
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? "收起详情 ▲" : "展开期望 / 实际 / 证据 ▼"}
+          </button>
+          {expanded && <pre className={styles.transcript}>{caseRecord.transcript}</pre>}
         </div>
       )}
-
-      {item.suggestedAction && <p className={styles.actionText}>{item.suggestedAction}</p>}
-      {item.transcript && <pre className={styles.transcript}>{item.transcript}</pre>}
 
       <div className={styles.overrideRow}>
         {alreadyMarked ? (
@@ -590,7 +864,11 @@ function ReadOnlyCaseCard(props: {
               className={styles.primaryButton}
               type="button"
               disabled={markingFalsePositive}
-              onClick={async () => { await onMarkFalsePositive(item.caseId, note); setShowNote(false); setNote(""); }}
+              onClick={async () => {
+                await onMarkFalsePositive(caseRecord.caseId, note);
+                setShowNote(false);
+                setNote("");
+              }}
             >
               {markingFalsePositive ? "提交中…" : "确认错判"}
             </button>
@@ -646,7 +924,7 @@ function PendingCaseCard(props: {
             >
               {SOURCE_LABELS[source ?? "auto_fn"] ?? source}
             </span>
-            <span className={styles.statusPill}>{caseRecord.reviewStatus ?? "auto_captured"}</span>
+            <span className={styles.statusPill}>{reviewStatusLabel(caseRecord.reviewStatus)}</span>
             {humanReviewRequired && (
               <span
                 className={styles.statusPill}
@@ -657,10 +935,10 @@ function PendingCaseCard(props: {
               </span>
             )}
           </div>
-          <h3>{caseRecord.title ?? caseRecord.caseId}</h3>
+          <h3>{caseTitle(caseRecord)}</h3>
           <p className={styles.channelDesc}>{channelDesc}</p>
           <p>
-            {caseRecord.caseId} · session={caseRecord.sessionId}
+            {caseRecord.caseId} · 会话：{caseRecord.sessionId}
           </p>
         </div>
       </div>
@@ -672,8 +950,8 @@ function PendingCaseCard(props: {
           <ul>
             {rules.map((r, i) => (
               <li key={i}>
-                <code>{r.ruleKey ?? "unknown"}</code>
-                {r.severity && <span className={styles.severityTag}> · {r.severity}</span>}
+                <code>{r.ruleKey ?? "未知规则"}</code>
+                {r.severity && <span className={styles.severityTag}> · {severityLabel(r.severity)}</span>}
               </li>
             ))}
           </ul>
@@ -750,11 +1028,56 @@ function PendingCaseCard(props: {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function describeSignal(signal: Record<string, unknown>): string {
-  const kind = String(signal.kind ?? signal.ruleKey ?? "");
-  if (kind === "negative_keyword") return `负面关键词「${String(signal.keyword ?? "")}」(turn ${signal.turnIndex})`;
-  if (kind === "metric")           return `客观指标 ${String(signal.metric ?? "")} = ${signal.value}`;
-  if (kind === "implicit_signal")  return `隐式信号：${String(signal.signalId ?? "")}`;
-  if (signal.ruleKey)              return `规则：${String(signal.ruleKey)}（${String(signal.severity ?? "")}）`;
-  return JSON.stringify(signal);
+function hasChineseText(value?: string): boolean {
+  return Boolean(value && /[\u4e00-\u9fff]/.test(value));
+}
+
+function capabilityDisplayName(capability?: string): string {
+  if (!capability) return "未分维度";
+  if (hasChineseText(capability)) return capability;
+  return CAPABILITY_NAME_ZH[capability] ?? humanizeKeyZh(capability);
+}
+
+function metricDisplayName(metric?: string): string {
+  if (!metric) return "未标注指标";
+  if (hasChineseText(metric)) return metric;
+  return METRIC_NAME_ZH[metric] ?? humanizeKeyZh(metric);
+}
+
+function reviewStatusLabel(status?: DatasetCaseReviewStatus): string {
+  return REVIEW_STATUS_LABELS[status ?? "auto_captured"] ?? "未知状态";
+}
+
+function sourceLabel(source?: DatasetCaseSource, caseSetType?: DatasetCaseRecord["caseSetType"]): string {
+  if (source) return SOURCE_LABELS[source] ?? "未知来源";
+  return caseSetTypeLabel(caseSetType);
+}
+
+function caseSetTypeLabel(caseSetType?: DatasetCaseRecord["caseSetType"]): string {
+  if (caseSetType === "goodcase") return "正例 / 金标候选";
+  if (caseSetType === "badcase") return "坏例 / 回归案例";
+  return "未分类案例";
+}
+
+function caseTitle(caseRecord: DatasetCaseRecord): string {
+  const capability = capabilityDisplayName(caseRecord.capabilityDimension);
+  const metric = metricDisplayName(caseRecord.topicLabel);
+  if (caseRecord.capabilityDimension || caseRecord.topicLabel) return `${capability} / ${metric}`;
+  if (caseRecord.title && hasChineseText(caseRecord.title)) return caseRecord.title;
+  return caseRecord.caseId;
+}
+
+function severityLabel(severity: string): string {
+  return SEVERITY_LABELS[severity.toLowerCase()] ?? severity;
+}
+
+function humanizeKeyZh(value: string): string {
+  return value
+    .split(/[_\-\s]+/)
+    .filter(Boolean)
+    .map((part) => {
+      const known = CAPABILITY_NAME_ZH[part] ?? METRIC_NAME_ZH[part] ?? SEVERITY_LABELS[part.toLowerCase()];
+      return known ?? part;
+    })
+    .join(" / ");
 }

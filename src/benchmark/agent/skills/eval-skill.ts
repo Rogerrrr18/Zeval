@@ -195,9 +195,10 @@ function runRuleBasedEvaluation(
 // ───────────────────────────────────────────────
 
 async function runLlmJudgeEvaluation(input: SingleMetricEvalInput): Promise<BenchmarkMetricEvaluationResult> {
-  const { metric, taskCase, submission, apiKey, baseUrl, model } = input;
+  const { metric, taskCase, submission } = input;
 
   const criteria = metric.config?.criteria ?? metric.description;
+  const references = metric.config?.references ?? [];
 
   const prompt = [
     `你是评测专家。请评估以下 Agent 输出是否符合标准。`,
@@ -205,6 +206,7 @@ async function runLlmJudgeEvaluation(input: SingleMetricEvalInput): Promise<Benc
     `指标: ${metric.displayName}`,
     `能力维度: ${metric.capability}`,
     `评估标准: ${criteria}`,
+    references.length > 0 ? `参考依据: ${JSON.stringify(references, null, 2)}` : "",
     ``,
     `案例输入:`,
     JSON.stringify(taskCase.input, null, 2),

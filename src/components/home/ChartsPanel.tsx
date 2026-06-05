@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import type { ChartPayload } from "@/types/pipeline";
-import styles from "./evalConsole.module.css";
+import styles from "./chartsPanel.module.css";
 
 const MAX_RENDERED_SERIES = 8;
 

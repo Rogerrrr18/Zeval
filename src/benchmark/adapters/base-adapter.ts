@@ -11,7 +11,6 @@
 import type {
   BenchmarkAgentSubmission,
   BenchmarkCase,
-  BenchmarkMatrixCell,
 } from "@/benchmark/types";
 import type { AgentAdapter, AgentAdapterConfig, AgentAdapterContext } from "./types";
 

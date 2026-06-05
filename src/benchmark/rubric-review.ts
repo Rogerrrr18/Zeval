@@ -140,6 +140,7 @@ export async function* reviewRubricWalkthrough(
           `- 分值范围: ${metric.scale.min}-${metric.scale.max}，通过阈值: ${metric.scale.passThreshold}`,
           `- 说明: ${metric.description}`,
           metric.config?.criteria ? `- 评估标准: ${metric.config.criteria}` : "",
+          metric.config?.references?.length ? `- 参考依据: ${JSON.stringify(metric.config.references)}` : "",
         ].join("\n"),
       },
     ];

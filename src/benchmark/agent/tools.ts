@@ -12,13 +12,8 @@
  */
 
 import type {
-  BenchmarkAgentSubmission,
-  BenchmarkCase,
   BenchmarkCapabilityDimension,
   BenchmarkMetricEvaluationResult,
-  BenchmarkRubricMetric,
-  BenchmarkRunResult,
-  BenchmarkTaskPackage,
 } from "@/benchmark/types";
 import type {
   AgentExecutionContext,
@@ -28,6 +23,9 @@ import type {
   AgentToolResult,
   AgentToolSchema,
 } from "./types";
+import { createFileToolRegistry } from "./file-tools";
+import { createNetworkToolRegistry } from "./network-tools";
+import { createGitHubToolRegistry } from "./github-tools";
 
 // ───────────────────────────────────────────────
 // 工具 Schema 定义
@@ -185,7 +183,7 @@ const summarizeCapabilitySchema: AgentToolSchema = {
 // 工具实现
 // ───────────────────────────────────────────────
 
-const evaluateMetricHandler: AgentToolHandler = async (args, ctx) => {
+const evaluateMetricHandler: AgentToolHandler = async (args) => {
   const caseId = String(args.caseId ?? "");
   const metricKey = String(args.metricKey ?? "");
   const submissionOutput = String(args.submissionOutput ?? "");
@@ -203,9 +201,6 @@ const evaluateMetricHandler: AgentToolHandler = async (args, ctx) => {
   }
 
   // 查找当前案例的 metric
-  const metric = ctx.currentMetric;
-  const submission = ctx.currentSubmission;
-
   // 简单规则匹配评估
   let score = 0;
   let passed = false;
@@ -616,22 +611,16 @@ export function createEvalToolRegistry(): AgentToolRegistry {
 export function createFullToolRegistry(): AgentToolRegistry {
   const registry = createEvalToolRegistry();
 
-  // 合并文件系统工具
-  const { createFileToolRegistry } = require("./file-tools");
   const fileRegistry = createFileToolRegistry();
   for (const [name, entry] of fileRegistry) {
     registry.set(name, entry);
   }
 
-  // 合并网络工具
-  const { createNetworkToolRegistry } = require("./network-tools");
   const networkRegistry = createNetworkToolRegistry();
   for (const [name, entry] of networkRegistry) {
     registry.set(name, entry);
   }
 
-  // 合并 GitHub MCP 工具
-  const { createGitHubToolRegistry } = require("./github-tools");
   const githubRegistry = createGitHubToolRegistry();
   for (const [name, entry] of githubRegistry) {
     registry.set(name, entry);

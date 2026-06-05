@@ -44,12 +44,12 @@ const OPENAPI_SPEC = {
         },
       },
     },
-    "/api/benchmarks/hr-demo": {
+    "/api/benchmarks/run": {
       post: {
-        summary: "Run the local HR resume-screening benchmark demo",
-        description: "使用本地 HR fixture 和模拟 Agent 输出验证 Benchmark Mode runner、排行榜和 case 候选链路。",
+        summary: "Run a generic benchmark task",
+        description: "使用已确认的 rubric 与上传数据启动通用 Benchmark Mode 评测，并通过 /api/benchmarks/run-stream 订阅进度。",
         responses: {
-          "200": { description: "Benchmark run result" },
+          "200": { description: "Benchmark run ID" },
           "400": { description: "Invalid request" },
         },
       },

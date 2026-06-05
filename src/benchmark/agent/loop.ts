@@ -18,7 +18,7 @@
  * 4. 返回最终结果
  */
 
-import { parseToolCalls, serializeToolResult } from "./tool-parser";
+import { parseToolCalls } from "./tool-parser";
 import { AgentStateManager } from "./state";
 import { createFullToolRegistry, executeToolCall, getToolSchemas } from "./tools";
 import type {
@@ -27,7 +27,6 @@ import type {
   AgentLoopResult,
   AgentMessage,
   AgentState,
-  AgentToolCall,
   AgentToolRegistry,
   AgentToolResult,
 } from "./types";

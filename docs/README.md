@@ -14,17 +14,9 @@ This directory is the main documentation home for Zeval. The repository root now
 - [Design guidelines](design-guidelines.md)：UI theme and component-level visual rules.
 - [Changelog](changelog.md)：historical implementation log.
 
-## Prompt And Research Assets
+## Research Assets
 
-- [Codex prompt 2026-05-05](codex-prompt-2026-05-05.md)：P0/P1/P2 implementation prompt from the May 5 review.
 - [Seed user interview template](seed-user-interview-template.md)：customer discovery script and objection handling.
-
-## Archived Source Notes
-
-The following files were merged into [engineering-status](engineering-status.md) and kept only as historical source material:
-
-- [current development progress, 2026-05-04](archive/current-development-progress-2026-05-04.md)
-- [agent handoff, 2026-05-04](archive/agent-handoff-zeval-2026-05-04.md)
 
 ## Product Research Folder
 
