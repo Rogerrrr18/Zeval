@@ -34,6 +34,26 @@ const OPENAPI_SPEC = {
         },
       },
     },
+    "/api/benchmarks/rubric": {
+      post: {
+        summary: "Draft a capability-based benchmark rubric",
+        description: "从真实业务需求生成候选 rubric。所有 metric 默认需要用户审核确认后才进入评测。",
+        responses: {
+          "200": { description: "Rubric draft response" },
+          "400": { description: "Invalid request" },
+        },
+      },
+    },
+    "/api/benchmarks/run": {
+      post: {
+        summary: "Run a generic benchmark task",
+        description: "使用已确认的 rubric 与上传数据启动通用 Benchmark Mode 评测，并通过 /api/benchmarks/run-stream 订阅进度。",
+        responses: {
+          "200": { description: "Benchmark run ID" },
+          "400": { description: "Invalid request" },
+        },
+      },
+    },
     "/api/traces/ingest": {
       post: {
         summary: "Ingest OTel GenAI semconv-compatible traces",

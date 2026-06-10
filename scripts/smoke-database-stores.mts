@@ -27,9 +27,10 @@ async function main(): Promise<void> {
   const sampleBatchId = `db_sample_${suffix}`;
   const runId = `db_store_run_${suffix}`;
 
-  const rawCsvPath = path.resolve(
-    process.env.DB_SMOKE_RAW_CSV ?? "mock-chatlog/raw-data/support-refund-short.csv",
-  );
+  if (!process.env.DB_SMOKE_RAW_CSV) {
+    throw new Error("DB_SMOKE_RAW_CSV is required. Mock chatlog defaults were removed.");
+  }
+  const rawCsvPath = path.resolve(process.env.DB_SMOKE_RAW_CSV);
   const rawRows = csvParserApi.parseCsvRows(await readFile(rawCsvPath, "utf8"));
   const evaluate = await evaluateRunApi.runEvaluatePipeline(rawRows, {
     useLlm: false,

@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>章伟伟 · Zeval 三块负责模块执行方案</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f7f5f0; --surface: #fff; --ink: #1a1a1f; --muted: #5c5c66;
+      --accent: #2d5a8a; --accent-light: #e8f0f8;
+      --warn: #c45c26; --warn-bg: #fdf3ed;
+      --ok: #2a7d5f; --ok-bg: #edf7f2;
+      --purple: #5b4b8a; --purple-bg: #f3f0fa;
+      --owner: #1a4d6e; --owner-bg: #e6f2f8;
+      --roger: #6b4c8a; --roger-bg: #f4f0fa;
+      --border: #e2dfd6; --shadow: 0 2px 16px rgba(26,26,31,.06);
+      --radius: 12px;
+      --serif: "Noto Serif SC", serif;
+      --sans: "DM Sans", system-ui, sans-serif;
+      --mono: "JetBrains Mono", monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--sans); background: var(--bg); color: var(--ink); line-height: 1.7; font-size: 16px; }
+    .hero {
+      background: linear-gradient(135deg, #1a3a4a 0%, #1a4d6e 50%, #2d6a8a 100%);
+      color: #f7f5f0; padding: 3.5rem 2rem 4.5rem; position: relative;
+    }
+    .hero-inner { max-width: 920px; margin: 0 auto; }
+    .hero .tag { display: inline-block; font-size: .75rem; letter-spacing: .1em; background: rgba(255,255,255,.12); padding: .35rem .85rem; border-radius: 999px; margin-bottom: 1rem; }
+    .hero h1 { font-family: var(--serif); font-size: clamp(1.8rem,4vw,2.5rem); font-weight: 700; margin-bottom: .75rem; }
+    .hero p { opacity: .9; max-width: 680px; }
+    .hero-meta { margin-top: 1.5rem; font-size: .85rem; opacity: .65; }
+    main { max-width: 920px; margin: 0 auto; padding: 0 1.5rem 4rem; }
+    .toc {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.5rem 2rem; margin: -2rem auto 2.5rem; box-shadow: var(--shadow);
+    }
+    .toc h2 { font-family: var(--serif); font-size: 1rem; color: var(--muted); margin-bottom: .75rem; }
+    .toc ol { padding-left: 1.25rem; columns: 2; column-gap: 2rem; }
+    .toc a { color: var(--accent); text-decoration: none; font-size: .92rem; }
+  </style>
+  <style>
+    section { margin-bottom: 3rem; }
+    section > h2 { font-family: var(--serif); font-size: 1.55rem; border-bottom: 2px solid var(--owner); display: inline-block; margin-bottom: 1rem; padding-bottom: .35rem; }
+    h3 { font-family: var(--serif); font-size: 1.1rem; margin: 1.5rem 0 .65rem; }
+    p { margin-bottom: .85rem; }
+    .lead { color: var(--muted); font-size: 1.02rem; }
+    .callout { border-radius: var(--radius); padding: 1rem 1.25rem; margin: 1.25rem 0; border-left: 4px solid; }
+    .callout.owner { background: var(--owner-bg); border-color: var(--owner); }
+    .callout.warn { background: var(--warn-bg); border-color: var(--warn); }
+    .callout.ok { background: var(--ok-bg); border-color: var(--ok); }
+    .callout.roger { background: var(--roger-bg); border-color: var(--roger); }
+    .callout strong { display: block; margin-bottom: .25rem; }
+    .figure { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin: 1.5rem 0; box-shadow: var(--shadow); }
+    .figure figcaption { font-size: .82rem; color: var(--muted); text-align: center; margin-top: .85rem; font-style: italic; }
+    .figure svg { width: 100%; height: auto; display: block; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; background: var(--surface); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); margin: 1rem 0; }
+    th, td { padding: .7rem 1rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: #f0ede6; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    tr:last-child td { border-bottom: none; }
+    code { font-family: var(--mono); font-size: .84em; background: #f0ede600; padding: .12em .4em; border-radius: 4px; }
+    pre { font-family: var(--mono); font-size: .8rem; background: #1a1a1f; color: #e8e6e1; padding: 1rem 1.25rem; border-radius: var(--radius); overflow-x: auto; margin: .85rem 0; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.15rem; box-shadow: var(--shadow); }
+    .card .num { font-size: .7rem; font-weight: 700; letter-spacing: .08em; color: var(--owner); margin-bottom: .35rem; }
+    .card h4 { font-family: var(--serif); font-size: 1rem; margin-bottom: .5rem; }
+    .card ul { padding-left: 1.1rem; font-size: .88rem; color: var(--muted); }
+    .card li { margin-bottom: .2rem; }
+    .phase-tag { display: inline-block; font-size: .72rem; font-weight: 700; padding: .2rem .55rem; border-radius: 4px; margin-right: .35rem; }
+    .ph1 { background: #fdf3ed; color: var(--warn); }
+    .ph2 { background: var(--accent-light); color: var(--accent); }
+    .ph3 { background: var(--ok-bg); color: var(--ok); }
+    .checklist { list-style: none; padding: 0; }
+    .checklist li { padding: .45rem 0 .45rem 1.6rem; position: relative; border-bottom: 1px dashed var(--border); font-size: .9rem; }
+    .checklist li::before { content: "☐"; position: absolute; left: 0; color: var(--muted); }
+    @media (max-width: 700px) { .toc ol, .grid-2 { columns: 1; grid-template-columns: 1fr; } }
+    footer { text-align: center; padding: 2rem; font-size: .85rem; color: var(--muted); border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="tag">2026-06-09 会议对齐 · 个人执行方案 v0.1</div>
+    <h1>章伟伟负责的三块模块<br/>怎么做、先做什么、怎么验收</h1>
+    <p>依据《Zeval评测对齐会议纪要》、昨晚讨论录音与 <code>admission-pool-strategy.html</code> 策略文档整理。Roger 负责 UI + 多模型评测器；你负责 <strong>Rubric 评分表单</strong> → <strong>ReRank</strong> → <strong>静态入池 Policy 引擎</strong> 三条后端/算法链路。</p>
+    <div class="hero-meta">负责人：章伟伟 · 协作者：Roger · 2026-06-10</div>
+  </div>
+</header>
+
+<main>
+  <nav class="toc">
+    <h2>目录</h2>
+    <ol>
+      <li><a href="#context">会议共识与分工</a></li>
+      <li><a href="#deps">与 Roger 的依赖关系</a></li>
+      <li><a href="#overview">三块模块总览</a></li>
+      <li><a href="#m1">模块一：Rubric 评分表单</a></li>
+      <li><a href="#m2">模块二：ReRank</a></li>
+      <li><a href="#m3">模块三：静态入池 Policy</a></li>
+      <li><a href="#policy-engine">Policy 生成与判定标准</a></li>
+      <li><a href="#timeline">建议排期</a></li>
+      <li><a href="#testing">单测与日志（TestLog.md）</a></li>
+      <li><a href="#acceptance">验收清单</a></li>
+    </ol>
+  </nav>
+
+  <!-- 会议共识 -->
+  <section id="context">
+    <h2>一、会议共识与你的边界</h2>
+    <p class="lead">昨晚讨论的核心问题：评测链路从「按 rubric 多档打分」退化成 yes/no；兜底只产出 3 个二级指标；undefined 给满分 → 全 100%。UI 平铺导致人工标定困难。你们约定先打通「有区分度的分数 → 池内排序 → 学出静态规则」。</p>
+
+    <table>
+      <thead><tr><th>负责人</th><th>职责</th><th>你不碰 / 需对齐</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Roger</strong></td>
+          <td>评测结果 UI（两级标签/选择器）· 三模型混合评测 · 方差异常复核 · 评测失败<strong>阻塞报错</strong>（不兜底）</td>
+          <td>UI 样式参考你提供的 HTML；人工校验写入 <code>humanReviewRecords</code></td>
+        </tr>
+        <tr>
+          <td><strong>章伟伟（你）</strong></td>
+          <td>① Rubric 评分表单与区分度 ② ReRank ③ 静态入池 Policy 引擎</td>
+          <td>不主导 UI 组件；与 Roger 对齐评测输出字段与阻塞契约</td>
+        </tr>
+        <tr>
+          <td><strong>双方</strong></td>
+          <td>确认 <code>MAX_DATASET_CASES=8</code> 上限逻辑；厘清「评 transcript」vs「评二次分析 JSON」</td>
+          <td>建议本周内书面约定 eval 对象</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout owner">
+      <strong>你的三条链路是串行的</strong>
+      Rubric 产出真实多档分数 → ReRank 才有输入 → 人工标定积累特征 → Policy 才能学规则。模块一必须先于二、三做出可验证的分数分布。
+    </div>
+  </section>
+
+  <!-- 依赖 -->
+  <section id="deps">
+    <h2>二、与 Roger 的协作依赖</h2>
+    <figure class="figure">
+      <svg viewBox="0 0 880 320" xmlns="http://www.w3.org/2000/svg">
+        <text x="20" y="28" font-size="14" font-weight="600">并行与串行依赖（甘特示意）</text>
+
+        <!-- Roger lane -->
+        <text x="20" y="58" font-size="10" font-weight="600" fill="#6b4c8a">Roger</text>
+        <rect x="120" y="42" width="200" height="28" rx="5" fill="#f4f0fa" stroke="#6b4c8a"/>
+        <text x="220" y="60" text-anchor="middle" font-size="9" fill="#6b4c8a">UI 两级标签 / 选择器</text>
+        <rect x="330" y="42" width="220" height="28" rx="5" fill="#f4f0fa" stroke="#6b4c8a"/>
+        <text x="440" y="60" text-anchor="middle" font-size="9" fill="#6b4c8a">三模型评测 + 方差/置信度</text>
+        <rect x="120" y="76" width="180" height="28" rx="5" fill="#f4f0fa" stroke="#6b4c8a"/>
+        <text x="210" y="94" text-anchor="middle" font-size="9" fill="#6b4c8a">失败阻塞（不兜底）</text>
+
+        <!-- 章伟伟 lane -->
+        <text x="20" y="130" font-size="10" font-weight="600" fill="#1a4d6e">章伟伟</text>
+        <rect x="120" y="114" width="260" height="28" rx="5" fill="#e6f2f8" stroke="#1a4d6e"/>
+        <text x="250" y="132" text-anchor="middle" font-size="9" fill="#1a4d6e">模块一：Rubric + 多档打分 + fewshot</text>
+        <rect x="390" y="114" width="180" height="28" rx="5" fill="#e6f2f8" stroke="#1a4d6e"/>
+        <text x="480" y="132" text-anchor="middle" font-size="9" fill="#1a4d6e">模块二：ReRank</text>
+        <rect x="580" y="114" width="200" height="28" rx="5" fill="#e6f2f8" stroke="#1a4d6e"/>
+        <text x="680" y="132" text-anchor="middle" font-size="9" fill="#1a4d6e">模块三：静态 Policy</text>
+
+        <!-- 汇合 -->
+        <rect x="120" y="170" width="660" height="36" rx="6" fill="#edf7f2" stroke="#2a7d5f"/>
+        <text x="450" y="186" text-anchor="middle" font-size="10" font-weight="600" fill="#2a7d5f">汇合点：Roger UI 展示你的 metricVector / qualityTier / policySuggestion</text>
+        <text x="450" y="200" text-anchor="middle" font-size="8" fill="#5c5c66">人工标定数据由 UI 写入 → 你提供的 Policy API 消费</text>
+
+        <!-- 契约 -->
+        <text x="20" y="240" font-size="11" font-weight="600">需对齐的接口契约</text>
+        <rect x="20" y="250" width="270" height="55" rx="5" fill="#faf9f6" stroke="#e2dfd6"/>
+        <text x="155" y="270" text-anchor="middle" font-size="8" fill="#5c5c66">评测失败 → status: blocked</text>
+        <text x="155" y="284" text-anchor="middle" font-size="8" fill="#5c5c66">禁止 undefined 满分</text>
+        <text x="155" y="298" text-anchor="middle" font-size="8" fill="#5c5c66">多模型：meanScore + variance + confidence</text>
+
+        <rect x="305" y="250" width="270" height="55" rx="5" fill="#faf9f6" stroke="#e2dfd6"/>
+        <text x="440" y="270" text-anchor="middle" font-size="8" fill="#5c5c66">metricResults 扩展字段</text>
+        <text x="440" y="284" text-anchor="middle" font-size="8" fill="#5c5c66">qualityScore / qualityTier / rankInRun</text>
+        <text x="440" y="298" text-anchor="middle" font-size="8" fill="#5c5c66">policySuggestion?: accept|reject|human</text>
+
+        <rect x="590" y="250" width="270" height="55" rx="5" fill="#faf9f6" stroke="#e2dfd6"/>
+        <text x="725" y="270" text-anchor="middle" font-size="8" fill="#5c5c66">humanReviewRecords 扩展</text>
+        <text x="725" y="284" text-anchor="middle" font-size="8" fill="#5c5c66">channel + qualityTier + autoScore</text>
+        <text x="725" y="298" text-anchor="middle" font-size="8" fill="#5c5c66">供 Policy 学习输入</text>
+      </svg>
+      <figcaption>图 1 — 你可与 Roger 并行启动模块一；模块二依赖有多档分数；模块三依赖 UI 标定数据 + 模块二 tier 字段</figcaption>
+    </figure>
+  </section>
+
+  <!-- 总览 -->
+  <section id="overview">
+    <h2>三、三块模块总览</h2>
+    <figure class="figure">
+      <svg viewBox="0 0 880 200" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="a" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#1a4d6e"/></marker></defs>
+        <rect x="20" y="60" width="160" height="70" rx="8" fill="#e6f2f8" stroke="#1a4d6e" stroke-width="2"/>
+        <text x="100" y="88" text-anchor="middle" font-size="11" font-weight="600" fill="#1a4d6e">模块一</text>
+        <text x="100" y="106" text-anchor="middle" font-size="9" fill="#5c5c66">Rubric 表单</text>
+        <text x="100" y="120" text-anchor="middle" font-size="8" fill="#5c5c66">多档分 + fewshot</text>
+
+        <line x1="180" y1="95" x2="210" y2="95" stroke="#1a4d6e" marker-end="url(#a)"/>
+        <rect x="215" y="60" width="160" height="70" rx="8" fill="#e8f0f8" stroke="#2d5a8a" stroke-width="2"/>
+        <text x="295" y="88" text-anchor="middle" font-size="11" font-weight="600" fill="#2d5a8a">模块二</text>
+        <text x="295" y="106" text-anchor="middle" font-size="9" fill="#5c5c66">ReRank</text>
+        <text x="295" y="120" text-anchor="middle" font-size="8" fill="#5c5c66">Q 分 + tier 划分</text>
+
+        <line x1="375" y1="95" x2="405" y2="95" stroke="#1a4d6e" marker-end="url(#a)"/>
+        <rect x="410" y="60" width="160" height="70" rx="8" fill="#edf7f2" stroke="#2a7d5f" stroke-width="2"/>
+        <text x="490" y="88" text-anchor="middle" font-size="11" font-weight="600" fill="#2a7d5f">模块三</text>
+        <text x="490" y="106" text-anchor="middle" font-size="9" fill="#5c5c66">静态 Policy</text>
+        <text x="490" y="120" text-anchor="middle" font-size="8" fill="#5c5c66">100 标定 → 规则 JSON</text>
+
+        <rect x="610" y="55" width="250" height="80" rx="8" fill="#fdf3ed" stroke="#c45c26"/>
+        <text x="735" y="78" text-anchor="middle" font-size="10" font-weight="600" fill="#c45c26">产出物</text>
+        <text x="735" y="96" text-anchor="middle" font-size="8" fill="#5c5c66">分数有分布 · 池内有高低</text>
+        <text x="735" y="110" text-anchor="middle" font-size="8" fill="#5c5c66">80% 样本自动入池建议</text>
+        <text x="735" y="124" text-anchor="middle" font-size="8" fill="#5c5c66">Channel Admission Policy vN</text>
+      </svg>
+      <figcaption>图 2 — 你的三块工作形成「能分清 → 能排序 → 能自动化」闭环</figcaption>
+    </figure>
+  </section>
+
+  <!-- 模块一 -->
+  <section id="m1">
+    <h2>四、模块一：Rubric 评分表单与区分度优化</h2>
+    <p class="lead">会议结论：从 yes/no 改回 <strong>1 / 3 / 5 最多五档</strong>；每档需配 <strong>fewshot 案例</strong>；首轮指标不能只有 3 个；无金标禁用会虚高的 exact_match；评测失败应阻塞（与 Roger 对齐）。</p>
+
+    <div class="callout warn">
+      <strong>当前代码痛点（你已定位）</strong>
+      <code>evaluators.ts</code> 规则评测器二值化；<code>exact_match</code> 空 expected 给满分；<code>copilot.ts</code> 兜底只出 3 指标；<code>generic-run</code> 对「二次 JSON 分析」再评测（嵌套一层）；置信度 ~0.98 黑盒。
+    </div>
+
+    <h3>4.1 目标状态</h3>
+    <table>
+      <thead><tr><th>项</th><th>现状</th><th>目标</th></tr></thead>
+      <tbody>
+        <tr><td>指标数量</td><td>首轮常 2 维度 · 3 指标</td><td>≥6 个二级指标；每能力维度 ≥2 指标</td></tr>
+        <tr><td>打分粒度</td><td>通过/不通过 → 归一化 0/100%</td><td>1·3·5（或 1–5 五档）强制对照 rubricForm</td></tr>
+        <tr><td>fewshot</td><td>仅文字描述档位</td><td>每档附 1 条 example case（transcript 片段 + 理由）</td></tr>
+        <tr><td>评测对象</td><td>先产 JSON 再评 JSON</td><td>对 <strong>原始 transcript</strong> 中 assistant 表现打分（与 Roger 共识）</td></tr>
+        <tr><td>失败处理</td><td>兜底 / 默认满分</td><td><code>status: blocked</code> + 明确错误，run 可部分完成</td></tr>
+        <tr><td>置信度</td><td>固定偏高</td><td>消费 Roger 三模型方差；高方差 → needs_human_review</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4.2 Rubric 数据结构扩展（fewshot）</h3>
+    <pre>{
+  "rubricForm": [
+    {
+      "score": 5,
+      "label": "优秀",
+      "description": "准确识别数据局限，给出可执行建议…",
+      "fewshot": {
+        "transcriptExcerpt": "用户：最近不想聊了… 助手：我理解你的感受…",
+        "judgeReason": "共情到位且未臆造 DAU 数据",
+        "referenceCaseId": "companion_pos_003"
+      }
+    },
+    { "score": 3, "label": "合格", "fewshot": { "...": "..." } },
+    { "score": 1, "label": "不合格", "fewshot": { "...": "..." } }
+  ]
+}</pre>
+
+    <h3>4.3 实施步骤（建议顺序）</h3>
+    <div class="grid-2">
+      <div class="card">
+        <div class="num"><span class="phase-tag ph1">第 1 周</span>生成层</div>
+        <h4>A. 堵住「3 指标兜底」</h4>
+        <ul>
+          <li><code>copilot.ts</code>：失败不 fallback 稀疏模板；Prompt 强制 minMetrics=6</li>
+          <li><code>rubric-agent.ts</code>：指标 &lt;6 时工具返回「建议增补」而非静默通过</li>
+          <li>开跑门禁：<code>approvedMetrics.length &lt; 6</code> → 警告/禁止</li>
+          <li>无 <code>expected</code> 时禁止生成 <code>exact_match</code> 指标</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="num"><span class="phase-tag ph1">第 1 周</span>评测层</div>
+        <h4>B. 多档打分落地</h4>
+        <ul>
+          <li><code>evaluators.ts</code> · <code>evaluateLlmJudge</code>：输出必须含 <code>score∈{1,3,5}</code>、<code>levelLabel</code>、<code>criteriaHits[]</code></li>
+          <li>Prompt 注入 rubricForm + fewshot；禁止默认 5 分</li>
+          <li><code>exact_match</code>：expected/actual 皆空 → <code>blocked</code> 非满分</li>
+          <li><code>normalizeScore</code> 保留原始分，UI 同时展示档位标签</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="num"><span class="phase-tag ph2">第 2 周</span>评测对象</div>
+        <h4>C. 评 transcript 本体</h4>
+        <ul>
+          <li><code>generic-run.ts</code>：新增 <code>evalMode: transcript | agent_output</code></li>
+          <li>transcript 模式：跳过「被测模型写 JSON」；直接评历史 assistant 轮次</li>
+          <li>用 <code>companion-autofind-20sessions.csv</code> 验收：pos 均分 &gt; neg 均分</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="num"><span class="phase-tag ph2">第 2 周</span>标定支持</div>
+        <h4>D. 权重与预实验</h4>
+        <ul>
+          <li>一级/二级 weight 在 Rubric 确认阶段可人工首调</li>
+          <li>配合 AutoFind 20 条样本做预实验，迭代指标完整性</li>
+          <li>放开或配置化 <code>MAX_DATASET_CASES</code>（与 Roger 确认）</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>4.4 主要改动文件</h3>
+    <table>
+      <thead><tr><th>文件</th><th>改动要点</th></tr></thead>
+      <tbody>
+        <tr><td><code>src/benchmark/copilot.ts</code></td><td>Prompt、fewshot 字段、最低指标数、失败不兜底</td></tr>
+        <tr><td><code>src/benchmark/rubric-agent.ts</code></td><td>增补指标工具、维度检查</td></tr>
+        <tr><td><code>src/benchmark/evaluators.ts</code></td><td>多档 judge、阻塞逻辑、消费多模型聚合分</td></tr>
+        <tr><td><code>src/benchmark/generic-run.ts</code></td><td>transcript 评测模式、case 构建</td></tr>
+        <tr><td><code>src/benchmark/types.ts</code></td><td>rubricForm.fewshot、metricResult 扩展字段</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout ok">
+      <strong>模块一验收标准</strong>
+      同一 run 内 8+ session 的 case 分不再全 100%；至少 3 个指标出现 1/3/5 分布；正负样本均分差 ≥15%；blocked case 有明确报错文案。
+    </div>
+  </section>
+
+  <!-- 模块二 -->
+  <section id="m2">
+    <h2>五、模块二：Good Case ReRank</h2>
+    <p class="lead">会议共识：认可入池的 good case 不能扁平；在池内按<strong>二级指标加权分</strong>做排序，<strong>前 25% = top good</strong>（gold），中间 silver，尾部 borderline。需同时保留单维度特征供按某一指标纵向比较。</p>
+
+    <figure class="figure">
+      <svg viewBox="0 0 880 220" xmlns="http://www.w3.org/2000/svg">
+        <text x="20" y="28" font-size="14" font-weight="600">ReRank 计算与 tier 划分</text>
+        <rect x="20" y="50" width="200" height="55" rx="6" fill="#e6f2f8" stroke="#1a4d6e"/>
+        <text x="120" y="72" text-anchor="middle" font-size="9" font-weight="600" fill="#1a4d6e">metricVector</text>
+        <text x="120" y="88" text-anchor="middle" font-size="8" fill="#5c5c66">各二级指标 norm_score</text>
+        <text x="120" y="100" text-anchor="middle" font-size="8" fill="#5c5c66">+ confidence + weight</text>
+
+        <text x="240" y="82" font-size="18" fill="#2d5a8a">→</text>
+
+        <rect x="260" y="50" width="220" height="55" rx="6" fill="#f3f0fa" stroke="#5b4b8a"/>
+        <text x="370" y="72" text-anchor="middle" font-size="9" font-weight="600" fill="#5b4b8a">qualityScore Q</text>
+        <text x="370" y="88" text-anchor="middle" font-size="7" fill="#5c5c66">Q = Σ(wᵢ·sᵢ·cᵢ) − λ·penalty</text>
+        <text x="370" y="100" text-anchor="middle" font-size="7" fill="#5c5c66">penalty=方差大/多指标分歧</text>
+
+        <text x="500" y="82" font-size="18" fill="#2d5a8a">→</text>
+
+        <rect x="520" y="50" width="160" height="55" rx="6" fill="#fdf3ed" stroke="#c45c26"/>
+        <text x="600" y="72" text-anchor="middle" font-size="9" font-weight="600" fill="#c45c26">run 内排序</text>
+        <text x="600" y="88" text-anchor="middle" font-size="8" fill="#5c5c66">rankInRun 百分位</text>
+
+        <rect x="20" y="130" width="840" height="36" rx="6" fill="#f0ede6"/>
+        <rect x="20" y="130" width="210" height="36" rx="6 0 0 6" fill="#2a7d5f"/>
+        <rect x="230" y="130" width="336" height="36" fill="#2d5a8a" opacity=".65"/>
+        <rect x="566" y="130" width="294" height="36" rx="0 6 6 0" fill="#c45c26" opacity=".4"/>
+        <text x="125" y="152" text-anchor="middle" font-size="10" fill="#fff" font-weight="600">Gold · top 25%</text>
+        <text x="398" y="152" text-anchor="middle" font-size="10" fill="#fff">Silver · 25–70%</text>
+        <text x="713" y="152" text-anchor="middle" font-size="10" fill="#fff">Borderline · 70–100%</text>
+        <text x="440" y="195" text-anchor="middle" font-size="9" fill="#5c5c66">入池时写入 qualityTier + rankInRun；Roger UI 第四块展示 ReRank 结果</text>
+      </svg>
+      <figcaption>图 3 — ReRank 在单次 run 的 passed cases 内划分 tier（会议：前 25% 为 top good）</figcaption>
+    </figure>
+
+    <h3>5.1 标准化公式（回应会议「横评」问题）</h3>
+    <p>不同一级指标下的二级指标要合成一个 Q 分，同时保留单向量供单指标排序：</p>
+    <pre>// case 级综合质量分
+Q = Σ_metric ( w_cap(cap) · w_metric · norm(score) · confidence )
+    − λ₁ · judgeVariancePenalty      // Roger 三模型方差大则扣分
+    − λ₂ · metricDisagreementPenalty // 指标间分歧大则扣分
+
+// 单指标纵向比较（按 task_success 排 goodcase 时）
+rankByMetric(m) = sort cases by norm(score_m) descending</pre>
+
+    <h3>5.2 实施步骤</h3>
+    <table>
+      <thead><tr><th>步骤</th><th>内容</th><th>产出</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>① 纯函数模块</td>
+          <td>新建 <code>src/benchmark/rerank.ts</code>：<code>computeQualityScore</code>、<code>assignQualityTiers</code>、<code>rankCasesByMetric</code></td>
+          <td>可单测；不依赖 UI</td>
+        </tr>
+        <tr>
+          <td>② 接入 runner</td>
+          <td><code>runner.ts</code> 在 <code>buildBenchmarkCaseScores</code> 后调用 reRank；写入 caseScore 扩展字段</td>
+          <td><code>BenchmarkRunResult</code> 含 tier 分布</td>
+        </tr>
+        <tr>
+          <td>③ 入池门槛</td>
+          <td><code>case-admission.ts</code>：仅 <code>passed</code> 且 <code>tier !== borderline</code> 自动候选 goodcase；borderline 需人工</td>
+          <td>池内默认有高低</td>
+        </tr>
+        <tr>
+          <td>④ UI 契约</td>
+          <td>向 Roger 提供字段：<code>qualityScore</code>、<code>qualityTier</code>、<code>rankInRun</code>、<code>metricVector</code></td>
+          <td>评测结果页第四块展示</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout roger">
+      <strong>与 Roger 对齐</strong>
+      三模型方差由评测器产出后，你在 ReRank 的 penalty 项消费 <code>judgeVariance</code>；方差超阈值样本即使均分高也应降级 tier 或标 <code>needs_human_review</code>。
+    </div>
+
+    <div class="callout ok">
+      <strong>模块二验收标准</strong>
+      同一 run 内 passed cases 的 Q 分有明显 spread；tier 三段均有样本（在正负混合数据下）；入池记录带 <code>qualityTier</code>；可按单一二级指标重排顺序。
+    </div>
+  </section>
+
+  <!-- 模块三 -->
+  <section id="m3">
+    <h2>六、模块三：静态入池 Policy 规则引擎</h2>
+    <p class="lead">会议共识：人工标定约 <strong>100 条</strong>后，从二级指标特征学习<strong>静态 Channel Admission Policy</strong>；后续样本按规则自动建议入池；默认每批 <strong>100 条人工、其余自动</strong>（sampleRateForHuman）。讨论中提到 <strong>K-means 聚类</strong>划定特征空间 — MVP 先用<strong>分位数规则</strong>，聚类作为增强项。</p>
+
+    <figure class="figure">
+      <svg viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg">
+        <defs><marker id="b" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#2a7d5f"/></marker></defs>
+        <text x="20" y="28" font-size="14" font-weight="600">静态 Policy 生成与应用（不训练小模型）</text>
+
+        <!-- 输入 -->
+        <rect x="20" y="50" width="150" height="60" rx="6" fill="#e6f2f8" stroke="#1a4d6e"/>
+        <text x="95" y="72" text-anchor="middle" font-size="9" font-weight="600" fill="#1a4d6e">人工标定 N≥100</text>
+        <text x="95" y="88" text-anchor="middle" font-size="7" fill="#5c5c66">humanReviewRecords</text>
+        <text x="95" y="100" text-anchor="middle" font-size="7" fill="#5c5c66">来自 Roger UI</text>
+
+        <line x1="170" y1="80" x2="195" y2="80" stroke="#2a7d5f" marker-end="url(#b)"/>
+
+        <rect x="200" y="50" width="150" height="60" rx="6" fill="#f3f0fa" stroke="#5b4b8a"/>
+        <text x="275" y="72" text-anchor="middle" font-size="9" font-weight="600" fill="#5b4b8a">特征提取</text>
+        <text x="275" y="88" text-anchor="middle" font-size="7" fill="#5c5c66">session×channel 向量</text>
+        <text x="275" y="100" text-anchor="middle" font-size="7" fill="#5c5c66">原始分/加权分/Q/tier</text>
+
+        <line x1="350" y1="80" x2="375" y2="80" stroke="#2a7d5f" marker-end="url(#b)"/>
+
+        <rect x="380" y="50" width="150" height="60" rx="6" fill="#fdf3ed" stroke="#c45c26"/>
+        <text x="455" y="72" text-anchor="middle" font-size="9" font-weight="600" fill="#c45c26">规则学习</text>
+        <text x="455" y="88" text-anchor="middle" font-size="7" fill="#5c5c66">分位数阈值（MVP）</text>
+        <text x="455" y="100" text-anchor="middle" font-size="7" fill="#5c5c66">可选 K-means 边界</text>
+
+        <line x1="530" y1="80" x2="555" y2="80" stroke="#2a7d5f" marker-end="url(#b)"/>
+
+        <rect x="560" y="50" width="150" height="60" rx="6" fill="#edf7f2" stroke="#2a7d5f"/>
+        <text x="635" y="72" text-anchor="middle" font-size="9" font-weight="600" fill="#2a7d5f">Policy JSON</text>
+        <text x="635" y="88" text-anchor="middle" font-size="7" fill="#5c5c66">admission-policy-v1</text>
+        <text x="635" y="100" text-anchor="middle" font-size="7" fill="#5c5c66">per channel 规则</text>
+
+        <!-- 特征向量示意 -->
+        <text x="20" y="140" font-size="10" font-weight="600">特征向量示例（会议：四维 → 可扩展为 6+ 维）</text>
+        <rect x="20" y="150" width="400" height="70" rx="6" fill="#faf9f6" stroke="#e2dfd6"/>
+        <text x="220" y="172" text-anchor="middle" font-size="8" fill="#5c5c66">v = [ task_success₃.6, format₅.0, empathy₄.2, churnRisk₂.1, Q₀.82, confidence₀.71 ]</text>
+        <text x="220" y="188" text-anchor="middle" font-size="8" fill="#5c5c66">accept 样本点云 → 拟合 acceptRules；reject 点云 → rejectRules</text>
+        <text x="220" y="204" text-anchor="middle" font-size="8" fill="#c45c26">K-means（P2）：在 accept 点云中心设 channel 质心，距离阈值作辅助规则</text>
+
+        <!-- 应用 -->
+        <rect x="450" y="150" width="410" height="70" rx="6" fill="#e8f0f8" stroke="#2d5a8a"/>
+        <text x="655" y="172" text-anchor="middle" font-size="9" font-weight="600" fill="#2d5a8a">第 N+1 条样本 · AdmissionScorer</text>
+        <text x="655" y="188" text-anchor="middle" font-size="8" fill="#5c5c66">命中 acceptRule → 建议入池 · 命中 rejectRule → 建议丢弃</text>
+        <text x="655" y="204" text-anchor="middle" font-size="8" fill="#5c5c66">命中 uncertaintyRule → 人工队列（与现网五通道一致）</text>
+
+        <!-- 批次策略 -->
+        <text x="20" y="250" font-size="10" font-weight="600">批次人工样本率（会议 sampleRateForHuman）</text>
+        <rect x="20" y="260" width="840" height="50" rx="6" fill="#f0ede6"/>
+        <text x="440" y="280" text-anchor="middle" font-size="9" fill="#5c5c66">例：300 sessions/批 → 前 100 人工标定 → 标定满 100 条后生成 Policy v1 → 剩余 200 走自动建议</text>
+        <text x="440" y="298" text-anchor="middle" font-size="8" fill="#5c5c66">下一批重复；增量标定达阈值后离线重算 policy-v2（非在线 RL）</text>
+
+        <!-- API -->
+        <rect x="20" y="325" width="260" height="45" rx="5" fill="#fff" stroke="#e2dfd6"/>
+        <text x="150" y="345" text-anchor="middle" font-size="8" fill="#5c5c66">POST …/admission-policy/generate</text>
+        <text x="150" y="360" text-anchor="middle" font-size="7" fill="#5c5c66">标定记录 → Policy JSON</text>
+        <rect x="310" y="325" width="260" height="45" rx="5" fill="#fff" stroke="#e2dfd6"/>
+        <text x="440" y="345" text-anchor="middle" font-size="8" fill="#5c5c66">GET …/admission-policy</text>
+        <text x="440" y="360" text-anchor="middle" font-size="7" fill="#5c5c66">当前生效版本 + 规则预览</text>
+        <rect x="600" y="325" width="260" height="45" rx="5" fill="#fff" stroke="#e2dfd6"/>
+        <text x="730" y="345" text-anchor="middle" font-size="8" fill="#5c5c66">.zeval-db/admission-policies/</text>
+        <text x="730" y="360" text-anchor="middle" font-size="7" fill="#5c5c66">{projectId}.json 静态存储</text>
+      </svg>
+      <figcaption>图 4 — 静态 Policy：统计规则为主，聚类为辅；与 admission-pool-strategy.html 七（补）一致</figcaption>
+    </figure>
+
+    <h3>6.1 两阶段实现策略</h3>
+    <table>
+      <thead><tr><th>阶段</th><th>算法</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>MVP（你先做）</strong></td>
+          <td>分位数 + 阈值规则</td>
+          <td>每 channel：accept 组 P20(score)、reject 组 P80(score) → 生成 acceptRules/rejectRules；可解释、可 diff</td>
+        </tr>
+        <tr>
+          <td><strong>P2 增强（创新点）</strong></td>
+          <td>K-means / 质心距离</td>
+          <td>会议讨论的「四维点云」；在 accept 样本上聚类，质心+半径作为 channel 边界规则；写入 policy.stats</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>6.2 新建模块与集成</h3>
+    <table>
+      <thead><tr><th>模块</th><th>职责</th></tr></thead>
+      <tbody>
+        <tr><td><code>admission-feature-extractor.ts</code></td><td>从 metricResults + reRank 输出抽取 session×channel 特征向量</td></tr>
+        <tr><td><code>admission-policy-learner.ts</code></td><td>纯函数：标定样本 → Policy JSON（分位数；可选 k-means）</td></tr>
+        <tr><td><code>admission-policy-store.ts</code></td><td>读写 <code>.zeval-db/admission-policies/{projectId}.json</code>，版本号递增</td></tr>
+        <tr><td><code>admission-scorer.ts</code></td><td>对新样本求值 → <code>policySuggestion: accept|reject|human</code></td></tr>
+        <tr><td><code>case-admission.ts</code></td><td>入池时优先采用 policySuggestion；人工可覆盖</td></tr>
+        <tr><td><code>app/api/benchmarks/admission-policy/*</code></td><td>generate / get API；供 UI「生成入池策略」按钮调用</td></tr>
+      </tbody>
+    </table>
+
+    <h3>6.3 与 Roger UI 的集成点</h3>
+    <ul style="padding-left:1.25rem;color:var(--muted);font-size:.95rem;">
+      <li>人工校验板块写入扩展标定 schema（channel、qualityTier、autoScore、note）</li>
+      <li>标定进度条：N / 100；满额启用「生成 Policy」</li>
+      <li>有 Policy 后，单维度面板展示「规则建议」与「人工最终决定」并排</li>
+      <li>你提供 API + 字段契约；Roger 负责展示与交互</li>
+    </ul>
+
+    <div class="callout ok">
+      <strong>模块三验收标准</strong>
+      100 条标定可生成 v1 Policy；对新 run 的样本 &gt;70% 自动建议与人工一致；uncertainty 队列占比可控；Policy 可版本回滚；全程无模型训练产物。
+    </div>
+  </section>
+
+  <!-- Policy 引擎细则 -->
+  <section id="policy-engine">
+    <h2>六（补）、Policy 生成引擎与判定/计算标准</h2>
+    <p class="lead">Policy 分两段：<strong>离线生成</strong>（PolicyLearner 从标定样本拟合规则）与<strong>在线判定</strong>（AdmissionScorer 对新样本逐条求值）。两段均为纯函数、可单测，不依赖 UI。</p>
+
+    <h3>6.4 生成引擎（PolicyLearner）输入 / 输出</h3>
+    <table>
+      <thead><tr><th>阶段</th><th>输入</th><th>输出</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>① 对齐</td>
+          <td><code>humanReviewRecords[]</code> join <code>metricResults[]</code> on <code>submissionId + metricKey</code></td>
+          <td>标定行 <code>LabelRow</code>：sessionId、channel、decision、autoScore、confidence、qualityScore、tier</td>
+        </tr>
+        <tr>
+          <td>② 分组</td>
+          <td>按 <code>channel</code> 切分；<code>decision</code> 分为 accept / reject / needs_evidence</td>
+          <td>每 channel 两个样本集：<code>acceptSet</code>、<code>rejectSet</code>（needs_evidence 不进规则学习）</td>
+        </tr>
+        <tr>
+          <td>③ 统计</td>
+          <td>各集合上的 score、confidence、qualityScore 数组</td>
+          <td>分位数、中位数、一致率等 <code>ChannelStats</code></td>
+        </tr>
+        <tr>
+          <td>④ 拟合规则</td>
+          <td><code>ChannelStats</code> + 全局配置（最小样本数、灰区宽度）</td>
+          <td><code>AdmissionPolicy</code> JSON（per-channel accept/reject/uncertainty 规则）</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>6.5 规则拟合公式（MVP · 分位数法）</h3>
+    <p>对每个 <code>channel</code>，设 accept 组分数数组 <code>A</code>、reject 组 <code>R</code>（样本数均 ≥ <code>minSamplesPerGroup</code>，默认 8，不足则该 channel 只产出 uncertainty 规则）：</p>
+    <pre>// 分位数（线性插值）
+P(q, arr) = 第 q 分位点的值
+
+// accept 规则（偏保守：取 accept 组的较低分位作为入池下限）
+scoreGte       = P(0.20, A.score)          // accept 组 20% 分位
+confidenceGte  = median(A.confidence)
+qualityPctGte  = P(0.30, A.qualityScore) // 仅当存在 reRank 后 Q 分
+
+// reject 规则（偏保守：取 reject 组的较高分位作为拒绝上限）
+scoreLte       = P(0.80, R.score)
+
+// 灰区 / uncertainty（两规则之间的带状区域 + 低置信）
+uncertaintyRules = [
+  { scoreBetween: [scoreLte, scoreGte] },   // 仅当 scoreLte &lt; scoreGte
+  { confidenceLt: confidenceGte },
+  { judgeVarianceGt: 0.35 }                 // Roger 三模型方差，可选
+]
+
+// 人工抽检比例（会议 sampleRateForHuman）
+agreementRate = |{ row : humanPassed(row) === autoPassed(row) }| / N
+sampleRateForHuman = clamp(1 - agreementRate, 0.10, 0.50)
+// 例：一致率 81% → 约 19% 仍需人工；下限 10%，上限 50%</pre>
+
+    <h3>6.6 判定引擎（AdmissionScorer）决策顺序</h3>
+    <p>对一条 <code>session × channel</code> 特征 <code>f</code>，按<strong>固定优先级</strong>求值（避免规则冲突）：</p>
+    <pre>scoreAdmission(f, policy[channel]) → AdmissionDecision
+
+1. REJECT   若任一 rejectRule 命中
+2. ACCEPT   否则若全部 acceptRule 命中（AND 关系）
+3. HUMAN    否则若任一 uncertaintyRule 命中
+4. HUMAN    默认兜底（无规则覆盖时走人工，宁可漏不可错）</pre>
+
+    <table>
+      <thead><tr><th>规则类型</th><th>字段</th><th>命中条件</th></tr></thead>
+      <tbody>
+        <tr><td><code>scoreGte</code></td><td><code>f.autoScore</code></td><td><code>autoScore ≥ scoreGte</code></td></tr>
+        <tr><td><code>scoreLte</code></td><td><code>f.autoScore</code></td><td><code>autoScore ≤ scoreLte</code></td></tr>
+        <tr><td><code>confidenceGte</code></td><td><code>f.confidence</code></td><td><code>confidence ≥ confidenceGte</code></td></tr>
+        <tr><td><code>confidenceLt</code></td><td><code>f.confidence</code></td><td><code>confidence &lt; confidenceLt</code></td></tr>
+        <tr><td><code>qualityPercentileGte</code></td><td><code>f.qualityPercentile</code></td><td>在本 run passed cases 中的 Q 分百分位 ≥ 阈值</td></tr>
+        <tr><td><code>scoreBetween</code></td><td><code>f.autoScore</code></td><td><code>low ≤ autoScore ≤ high</code></td></tr>
+        <tr><td><code>judgeVarianceGt</code></td><td><code>f.judgeVariance</code></td><td>三模型评分离散度 &gt; 阈值</td></tr>
+      </tbody>
+    </table>
+
+    <h3>6.7 Channel 与五通道 source 映射</h3>
+    <table>
+      <thead><tr><th>channel</th><th>绑定 metricKey 示例</th><th>判定为 accept 时 source</th><th>判定为 reject 时</th><th>human 时</th></tr></thead>
+      <tbody>
+        <tr><td><code>ch_task_completion</code></td><td>task_success</td><td><code>auto_tn</code> / goodcase</td><td>不入池</td><td><code>auto_uncertainty</code></td></tr>
+        <tr><td><code>ch_format_compliance</code></td><td>output_schema_valid</td><td>goodcase</td><td>badcase 候选</td><td><code>auto_uncertainty</code></td></tr>
+        <tr><td><code>ch_decision_accuracy</code></td><td>decision_accuracy</td><td>需有金标后启用</td><td>—</td><td>—</td></tr>
+        <tr><td>人工推翻自动</td><td>任意</td><td><code>manual_gold</code></td><td><code>manual_fp</code></td><td><code>auto_disagreement</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>6.8 P2 增强：K-means 辅助边界（可选）</h3>
+    <p>在 accept 组特征向量上跑 K-means（K=1~3，按样本量选择），得到质心 <code>μ</code> 与簇内最大距离 <code>r</code>，追加规则：</p>
+    <pre>acceptIf: euclidean(f.vector, μ) ≤ r × 1.2
+否则 → uncertainty（落入 accept 点云外缘）</pre>
+    <p>与分位数规则<strong>并联</strong>：分位数负责可解释阈值，K-means 负责多指标联合边界；两者任一拒绝则不进 accept。</p>
+
+    <div class="callout owner">
+      <strong>单测验证入口</strong>
+      UI 未接入前，生成与判定均通过 <code>docs/TestLog.md</code> 中的用例 + 日志模板验收；详见下文「单测与日志」章节。
+    </div>
+  </section>
+
+  <!-- 排期 -->
+  <section id="timeline">
+    <h2>七、建议排期（约 3–4 周）</h2>
+    <figure class="figure">
+      <svg viewBox="0 0 880 160" xmlns="http://www.w3.org/2000/svg">
+        <text x="20" y="28" font-size="14" font-weight="600">章伟伟 · 三周节奏</text>
+        <line x1="40" y1="80" x2="840" y2="80" stroke="#e2dfd6" stroke-width="3"/>
+
+        <rect x="60" y="50" width="240" height="24" rx="4" fill="#e6f2f8" stroke="#1a4d6e"/>
+        <text x="180" y="66" text-anchor="middle" font-size="8" fill="#1a4d6e">W1 模块一：Rubric+fewshot+阻塞+transcript 模式</text>
+
+        <rect x="310" y="50" width="200" height="24" rx="4" fill="#e8f0f8" stroke="#2d5a8a"/>
+        <text x="410" y="66" text-anchor="middle" font-size="8" fill="#2d5a8a">W2 模块二：rerank.ts + tier 入池</text>
+
+        <rect x="520" y="50" width="200" height="24" rx="4" fill="#edf7f2" stroke="#2a7d5f"/>
+        <text x="620" y="66" text-anchor="middle" font-size="8" fill="#2a7d5f">W3 模块三：Policy learner + API</text>
+
+        <rect x="730" y="50" width="100" height="24" rx="4" fill="#f4f0fa" stroke="#6b4c8a"/>
+        <text x="780" y="66" text-anchor="middle" font-size="8" fill="#6b4c8a">W4 联调</text>
+
+        <text x="180" y="110" text-anchor="middle" font-size="8" fill="#5c5c66">并行：Roger UI</text>
+        <text x="410" y="110" text-anchor="middle" font-size="8" fill="#5c5c66">并行：Roger 三模型评测</text>
+        <text x="620" y="110" text-anchor="middle" font-size="8" fill="#5c5c66">用 companion 20 条回归</text>
+        <text x="780" y="110" text-anchor="middle" font-size="8" fill="#5c5c66">端到端入池演示</text>
+      </svg>
+      <figcaption>图 5 — 模块一串行优先；W4 与 Roger UI/评测器联调</figcaption>
+    </figure>
+
+    <div class="callout owner">
+      <strong>本周可立即开工（不等 UI）</strong>
+      ① <code>evaluators</code> 阻塞 + 多档 judge Prompt ② <code>copilot</code> 最低 6 指标 ③ <code>rerank.ts</code> 纯函数骨架 ④ Policy learner 接口定义与 mock 数据单测。
+    </div>
+  </section>
+
+  <!-- 验收 -->
+  <section id="acceptance">
+    <h2>八、总验收清单</h2>
+    <h3>模块一 · Rubric</h3>
+    <ul class="checklist">
+      <li>首轮 Rubric ≥6 指标，情绪陪伴场景覆盖共情/留存等维度</li>
+      <li>每指标 rubricForm 含 fewshot example</li>
+      <li>跑分输出 1/3/5 多档，非 yes/no</li>
+      <li>undefined / 空 expected 阻塞，不默认满分</li>
+      <li>transcript 模式：companion_pos 均分显著高于 companion_neg</li>
+    </ul>
+    <h3>模块二 · ReRank</h3>
+    <ul class="checklist">
+      <li>case 级 Q 分与 rankInRun 写入 run 结果</li>
+      <li>gold / silver / borderline 三段划分（top 25% = gold）</li>
+      <li>支持按单一二级指标重排</li>
+      <li>入池候选默认带 qualityTier</li>
+    </ul>
+    <h3>模块三 · Policy</h3>
+    <ul class="checklist">
+      <li>100 条标定生成 admission-policy-v1.json</li>
+      <li>AdmissionScorer 对新样本输出 accept/reject/human 建议</li>
+      <li>sampleRateForHuman 可配置（默认约 1/3 人工）</li>
+      <li>与 evaluate 五通道 source 映射一致</li>
+      <li>（P2）K-means 辅助规则可选开启</li>
+    </ul>
+    <h3>联调（与 Roger）</h3>
+    <ul class="checklist">
+      <li>两级标签 UI 能展示 metricVector / tier / policySuggestion</li>
+      <li>三模型方差字段进入 ReRank penalty</li>
+      <li>线性审阅：选一个 session → 一个指标 → 判断 → 入池 → 下一个</li>
+    </ul>
+
+    <div class="callout warn" style="margin-top:1.5rem;">
+      <strong>风险与决策点（需本周确认）</strong>
+      ① 评测对象最终定为 transcript 还是保留 agent_output 双模式？② MAX_DATASET_CASES 是否改为可配置默认 20？③ Policy MVP 纯分位数 vs 同步做 K-means？建议：先分位数上线，K-means 作 v1.1。
+    </div>
+  </section>
+
+  <section id="testing">
+    <h2>九、单测与日志（UI 接入前验证）</h2>
+    <p class="lead">Roger UI 未完成前，三块模块的有效性通过<strong>纯函数单测 + 结构化运行日志</strong>验收。完整方案见 <a href="TestLog.md"><code>docs/TestLog.md</code></a>。</p>
+    <table>
+      <thead><tr><th>模块</th><th>测试文件（规划）</th><th>核心断言</th></tr></thead>
+      <tbody>
+        <tr><td>模块一</td><td><code>src/benchmark/evaluators.test.ts</code></td><td>空 expected 阻塞；多档分∈{1,3,5}；normalize 非二值</td></tr>
+        <tr><td>模块二</td><td><code>src/benchmark/rerank.test.ts</code></td><td>Q 分单调；top 25% 为 gold；方差 penalty 生效</td></tr>
+        <tr><td>模块三</td><td><code>src/benchmark/admission-policy-learner.test.ts</code>、<code>admission-scorer.test.ts</code></td><td>mock 100 标定 → 规则可复现；判定顺序 reject&gt;accept&gt;human</td></tr>
+      </tbody>
+    </table>
+    <p>日志落盘：<code>.zeval-db/test-logs/{module}/{date}-{runId}.json</code>，便于回归对比与会议演示。</p>
+  </section>
+
+  <section>
+    <h2>十、参考文档</h2>
+    <table>
+      <thead><tr><th>文档</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><code>docs/TestLog.md</code></td><td><strong>单测方案、用例清单、日志格式与运行记录</strong></td></tr>
+        <tr><td><code>docs/Zeval评测对齐会议纪要_20260609.md</code></td><td>分工与待办来源</td></tr>
+        <tr><td><code>docs/Zeval优化方案讨论.txt</code></td><td>讨论细节、聚类/sampleRate 口径</td></tr>
+        <tr><td><code>docs/admission-pool-strategy.html</code></td><td>策略全景、UI 线框、Policy 结构</td></tr>
+        <tr><td><code>public/sample-data/companion-autofind-20sessions.csv</code></td><td>预实验与验收数据集</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+
+<footer>
+  章伟伟 · Zeval 三块负责模块执行方案 v0.2 · 2026-06-10<br />
+  <code>docs/zhangweiwei-work-plan.html</code> · 浏览器直接打开即可阅读
+</footer>
+
+</body>
+</html>

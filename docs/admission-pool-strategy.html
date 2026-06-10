@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zeval 入池策略与区分度分析</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f7f5f0;
+      --surface: #ffffff;
+      --ink: #1a1a1f;
+      --muted: #5c5c66;
+      --accent: #2d5a8a;
+      --accent-light: #e8f0f8;
+      --warn: #c45c26;
+      --warn-bg: #fdf3ed;
+      --ok: #2a7d5f;
+      --ok-bg: #edf7f2;
+      --purple: #5b4b8a;
+      --purple-bg: #f3f0fa;
+      --border: #e2dfd6;
+      --shadow: 0 2px 16px rgba(26, 26, 31, 0.06);
+      --radius: 12px;
+      --font-serif: "Noto Serif SC", "Songti SC", serif;
+      --font-sans: "DM Sans", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.7;
+      font-size: 16px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #1a2a3a 0%, #2d5a8a 55%, #3a6b9e 100%);
+      color: #f7f5f0;
+      padding: 4rem 2rem 5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero .tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      background: rgba(255,255,255,0.12);
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(2rem, 5vw, 2.75rem);
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 1rem;
+    }
+
+    .hero p {
+      font-size: 1.1rem;
+      opacity: 0.88;
+      max-width: 640px;
+    }
+
+    .hero-meta {
+      margin-top: 2rem;
+      font-size: 0.85rem;
+      opacity: 0.65;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 1.5rem 4rem;
+    }
+
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem 2rem;
+      margin: -2.5rem auto 3rem;
+      position: relative;
+      z-index: 2;
+      box-shadow: var(--shadow);
+    }
+
+    .toc h2 {
+      font-family: var(--font-serif);
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .toc ol {
+      padding-left: 1.25rem;
+      columns: 2;
+      column-gap: 2rem;
+    }
+
+    .toc li { margin-bottom: 0.35rem; }
+    .toc a { color: var(--accent); text-decoration: none; font-size: 0.92rem; }
+    .toc a:hover { text-decoration: underline; }
+
+    section {
+      margin-bottom: 3.5rem;
+    }
+
+    section > h2 {
+      font-family: var(--font-serif);
+      font-size: 1.65rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--accent);
+      display: inline-block;
+    }
+
+    section > h3 {
+      font-family: var(--font-serif);
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin: 1.75rem 0 0.75rem;
+      color: var(--ink);
+    }
+
+    p { margin-bottom: 1rem; color: var(--ink); }
+    p.lead { font-size: 1.05rem; color: var(--muted); }
+
+    .callout {
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin: 1.5rem 0;
+      border-left: 4px solid;
+    }
+
+    .callout.warn { background: var(--warn-bg); border-color: var(--warn); }
+    .callout.ok { background: var(--ok-bg); border-color: var(--ok); }
+    .callout.info { background: var(--accent-light); border-color: var(--accent); }
+    .callout.purple { background: var(--purple-bg); border-color: var(--purple); }
+
+    .callout strong { display: block; margin-bottom: 0.35rem; }
+
+    .figure {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin: 1.75rem 0;
+      box-shadow: var(--shadow);
+    }
+
+    .figure figcaption {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 1rem;
+      text-align: center;
+      font-style: italic;
+    }
+
+    .figure svg { display: block; width: 100%; height: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin: 1rem 0;
+      background: var(--surface);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    th, td {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: #f0ede6;
+      font-weight: 600;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #faf9f6; }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: #f0ede6;
+      padding: 0.15em 0.45em;
+      border-radius: 4px;
+    }
+
+    pre {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      background: #1a1a1f;
+      color: #e8e6e1;
+      padding: 1.25rem 1.5rem;
+      border-radius: var(--radius);
+      overflow-x: auto;
+      margin: 1rem 0;
+      line-height: 1.55;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    @media (max-width: 700px) {
+      .toc ol { columns: 1; }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .phase-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    .phase-card .label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+
+    .phase-card h4 {
+      font-family: var(--font-serif);
+      font-size: 1.05rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .phase-card ul {
+      padding-left: 1.1rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+
+    .phase-card li { margin-bottom: 0.25rem; }
+
+    .priority-table td:first-child {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .p0 { color: var(--warn); }
+    .p0-top { color: #9b2c2c; }
+    .p1 { color: var(--accent); }
+    .p2 { color: var(--purple); }
+
+    .priority-banner {
+      background: linear-gradient(90deg, #fdf3ed 0%, #fff 100%);
+      border: 2px solid #c45c26;
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.92rem;
+    }
+
+    .priority-banner strong { color: #9b2c2c; }
+
+    .toc li.toc-top a { font-weight: 600; color: #9b2c2c; }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="tag">Zeval 2.x · 策略分析文档</div>
+    <h1>评测区分度与自动化入池策略</h1>
+    <p>针对 Benchmark 跑分全 100%、评测结果 UI 平铺错乱、首轮 Rubric 指标过少、Good case 无排序、人工标定后静态入池 Policy 等问题的根因分析与分阶段实施方案。</p>
+    <div class="hero-meta">文档版本 2026-06-10 · 分析-only，不含代码改动</div>
+  </div>
+</header>
+
+<main>
+
+  <nav class="toc" aria-label="目录">
+    <h2>目录</h2>
+    <ol>
+      <li class="toc-top"><a href="#ui-review">★ 评测结果 UI 改造（最高优先级）</a></li>
+      <li class="toc-top"><a href="#policy-static">人工标定 → 静态 Policy</a></li>
+      <li><a href="#summary">核心结论</a></li>
+      <li><a href="#problem">为何全是 100%</a></li>
+      <li><a href="#rubric-sparse">首轮 Rubric 指标过少</a></li>
+      <li><a href="#gap">现状与目标差距</a></li>
+      <li><a href="#rerank">Good case reRank</a></li>
+      <li><a href="#channel">Channel 入池框架</a></li>
+      <li><a href="#rlhf">类 RLHF 学习路径</a></li>
+      <li><a href="#engine">自动化入池引擎</a></li>
+      <li><a href="#roadmap">实施优先级</a></li>
+      <li><a href="#mapping">代码模块映射</a></li>
+    </ol>
+  </nav>
+
+  <!-- ===== 0. UI 改造（最高优先级） ===== -->
+  <section id="ui-review">
+    <h2>零、最高优先级：评测结果 UI 改造</h2>
+
+    <div class="priority-banner">
+      <strong>P0+ · 全项目最高优先级</strong> — 在修 Rubric、跑分逻辑之前，先把「可解释性分析 + 人工校验」改成<strong>两级标签</strong>单焦点展示，否则 8 session × N 指标平铺会导致人工打标错乱，无法积累高质量入池标定数据。
+    </div>
+
+    <h3>现状问题（对应截图红框区域）</h3>
+    <p>当前 <code>NotebookLayout</code> 的「评测结果 → 可解释性分析」将<strong>所有 session 的全部维度结果平铺</strong>在同一滚动区内；下方「人工校验队列」又以 metric 为粒度再次平铺。8 个 session × 3 个二级指标 ≈ 24 张卡片堆叠，审阅者很难对齐「这条会话在这个指标上该怎么判」。</p>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="评测结果 UI：现状 vs 目标">
+        <text x="20" y="28" font-size="14" font-weight="600" fill="#1a1a1f">可解释性分析 UI：现状平铺 vs 两级标签</text>
+
+        <!-- 现状 -->
+        <rect x="20" y="45" width="370" height="170" rx="8" fill="#fdf3ed" stroke="#c45c26" stroke-width="1.5"/>
+        <text x="205" y="68" text-anchor="middle" font-size="11" font-weight="600" fill="#c45c26">现状 · 全量平铺</text>
+        <rect x="35" y="80" width="340" height="22" rx="4" fill="#f0ede6"/><text x="45" y="95" font-size="8" fill="#5c5c66">case_001 · 任务完成度 · 100%</text>
+        <rect x="35" y="106" width="340" height="22" rx="4" fill="#f0ede6"/><text x="45" y="121" font-size="8" fill="#5c5c66">case_001 · 筛选决策 · 100%</text>
+        <rect x="35" y="132" width="340" height="22" rx="4" fill="#f0ede6"/><text x="45" y="147" font-size="8" fill="#5c5c66">case_001 · 格式合规 · 100%</text>
+        <rect x="35" y="158" width="340" height="22" rx="4" fill="#f0ede6"/><text x="45" y="173" font-size="8" fill="#5c5c66">case_002 · 任务完成度 · 100%</text>
+        <text x="205" y="200" text-anchor="middle" font-size="9" fill="#c45c26">↓ 继续平铺 case_002…008 × 各指标 → 易错乱</text>
+
+        <!-- 目标 -->
+        <rect x="430" y="45" width="370" height="350" rx="8" fill="#edf7f2" stroke="#2a7d5f" stroke-width="1.5"/>
+        <text x="615" y="68" text-anchor="middle" font-size="11" font-weight="600" fill="#2a7d5f">目标 · 两级标签 · 单焦点</text>
+
+        <!-- L1 tabs -->
+        <text x="445" y="88" font-size="9" fill="#5c5c66">一级标签 · Session ID</text>
+        <rect x="445" y="94" width="72" height="24" rx="4" fill="#2a7d5f"/><text x="481" y="110" text-anchor="middle" font-size="8" fill="#fff">case_001</text>
+        <rect x="522" y="94" width="72" height="24" rx="4" fill="#f0ede6" stroke="#5c5c66"/><text x="558" y="110" text-anchor="middle" font-size="8" fill="#5c5c66">case_002</text>
+        <rect x="599" y="94" width="72" height="24" rx="4" fill="#f0ede6" stroke="#5c5c66"/><text x="635" y="110" text-anchor="middle" font-size="8" fill="#5c5c66">case_003</text>
+        <text x="690" y="110" font-size="8" fill="#5c5c66">…</text>
+
+        <!-- L2 tabs -->
+        <text x="445" y="138" font-size="9" fill="#5c5c66">二级标签 · 二级指标</text>
+        <rect x="445" y="144" width="88" height="22" rx="4" fill="#2d5a8a"/><text x="489" y="159" text-anchor="middle" font-size="7" fill="#fff">任务完成度</text>
+        <rect x="538" y="144" width="88" height="22" rx="4" fill="#f0ede6"/><text x="582" y="159" text-anchor="middle" font-size="7" fill="#5c5c66">筛选决策</text>
+        <rect x="631" y="144" width="88" height="22" rx="4" fill="#f0ede6"/><text x="675" y="159" text-anchor="middle" font-size="7" fill="#5c5c66">格式合规</text>
+
+        <!-- content panels -->
+        <rect x="445" y="178" width="340" height="28" rx="4" fill="#faf9f6" stroke="#e2dfd6"/>
+        <text x="455" y="196" font-size="8" fill="#5c5c66">▸ 原始会话（默认折叠）· companion_pos_001 · 12 轮</text>
+
+        <rect x="445" y="214" width="340" height="48" rx="4" fill="#e8f0f8" stroke="#2d5a8a"/>
+        <text x="455" y="230" font-size="9" font-weight="600" fill="#2d5a8a">本 Session 评测总览</text>
+        <text x="455" y="246" font-size="8" fill="#5c5c66">综合分 87% · Q 分 0.82 · tier: silver · 2/3 指标需关注</text>
+        <text x="455" y="258" font-size="8" fill="#5c5c66">最弱指标：任务完成度 72%</text>
+
+        <rect x="445" y="270" width="340" height="58" rx="4" fill="#fff" stroke="#2a7d5f"/>
+        <text x="455" y="286" font-size="9" font-weight="600" fill="#2a7d5f">当前维度：任务完成度</text>
+        <text x="455" y="302" font-size="8" fill="#5c5c66">得分 3.6/5 · 置信度 0.71 · llm_judge</text>
+        <text x="455" y="316" font-size="8" fill="#5c5c66">理由：识别了数据局限但未给出可执行留存建议…</text>
+
+        <rect x="445" y="336" width="340" height="48" rx="4" fill="#fdf3ed" stroke="#c45c26"/>
+        <text x="455" y="352" font-size="9" font-weight="600" fill="#c45c26">人工校验（绑定当前 session × 指标）</text>
+        <text x="455" y="368" font-size="8" fill="#5c5c66">[认可] [驳回] [补证据] · Channel: ch_task_completion · [保存本条入池]</text>
+
+        <text x="205" y="240" font-size="22" fill="#2d5a8a">→</text>
+      </svg>
+      <figcaption>图 0 — 从全量平铺改为「Session ID → 二级指标」两级标签，板块内只呈现一个焦点</figcaption>
+    </figure>
+
+    <h3>目标信息架构</h3>
+    <table>
+      <thead>
+        <tr><th>层级</th><th>控件</th><th>内容</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>一级标签</td>
+          <td>Session ID 横向 Tab（<code>case_001</code>…）</td>
+          <td>切换后加载该 session 的总览与 transcript；显示综合分 / tier / 待审数量角标</td>
+        </tr>
+        <tr>
+          <td>二级标签</td>
+          <td>二级指标 Tab（任务完成度、筛选决策…）</td>
+          <td>只展示<strong>当前 session × 当前指标</strong>的评测详情与人工校验表单</td>
+        </tr>
+        <tr>
+          <td>内容区 A</td>
+          <td>原始会话（默认折叠）</td>
+          <td>来自 <code>case.input.transcript</code>；展开后可对照证据</td>
+        </tr>
+        <tr>
+          <td>内容区 B</td>
+          <td>本 Session 评测总览</td>
+          <td>case 级加权分、Q 分、tier、各指标迷你条 / 雷达摘要</td>
+        </tr>
+        <tr>
+          <td>内容区 C</td>
+          <td>单维度评测详情</td>
+          <td>score / confidence / reason / evidence / rubricForm 对照</td>
+        </tr>
+        <tr>
+          <td>内容区 D</td>
+          <td>人工校验板块</td>
+          <td>认可 / 驳回 / 补证据 + 备注；绑定 channel；单条或批量入池</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>与现有代码的集成点</h3>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;color:var(--muted);font-size:0.95rem;">
+      <li>改造位置：<code>NotebookLayout.tsx</code> 中 <code>BenchmarkResultPanel</code> 的「可解释性分析」+「人工校验队列」合并为同一两级 Tab 容器。</li>
+      <li>数据源：<code>props.result.cases</code> + <code>metricResults</code> 按 <code>caseId</code> × <code>metricKey</code> join；<code>humanReviewRecords</code> 键为 <code>submissionId + metricKey</code>（已有）。</li>
+      <li>顶部「主要能力短板 / 最需关注指标」保留为<strong>全局摘要</strong>，不再与 per-case 列表混排。</li>
+      <li>「保存入池」从底部批量按钮改为：当前 Tab 下「保存本条」+ 顶部「保存本 session 全部已审」。</li>
+    </ul>
+
+    <div class="callout ok">
+      <strong>验收标准</strong>
+      审阅者无需滚动即可在单一视图内完成「读会话 → 看该指标评分 → 下判断 → 入池」闭环；切换 session / 指标时上下文不丢失、不串台。
+    </div>
+  </section>
+
+  <!-- ===== 1. 核心结论 ===== -->
+  <section id="summary">
+    <h2>一、核心结论</h2>
+    <p class="lead">当前 100% 平均分<strong>不代表模型或对话真的好</strong>，而是评测链路对「通过」过于宽松，区分度被压扁了。在修复评测粒度之前，不建议用本次结果做入池或 reRank。</p>
+
+    <div class="callout warn">
+      <strong>直接判断</strong>
+      问题来自两层：<strong>上游</strong>首轮 Rubric 只生成 3 个二级指标（2 个能力维度），评测维度严重不足；<strong>下游</strong>两个规则指标虚高 + LLM judge 偏松 + 聚合太粗 → 8 个 case 全部 100%，goodcase 池会充满「假金标」。
+    </div>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="分数分布对比：现状 vs 目标">
+        <defs>
+          <linearGradient id="barBad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c45c26"/><stop offset="100%" stop-color="#e8a07a"/></linearGradient>
+          <linearGradient id="barGood" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2a7d5f"/><stop offset="100%" stop-color="#6bb89a"/></linearGradient>
+        </defs>
+        <text x="20" y="28" font-family="DM Sans,sans-serif" font-size="14" font-weight="600" fill="#1a1a1f">分数分布对比</text>
+
+        <!-- 现状 -->
+        <text x="20" y="58" font-family="DM Sans,sans-serif" font-size="12" fill="#5c5c66">现状：全部挤在顶端</text>
+        <rect x="20" y="68" width="360" height="24" rx="4" fill="#f0ede6"/>
+        <rect x="20" y="68" width="360" height="24" rx="4" fill="url(#barBad)" opacity="0.85"/>
+        <text x="390" y="85" font-family="JetBrains Mono,monospace" font-size="11" fill="#c45c26">100% × 8</text>
+
+        <!-- 目标 -->
+        <text x="20" y="128" font-family="DM Sans,sans-serif" font-size="12" fill="#5c5c66">目标：有分布、可排序</text>
+        <rect x="20" y="138" width="360" height="24" rx="4" fill="#f0ede6"/>
+        <rect x="20" y="138" width="72" height="24" rx="4" fill="#c45c26" opacity="0.7"/>
+        <rect x="92" y="138" width="90" height="24" fill="#c45c26" opacity="0.45"/>
+        <rect x="182" y="138" width="108" height="24" fill="#2d5a8a" opacity="0.6"/>
+        <rect x="290" y="138" width="54" height="24" fill="#2a7d5f" opacity="0.7"/>
+        <rect x="344" y="138" width="36" height="24" rx="0 4 4 0" fill="#2a7d5f"/>
+        <text x="390" y="155" font-family="JetBrains Mono,monospace" font-size="11" fill="#2a7d5f">20%–95% 分散</text>
+
+        <!-- 图例 -->
+        <circle cx="480" cy="80" r="6" fill="#c45c26" opacity="0.7"/><text x="494" y="84" font-size="11" fill="#5c5c66">边缘 / 需复核</text>
+        <circle cx="480" cy="108" r="6" fill="#2d5a8a"/><text x="494" y="112" font-size="11" fill="#5c5c66">中等 good</text>
+        <circle cx="480" cy="136" r="6" fill="#2a7d5f"/><text x="494" y="140" font-size="11" fill="#5c5c66">高金标候选</text>
+        <circle cx="480" cy="164" r="6" fill="#c45c26"/><text x="494" y="168" font-size="11" fill="#5c5c66">badcase</text>
+      </svg>
+      <figcaption>图 1 — 现状所有 case 堆在 100%，目标状态应有可排序的分数分布</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== 2. 为何全是 100% ===== -->
+  <section id="problem">
+    <h2>二、为何现在全是 100%？</h2>
+    <p>根因分两层：<strong>上游</strong>首轮 Rubric 仅 3 个二级指标，评测维度太少（详见<a href="#rubric-sparse">二（补）</a>）；<strong>下游</strong>现有三条指标路径都倾向于给满分，再经加权平均后全部顶格。</p>
+
+    <table>
+      <thead>
+        <tr><th>二级指标</th><th>评测器</th><th>实际行为</th><th>典型得分</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>任务完成度 <code>task_success</code></td>
+          <td><code>llm_judge</code></td>
+          <td>无金标时 LLM 倾向「解释得好」→ 给 5 分；rubricForm 5/3/1 档未强制对照</td>
+          <td style="color:var(--warn)">5 / 5</td>
+        </tr>
+        <tr>
+          <td>筛选决策准确率 <code>decision_accuracy</code></td>
+          <td><code>exact_match</code></td>
+          <td>case 无 <code>expected</code> 字段 → <code>undefined === undefined</code> → 直接匹配</td>
+          <td style="color:var(--warn)">5 / 5</td>
+        </tr>
+        <tr>
+          <td>输出格式合规性 <code>output_schema_valid</code></td>
+          <td><code>regex_match</code></td>
+          <td>被测 prompt 强制 JSON 输出，正则 <code>\{[\s\S]*\}</code> 几乎总过</td>
+          <td style="color:var(--warn)">5 / 5</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="100% 根因因果链">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#5c5c66"/></marker>
+        </defs>
+        <text x="20" y="28" font-family="DM Sans,sans-serif" font-size="14" font-weight="600" fill="#1a1a1f">100% 根因因果链（上游 + 下游）</text>
+
+        <!-- 上游 -->
+        <text x="20" y="52" font-size="11" font-weight="600" fill="#5b4b8a">上游 · Rubric 生成</text>
+        <rect x="20" y="62" width="780" height="58" rx="8" fill="#f3f0fa" stroke="#5b4b8a" stroke-width="1.5"/>
+        <text x="410" y="88" text-anchor="middle" font-size="12" font-weight="600" fill="#5b4b8a">首轮仅 2 维度 · 3 二级指标</text>
+        <text x="410" y="108" text-anchor="middle" font-size="11" fill="#5c5c66">领域关键维度缺失 → 区分向量不足 → reRank / Channel 无法展开</text>
+
+        <line x1="410" y1="120" x2="410" y2="138" stroke="#5c5c66" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- 下游三个根因 -->
+        <text x="20" y="152" font-size="11" font-weight="600" fill="#c45c26">下游 · 跑分执行</text>
+        <rect x="20" y="162" width="230" height="64" rx="8" fill="#fdf3ed" stroke="#c45c26" stroke-width="1.5"/>
+        <text x="135" y="188" text-anchor="middle" font-size="12" font-weight="600" fill="#c45c26">空 expected</text>
+        <text x="135" y="208" text-anchor="middle" font-size="11" fill="#5c5c66">exact_match 虚高满分</text>
+
+        <rect x="295" y="162" width="230" height="64" rx="8" fill="#fdf3ed" stroke="#c45c26" stroke-width="1.5"/>
+        <text x="410" y="188" text-anchor="middle" font-size="12" font-weight="600" fill="#c45c26">宽松 regex</text>
+        <text x="410" y="208" text-anchor="middle" font-size="11" fill="#5c5c66">JSON 格式几乎总过</text>
+
+        <rect x="570" y="162" width="230" height="64" rx="8" fill="#fdf3ed" stroke="#c45c26" stroke-width="1.5"/>
+        <text x="685" y="188" text-anchor="middle" font-size="12" font-weight="600" fill="#c45c26">LLM judge 偏松</text>
+        <text x="685" y="208" text-anchor="middle" font-size="11" fill="#5c5c66">未按 rubricForm 打分</text>
+
+        <!-- 箭头汇聚 -->
+        <line x1="135" y1="226" x2="135" y2="252" stroke="#5c5c66" stroke-width="1.5"/>
+        <line x1="410" y1="226" x2="410" y2="252" stroke="#5c5c66" stroke-width="1.5"/>
+        <line x1="685" y1="226" x2="685" y2="252" stroke="#5c5c66" stroke-width="1.5"/>
+        <line x1="135" y1="252" x2="685" y2="252" stroke="#5c5c66" stroke-width="1.5"/>
+        <line x1="410" y1="252" x2="410" y2="272" stroke="#5c5c66" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- 中间层 -->
+        <rect x="260" y="278" width="300" height="55" rx="8" fill="#f3f0fa" stroke="#5b4b8a" stroke-width="1.5"/>
+        <text x="410" y="303" text-anchor="middle" font-size="12" font-weight="600" fill="#5b4b8a">三指标均 max → 加权平均 100%</text>
+        <text x="410" y="321" text-anchor="middle" font-size="11" fill="#5c5c66">即使扩充指标，跑分逻辑不修仍会虚高</text>
+
+        <line x1="410" y1="333" x2="410" y2="352" stroke="#5c5c66" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- 入池 -->
+        <rect x="260" y="355" width="300" height="40" rx="8" fill="#edf7f2" stroke="#2a7d5f" stroke-width="1.5"/>
+        <text x="410" y="380" text-anchor="middle" font-size="12" font-weight="600" fill="#2a7d5f">全部 ≥90 → 进 goodcase 池，无 tier 排序</text>
+      </svg>
+      <figcaption>图 2 — 上游 Rubric 稀疏 + 下游三条宽松路径，共同导致 100% 与扁平入池</figcaption>
+    </figure>
+
+    <h3>其他加剧因素</h3>
+    <ul style="padding-left:1.25rem;margin-bottom:1rem;color:var(--muted);font-size:0.95rem;">
+      <li><strong>评的是新生成答案，不是历史对话</strong> — <code>generic-run</code> 让 LLM 读 transcript 后写 JSON 分析报告，而非评 assistant 真实轮次。</li>
+      <li><strong>MVP 只抽 8 个 session</strong> — 20 条数据中仅评前 8 条（<code>MAX_DATASET_CASES = 8</code>）。</li>
+      <li><strong>入池阈值二元化</strong> — &lt;60 badcase，≥90 goodcase，中间区间直接丢弃，无 tier 区分。</li>
+    </ul>
+  </section>
+
+  <!-- ===== 2b. 首轮 Rubric 指标过少 ===== -->
+  <section id="rubric-sparse">
+    <h2>二（补）、首轮 Rubric 指标过少 — 上游根因</h2>
+    <p class="lead">区分度不足不仅发生在<strong>跑分阶段</strong>，更早在<strong>评分标准生成阶段</strong>就已埋下：第一轮 <code>draftBenchmarkRubric</code> 往往只产出 <strong>2 个能力维度 · 3 个二级指标</strong>，对情绪陪伴这类复杂场景远远不够。</p>
+
+    <div class="callout purple">
+      <strong>现状快照（本次任务）</strong>
+      一级维度仅「任务完成」「格式合规」；二级指标仅「任务完成度」「筛选决策准确率」「输出格式合规性」。缺少共情、流失信号、互动连续性等该领域核心验收维度，导致 reRank 与 Channel 学习都缺少可用的特征向量。
+    </div>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="首轮 Rubric 稀疏 vs 目标丰富度对比">
+        <text x="20" y="28" font-size="14" font-weight="600" fill="#1a1a1f">首轮生成 Rubric vs 领域化目标 Rubric</text>
+
+        <!-- 现状框 -->
+        <rect x="20" y="45" width="360" height="330" rx="10" fill="#fdf3ed" stroke="#c45c26" stroke-width="1.5"/>
+        <text x="200" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="#c45c26">现状 · 首轮生成</text>
+        <text x="200" y="92" text-anchor="middle" font-size="10" fill="#5c5c66">2 能力维度 · 3 二级指标</text>
+
+        <rect x="130" y="108" width="140" height="28" rx="6" fill="#f3f0fa" stroke="#5b4b8a" stroke-width="1.5"/>
+        <text x="200" y="127" text-anchor="middle" font-size="10" font-weight="600" fill="#5b4b8a">自定义评测任务</text>
+        <line x1="200" y1="136" x2="200" y2="152" stroke="#5c5c66"/>
+        <line x1="100" y1="152" x2="300" y2="152" stroke="#5c5c66"/>
+        <line x1="100" y1="152" x2="100" y2="168" stroke="#5c5c66"/>
+        <line x1="300" y1="152" x2="300" y2="168" stroke="#5c5c66"/>
+
+        <rect x="50" y="168" width="100" height="26" rx="5" fill="#f0ede6" stroke="#5c5c66"/>
+        <text x="100" y="185" text-anchor="middle" font-size="9" fill="#5c5c66">任务完成</text>
+        <rect x="220" y="168" width="100" height="26" rx="5" fill="#f0ede6" stroke="#5c5c66"/>
+        <text x="270" y="185" text-anchor="middle" font-size="9" fill="#5c5c66">格式合规</text>
+
+        <rect x="30" y="210" width="140" height="36" rx="5" fill="#edf7f2" stroke="#2a7d5f"/>
+        <text x="100" y="226" text-anchor="middle" font-size="9" font-weight="600" fill="#2a7d5f">任务完成度</text>
+        <text x="100" y="238" text-anchor="middle" font-size="8" fill="#5c5c66">llm_judge</text>
+
+        <rect x="30" y="256" width="140" height="36" rx="5" fill="#edf7f2" stroke="#2a7d5f"/>
+        <text x="100" y="272" text-anchor="middle" font-size="9" font-weight="600" fill="#2a7d5f">筛选决策准确率</text>
+        <text x="100" y="284" text-anchor="middle" font-size="8" fill="#5c5c66">exact_match</text>
+
+        <rect x="220" y="210" width="140" height="36" rx="5" fill="#e8f0f8" stroke="#2d5a8a"/>
+        <text x="290" y="226" text-anchor="middle" font-size="9" font-weight="600" fill="#2d5a8a">输出格式合规性</text>
+        <text x="290" y="238" text-anchor="middle" font-size="8" fill="#5c5c66">regex_match</text>
+
+        <text x="200" y="320" text-anchor="middle" font-size="10" fill="#c45c26">区分向量仅 3 维 → reRank / Channel 无从展开</text>
+        <text x="200" y="338" text-anchor="middle" font-size="9" fill="#5c5c66">copilot.ts 要求 4–10 个，实际首轮常偏下限</text>
+
+        <!-- 箭头 -->
+        <text x="410" y="210" text-anchor="middle" font-size="22" fill="#2d5a8a">→</text>
+        <text x="410" y="235" text-anchor="middle" font-size="9" fill="#5c5c66">Rubric Agent</text>
+        <text x="410" y="250" text-anchor="middle" font-size="9" fill="#5c5c66">扩充 + 引证</text>
+
+        <!-- 目标框 -->
+        <rect x="440" y="45" width="360" height="330" rx="10" fill="#edf7f2" stroke="#2a7d5f" stroke-width="1.5"/>
+        <text x="620" y="72" text-anchor="middle" font-size="12" font-weight="600" fill="#2a7d5f">目标 · 领域化扩充（情绪陪伴示例）</text>
+        <text x="620" y="92" text-anchor="middle" font-size="10" fill="#5c5c66">5 能力维度 · 8–10 二级指标</text>
+
+        <rect x="550" y="108" width="140" height="28" rx="6" fill="#f3f0fa" stroke="#5b4b8a" stroke-width="1.5"/>
+        <text x="620" y="127" text-anchor="middle" font-size="10" font-weight="600" fill="#5b4b8a">情绪陪伴评测</text>
+
+        <!-- 目标维度行 1 -->
+        <rect x="455" y="148" width="95" height="22" rx="4" fill="#f0ede6" stroke="#5c5c66"/><text x="502" y="163" text-anchor="middle" font-size="8" fill="#5c5c66">情绪共情</text>
+        <rect x="558" y="148" width="95" height="22" rx="4" fill="#f0ede6" stroke="#5c5c66"/><text x="605" y="163" text-anchor="middle" font-size="8" fill="#5c5c66">留存信号</text>
+        <rect x="661" y="148" width="95" height="22" rx="4" fill="#f0ede6" stroke="#5c5c66"/><text x="708" y="163" text-anchor="middle" font-size="8" fill="#5c5c66">任务完成</text>
+
+        <!-- 目标指标 -->
+        <rect x="450" y="178" width="105" height="30" rx="4" fill="#edf7f2" stroke="#2a7d5f"/><text x="502" y="192" text-anchor="middle" font-size="8" fill="#2a7d5f">共情程度</text><text x="502" y="202" text-anchor="middle" font-size="7" fill="#5c5c66">llm_judge</text>
+        <rect x="450" y="214" width="105" height="30" rx="4" fill="#edf7f2" stroke="#2a7d5f"/><text x="502" y="228" text-anchor="middle" font-size="8" fill="#2a7d5f">情绪识别准确</text><text x="502" y="238" text-anchor="middle" font-size="7" fill="#5c5c66">llm_judge</text>
+
+        <rect x="563" y="178" width="105" height="30" rx="4" fill="#edf7f2" stroke="#2a7d5f"/><text x="615" y="192" text-anchor="middle" font-size="8" fill="#2a7d5f">流失风险识别</text><text x="615" y="202" text-anchor="middle" font-size="7" fill="#5c5c66">llm_judge</text>
+        <rect x="563" y="214" width="105" height="30" rx="4" fill="#edf7f2" stroke="#2a7d5f"/><text x="615" y="228" text-anchor="middle" font-size="8" fill="#2a7d5f">互动连续性</text><text x="615" y="238" text-anchor="middle" font-size="7" fill="#5c5c66">llm_judge</text>
+
+        <rect x="676" y="178" width="105" height="30" rx="4" fill="#edf7f2" stroke="#2a7d5f"/><text x="728" y="192" text-anchor="middle" font-size="8" fill="#2a7d5f">任务完成度</text><text x="728" y="202" text-anchor="middle" font-size="7" fill="#5c5c66">llm_judge</text>
+        <rect x="676" y="214" width="105" height="30" rx="4" fill="#edf7f2" stroke="#2a7d5f"/><text x="728" y="228" text-anchor="middle" font-size="8" fill="#2a7d5f">答非所问风险</text><text x="728" y="238" text-anchor="middle" font-size="7" fill="#5c5c66">llm_judge</text>
+
+        <!-- 更多维度 -->
+        <rect x="455" y="260" width="95" height="22" rx="4" fill="#f0ede6" stroke="#5c5c66"/><text x="502" y="275" text-anchor="middle" font-size="8" fill="#5c5c66">安全边界</text>
+        <rect x="558" y="260" width="95" height="22" rx="4" fill="#f0ede6" stroke="#5c5c66"/><text x="605" y="275" text-anchor="middle" font-size="8" fill="#5c5c66">格式合规</text>
+
+        <rect x="450" y="290" width="105" height="30" rx="4" fill="#e8f0f8" stroke="#2d5a8a"/><text x="502" y="304" text-anchor="middle" font-size="8" fill="#2d5a8a">说教/越界风险</text><text x="502" y="314" text-anchor="middle" font-size="7" fill="#5c5c66">llm_judge</text>
+        <rect x="563" y="290" width="105" height="30" rx="4" fill="#e8f0f8" stroke="#2d5a8a"/><text x="615" y="304" text-anchor="middle" font-size="8" fill="#2d5a8a">输出结构合规</text><text x="615" y="314" text-anchor="middle" font-size="7" fill="#5c5c66">regex / schema</text>
+
+        <text x="620" y="348" text-anchor="middle" font-size="10" fill="#2a7d5f">8+ 区分向量 → 支撑 reRank 与 per-channel 入池</text>
+        <text x="620" y="366" text-anchor="middle" font-size="9" fill="#5c5c66">每个二级指标可绑定独立 Channel</text>
+      </svg>
+      <figcaption>图 2b — 首轮 3 指标 vs 领域化 8–10 指标：上游稀疏直接导致下游无法拉开差距</figcaption>
+    </figure>
+
+    <h3>为何首轮容易偏少？</h3>
+    <table>
+      <thead>
+        <tr><th>环节</th><th>现象</th><th>影响</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>draftBenchmarkRubric</code></td>
+          <td>Prompt 要求 4–10 个指标，但 LLM 首轮常取保守下限；用户未追问时不再扩充</td>
+          <td>能力覆盖面窄，遗漏领域关键维度</td>
+        </tr>
+        <tr>
+          <td>能力维度选择</td>
+          <td>默认偏向通用的 task_completion + format_compliance</td>
+          <td>情绪陪伴场景的共情、留存、安全等维度未进入图谱</td>
+        </tr>
+        <tr>
+          <td>评测器类型</td>
+          <td>混入 exact_match / regex 等规则指标，但无金标时无效</td>
+          <td>占用了指标名额却不贡献真实区分度</td>
+        </tr>
+        <tr>
+          <td>用户确认流程</td>
+          <td>「确认全部」后不再迭代 Rubric，直接开跑</td>
+          <td>稀疏 Rubric 被固化进整条 pipeline</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>解决方案（Rubric 生成层）</h3>
+    <div class="grid-2">
+      <div class="phase-card">
+        <div class="label p0">生成策略</div>
+        <h4>首轮就要够宽</h4>
+        <ul>
+          <li>按场景模板设定<strong>最低指标数</strong>（建议 ≥6，复杂场景 ≥8）</li>
+          <li>每个能力维度至少 2 个二级指标，覆盖「做得好」与「做得差」两侧</li>
+          <li>优先 <code>llm_judge</code>，无金标时禁用 <code>exact_match</code></li>
+          <li>DeepSearch brief 必须映射到具体指标，不能只写进 researchSummary</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="label p1">交互策略</div>
+        <h4>生成后强制扩充一轮</h4>
+        <ul>
+          <li>Rubric Agent 自动检查：指标数 &lt; 6 时提示「维度不足」并建议增补</li>
+          <li>按业务需求（如 DAU/流失）追问缺失维度，再生成第二轮指标</li>
+          <li>图谱 UI 展示「建议补充」虚线节点，用户一键采纳</li>
+          <li>开跑前门禁：<code>approvedMetrics.length &lt; 6</code> 时警告</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <strong>与下游的关系</strong>
+      Rubric 指标数量 = reRank 的特征维度数 = Channel 数量上限。3 个指标最多 3 条 Channel，即使跑分逻辑完美，也无法在 goodcase 内做细粒度排序，更无法学到有意义的 per-channel 分布。
+    </div>
+  </section>
+
+  <!-- ===== 3. 现状与目标 ===== -->
+  <section id="gap">
+    <h2>三、现状与目标差距</h2>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="评测链路对比">
+        <defs><marker id="arr2" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2d5a8a"/></marker></defs>
+        <text x="20" y="28" font-size="14" font-weight="600" fill="#1a1a1f">评测 → 入池链路对比</text>
+
+        <!-- 现状 -->
+        <text x="20" y="58" font-size="11" font-weight="600" fill="#c45c26">现状（扁平）</text>
+        <rect x="20" y="68" width="100" height="44" rx="6" fill="#e8f0f8" stroke="#2d5a8a"/><text x="70" y="95" text-anchor="middle" font-size="11" fill="#2d5a8a">评测</text>
+        <line x1="120" y1="90" x2="145" y2="90" stroke="#2d5a8a" marker-end="url(#arr2)"/>
+        <rect x="150" y="68" width="100" height="44" rx="6" fill="#f0ede6" stroke="#5c5c66"/><text x="200" y="95" text-anchor="middle" font-size="11" fill="#5c5c66">过/不过</text>
+        <line x1="250" y1="90" x2="275" y2="90" stroke="#2d5a8a" marker-end="url(#arr2)"/>
+        <rect x="280" y="68" width="100" height="44" rx="6" fill="#edf7f2" stroke="#2a7d5f"/><text x="330" y="95" text-anchor="middle" font-size="11" fill="#2a7d5f">入池</text>
+        <text x="400" y="95" font-size="11" fill="#c45c26">← 无区分度</text>
+
+        <!-- 目标 -->
+        <text x="20" y="148" font-size="11" font-weight="600" fill="#2a7d5f">目标（有层次）</text>
+        <rect x="20" y="158" width="88" height="44" rx="6" fill="#e8f0f8" stroke="#2d5a8a"/><text x="64" y="185" text-anchor="middle" font-size="11" fill="#2d5a8a">评测</text>
+        <line x1="108" y1="180" x2="123" y2="180" stroke="#2d5a8a" marker-end="url(#arr2)"/>
+        <rect x="128" y="158" width="110" height="44" rx="6" fill="#f3f0fa" stroke="#5b4b8a"/><text x="183" y="178" text-anchor="middle" font-size="10" fill="#5b4b8a">细粒度分数</text><text x="183" y="192" text-anchor="middle" font-size="10" fill="#5b4b8a">+ 置信度</text>
+        <line x1="238" y1="180" x2="253" y2="180" stroke="#2d5a8a" marker-end="url(#arr2)"/>
+        <rect x="258" y="158" width="88" height="44" rx="6" fill="#fdf3ed" stroke="#c45c26"/><text x="302" y="185" text-anchor="middle" font-size="11" fill="#c45c26">reRank</text>
+        <line x1="346" y1="180" x2="361" y2="180" stroke="#2d5a8a" marker-end="url(#arr2)"/>
+        <rect x="366" y="158" width="110" height="44" rx="6" fill="#e8f0f8" stroke="#2d5a8a"/><text x="421" y="178" text-anchor="middle" font-size="10" fill="#2d5a8a">Channel</text><text x="421" y="192" text-anchor="middle" font-size="10" fill="#2d5a8a">规则学习</text>
+        <line x1="476" y1="180" x2="491" y2="180" stroke="#2d5a8a" marker-end="url(#arr2)"/>
+        <rect x="496" y="158" width="88" height="44" rx="6" fill="#edf7f2" stroke="#2a7d5f"/><text x="540" y="185" text-anchor="middle" font-size="11" fill="#2a7d5f">入池</text>
+        <text x="600" y="185" font-size="11" fill="#2a7d5f">gold / silver / borderline</text>
+      </svg>
+      <figcaption>图 3 — 目标链路在「过/不过」与「入池」之间插入 reRank 与 Channel 规则层</figcaption>
+    </figure>
+
+    <h3>评分标准图谱（三级结构）</h3>
+    <p>下图还原当前任务的 Rubric 树形结构。二级指标是 Channel 绑定与 reRank 的粒度单元；指标过少时，树太「矮」，无法支撑后续分层分析。</p>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="评分标准图谱三级结构">
+        <!-- 图例 -->
+        <rect x="20" y="12" width="780" height="36" rx="6" fill="#faf9f6" stroke="#e2dfd6"/>
+        <circle cx="45" cy="30" r="6" fill="#f3f0fa" stroke="#5b4b8a" stroke-width="1.5"/><text x="58" y="34" font-size="10" fill="#5c5c66">评分标准（根）</text>
+        <circle cx="175" cy="30" r="6" fill="#f0ede6" stroke="#5c5c66"/><text x="188" y="34" font-size="10" fill="#5c5c66">一级 · 能力维度</text>
+        <circle cx="315" cy="30" r="6" fill="#edf7f2" stroke="#2a7d5f"/><text x="328" y="34" font-size="10" fill="#5c5c66">二级 · 已确认指标</text>
+        <circle cx="465" cy="30" r="6" fill="#e8f0f8" stroke="#2d5a8a"/><text x="478" y="34" font-size="10" fill="#5c5c66">二级 · 待校验</text>
+        <circle cx="605" cy="30" r="6" fill="none" stroke="#c45c26" stroke-width="1.5" stroke-dasharray="3,2"/><text x="618" y="34" font-size="10" fill="#c45c26">建议补充（缺失）</text>
+
+        <!-- L0 root -->
+        <rect x="260" y="62" width="300" height="40" rx="8" fill="#f3f0fa" stroke="#5b4b8a" stroke-width="2"/>
+        <text x="410" y="82" text-anchor="middle" font-size="13" font-weight="600" fill="#5b4b8a">自定义评测任务</text>
+        <text x="410" y="96" text-anchor="middle" font-size="10" fill="#5c5c66">2 个能力维度 · 3 项指标（偏少）</text>
+
+        <!-- 主干 -->
+        <line x1="410" y1="102" x2="410" y2="122" stroke="#5c5c66" stroke-width="2"/>
+        <line x1="200" y1="122" x2="620" y2="122" stroke="#5c5c66" stroke-width="2"/>
+        <line x1="200" y1="122" x2="200" y2="140" stroke="#5c5c66" stroke-width="2"/>
+        <line x1="620" y1="122" x2="620" y2="140" stroke="#5c5c66" stroke-width="2"/>
+
+        <!-- L1 left -->
+        <rect x="90" y="140" width="220" height="36" rx="6" fill="#f0ede6" stroke="#5c5c66" stroke-width="1.5"/>
+        <text x="200" y="158" text-anchor="middle" font-size="11" font-weight="600" fill="#5c5c66">一级 · 任务完成</text>
+        <text x="200" y="170" text-anchor="middle" font-size="9" fill="#5c5c66">weight: 3</text>
+
+        <!-- L1 right -->
+        <rect x="510" y="140" width="220" height="36" rx="6" fill="#f0ede6" stroke="#5c5c66" stroke-width="1.5"/>
+        <text x="620" y="158" text-anchor="middle" font-size="11" font-weight="600" fill="#5c5c66">一级 · 格式合规</text>
+        <text x="620" y="170" text-anchor="middle" font-size="9" fill="#5c5c66">weight: 2</text>
+
+        <!-- branches to L2 -->
+        <line x1="150" y1="176" x2="150" y2="196" stroke="#5c5c66" stroke-width="1.5"/>
+        <line x1="250" y1="176" x2="250" y2="196" stroke="#5c5c66" stroke-width="1.5"/>
+        <line x1="620" y1="176" x2="620" y2="196" stroke="#5c5c66" stroke-width="1.5"/>
+
+        <!-- L2 existing metrics -->
+        <rect x="50" y="196" width="200" height="52" rx="6" fill="#edf7f2" stroke="#2a7d5f" stroke-width="1.5"/>
+        <text x="150" y="216" text-anchor="middle" font-size="11" font-weight="600" fill="#2a7d5f">二级 · 任务完成度</text>
+        <text x="150" y="232" text-anchor="middle" font-size="9" fill="#5c5c66">llm_judge · weight: 3</text>
+        <circle cx="150" cy="242" r="4" fill="#e8b84a"/><text x="162" y="245" font-size="8" fill="#5c5c66">已修改</text>
+
+        <rect x="270" y="196" width="200" height="52" rx="6" fill="#edf7f2" stroke="#2a7d5f" stroke-width="1.5"/>
+        <text x="370" y="216" text-anchor="middle" font-size="11" font-weight="600" fill="#2a7d5f">二级 · 筛选决策准确率</text>
+        <text x="370" y="232" text-anchor="middle" font-size="9" fill="#5c5c66">exact_match · weight: 4</text>
+        <circle cx="370" cy="242" r="4" fill="#2a7d5f"/><text x="382" y="245" font-size="8" fill="#5c5c66">已校验</text>
+
+        <rect x="510" y="196" width="220" height="52" rx="6" fill="#e8f0f8" stroke="#2d5a8a" stroke-width="1.5"/>
+        <text x="620" y="216" text-anchor="middle" font-size="11" font-weight="600" fill="#2d5a8a">二级 · 输出格式合规性</text>
+        <text x="620" y="232" text-anchor="middle" font-size="9" fill="#5c5c66">regex_match · weight: 2</text>
+        <circle cx="620" cy="242" r="4" fill="#2d5a8a"/><text x="632" y="245" font-size="8" fill="#5c5c66">待校验</text>
+
+        <!-- 建议补充（虚线） -->
+        <rect x="50" y="268" width="155" height="40" rx="6" fill="none" stroke="#c45c26" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="127" y="286" text-anchor="middle" font-size="10" fill="#c45c26">共情程度</text>
+        <text x="127" y="300" text-anchor="middle" font-size="8" fill="#5c5c66">建议补充 · llm_judge</text>
+
+        <rect x="220" y="268" width="155" height="40" rx="6" fill="none" stroke="#c45c26" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="297" y="286" text-anchor="middle" font-size="10" fill="#c45c26">流失风险识别</text>
+        <text x="297" y="300" text-anchor="middle" font-size="8" fill="#5c5c66">建议补充 · llm_judge</text>
+
+        <rect x="390" y="268" width="155" height="40" rx="6" fill="none" stroke="#c45c26" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="467" y="286" text-anchor="middle" font-size="10" fill="#c45c26">互动连续性</text>
+        <text x="467" y="300" text-anchor="middle" font-size="8" fill="#5c5c66">建议补充 · llm_judge</text>
+
+        <rect x="560" y="268" width="155" height="40" rx="6" fill="none" stroke="#c45c26" stroke-width="1.5" stroke-dasharray="5,3"/>
+        <text x="637" y="286" text-anchor="middle" font-size="10" fill="#c45c26">说教/越界风险</text>
+        <text x="637" y="300" text-anchor="middle" font-size="8" fill="#5c5c66">建议补充 · llm_judge</text>
+
+        <line x1="150" y1="248" x2="127" y2="268" stroke="#c45c26" stroke-width="1" stroke-dasharray="3,2"/>
+        <line x1="370" y1="248" x2="297" y2="268" stroke="#c45c26" stroke-width="1" stroke-dasharray="3,2"/>
+
+        <!-- rubricForm 说明 -->
+        <rect x="50" y="322" width="720" height="30" rx="6" fill="#fdf3ed" stroke="#c45c26" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="410" y="342" text-anchor="middle" font-size="10" fill="#c45c26">每个二级指标应有 rubricForm 5/3/1 分级 — 生成时有，运行时须强制对照（见第二章）</text>
+      </svg>
+      <figcaption>图 4 — 当前评分标准图谱（实线=已有 3 指标，虚线=情绪陪伴场景建议补充的缺失维度）</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== 4. reRank ===== -->
+  <section id="rerank">
+    <h2>四、Good case reRank 方案</h2>
+    <p class="lead">目标：即使同样「通过」的 case，也要能排先后，回答「到底有多好」。</p>
+
+    <div class="callout info">
+      <strong>质量分 Q（case 或 session 级）</strong>
+      <code>Q = Σ (wᵢ × norm_scoreᵢ × confᵢ) − λ × disagreement_penalty</code>
+    </div>
+
+    <table>
+      <thead>
+        <tr><th>因子</th><th>含义</th><th>数据来源</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>norm_scoreᵢ</code></td><td>二级指标归一化分（用 rubricForm 档位，非二值）</td><td>evaluators 改造后</td></tr>
+        <tr><td><code>confᵢ</code></td><td>该指标评测置信度</td><td>LLM judge 已有 <code>confidence</code></td></tr>
+        <tr><td><code>wᵢ</code></td><td>图 3 指标权重</td><td>rubric weight 3/4/2</td></tr>
+        <tr><td><code>disagreement_penalty</code></td><td>多指标分歧、低置信、需人工复核时扣分</td><td>metricResults 聚合</td></tr>
+      </tbody>
+    </table>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 260" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="reRank 流程">
+        <defs><marker id="arr3" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2d5a8a"/></marker></defs>
+        <text x="20" y="28" font-size="14" font-weight="600">reRank 流程</text>
+
+        <rect x="20" y="50" width="130" height="50" rx="8" fill="#e8f0f8" stroke="#2d5a8a"/><text x="85" y="80" text-anchor="middle" font-size="11" fill="#2d5a8a">Benchmark Run</text>
+        <line x1="150" y1="75" x2="175" y2="75" stroke="#2d5a8a" marker-end="url(#arr3)"/>
+        <rect x="180" y="50" width="130" height="50" rx="8" fill="#f3f0fa" stroke="#5b4b8a"/><text x="245" y="72" text-anchor="middle" font-size="10" fill="#5b4b8a">计算 Q 分</text><text x="245" y="88" text-anchor="middle" font-size="10" fill="#5b4b8a">+ metric 向量</text>
+        <line x1="310" y1="75" x2="335" y2="75" stroke="#2d5a8a" marker-end="url(#arr3)"/>
+        <rect x="340" y="50" width="130" height="50" rx="8" fill="#f0ede6" stroke="#5c5c66"/><text x="405" y="80" text-anchor="middle" font-size="11" fill="#5c5c66">筛 passed</text>
+        <line x1="470" y1="75" x2="495" y2="75" stroke="#2d5a8a" marker-end="url(#arr3)"/>
+        <rect x="500" y="50" width="130" height="50" rx="8" fill="#fdf3ed" stroke="#c45c26"/><text x="565" y="80" text-anchor="middle" font-size="11" fill="#c45c26">按 Q 排序</text>
+        <line x1="630" y1="75" x2="655" y2="75" stroke="#2d5a8a" marker-end="url(#arr3)"/>
+        <rect x="660" y="50" width="140" height="50" rx="8" fill="#edf7f2" stroke="#2a7d5f"/><text x="730" y="72" text-anchor="middle" font-size="10" fill="#2a7d5f">分配 tier</text><text x="730" y="88" text-anchor="middle" font-size="10" fill="#2a7d5f">gold/silver/borderline</text>
+
+        <!-- tier 示意 -->
+        <text x="20" y="140" font-size="12" font-weight="600">Tier 切分（passed cases 内）</text>
+        <rect x="20" y="155" width="780" height="36" rx="6" fill="#f0ede6"/>
+        <rect x="20" y="155" width="195" height="36" rx="6 0 0 6" fill="#2a7d5f"/>
+        <rect x="215" y="155" width="293" height="36" fill="#2d5a8a" opacity="0.65"/>
+        <rect x="508" y="155" width="292" height="36" rx="0 6 6 0" fill="#c45c26" opacity="0.45"/>
+        <text x="117" y="178" text-anchor="middle" font-size="11" fill="#fff" font-weight="600">Gold top 25%</text>
+        <text x="361" y="178" text-anchor="middle" font-size="11" fill="#fff">Silver 25–70%</text>
+        <text x="654" y="178" text-anchor="middle" font-size="11" fill="#fff">Borderline 70–100%</text>
+        <text x="20" y="215" font-size="10" fill="#5c5c66">类比 RLHF reward model 排序 — MVP 阶段用百分位 + 人工抽检即可，不必训练神经网络</text>
+      </svg>
+      <figcaption>图 5 — reRank：在 passed cases 内按质量分 Q 排序并分配 tier</figcaption>
+    </figure>
+
+    <h3>建议写入 case 元数据的字段</h3>
+    <pre>qualityScore, qualityTier (gold | silver | borderline),
+rankInRun, metricVector, confVector</pre>
+  </section>
+
+  <!-- ===== 5. Channel ===== -->
+  <section id="channel">
+    <h2>五、Channel 入池框架</h2>
+    <p>将图 3 的<strong>二级指标</strong>映射为入池 Channel，每个 Channel 独立学习分数分布特征。</p>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Channel 映射">
+        <text x="20" y="28" font-size="14" font-weight="600">二级指标 → Channel 映射</text>
+
+        <!-- 中心 hub -->
+        <circle cx="410" cy="160" r="50" fill="#e8f0f8" stroke="#2d5a8a" stroke-width="2"/>
+        <text x="410" y="155" text-anchor="middle" font-size="11" font-weight="600" fill="#2d5a8a">Session</text>
+        <text x="410" y="172" text-anchor="middle" font-size="10" fill="#5c5c66">× Channel</text>
+
+        <!-- channels -->
+        <rect x="30" y="50" width="160" height="56" rx="8" fill="#edf7f2" stroke="#2a7d5f"/>
+        <text x="110" y="74" text-anchor="middle" font-size="11" font-weight="600" fill="#2a7d5f">ch_task_completion</text>
+        <text x="110" y="92" text-anchor="middle" font-size="9" fill="#5c5c66">任务完成度 · llm_judge</text>
+        <line x1="190" y1="78" x2="360" y2="140" stroke="#2a7d5f" stroke-width="1.5"/>
+
+        <rect x="30" y="210" width="160" height="56" rx="8" fill="#e8f0f8" stroke="#2d5a8a"/>
+        <text x="110" y="234" text-anchor="middle" font-size="11" font-weight="600" fill="#2d5a8a">ch_format_compliance</text>
+        <text x="110" y="252" text-anchor="middle" font-size="9" fill="#5c5c66">输出格式合规 · regex</text>
+        <line x1="190" y1="238" x2="360" y2="180" stroke="#2d5a8a" stroke-width="1.5"/>
+
+        <rect x="630" y="50" width="160" height="56" rx="8" fill="#f3f0fa" stroke="#5b4b8a"/>
+        <text x="710" y="74" text-anchor="middle" font-size="11" font-weight="600" fill="#5b4b8a">ch_decision_accuracy</text>
+        <text x="710" y="92" text-anchor="middle" font-size="9" fill="#5c5c66">筛选决策 · exact_match</text>
+        <line x1="630" y1="78" x2="460" y2="140" stroke="#5b4b8a" stroke-width="1.5"/>
+
+        <rect x="630" y="210" width="160" height="56" rx="8" fill="#fdf3ed" stroke="#c45c26"/>
+        <text x="710" y="234" text-anchor="middle" font-size="11" font-weight="600" fill="#c45c26">ch_uncertainty</text>
+        <text x="710" y="252" text-anchor="middle" font-size="9" fill="#5c5c66">低置信 / 分歧 → 人工</text>
+        <line x1="630" y1="238" x2="460" y2="180" stroke="#c45c26" stroke-width="1.5"/>
+
+        <rect x="330" y="250" width="160" height="40" rx="8" fill="#f0ede6" stroke="#5c5c66"/>
+        <text x="410" y="275" text-anchor="middle" font-size="10" fill="#5c5c66">ch_human_gold · manual_gold</text>
+        <line x1="410" y1="210" x2="410" y2="250" stroke="#5c5c66" stroke-width="1.5"/>
+      </svg>
+      <figcaption>图 6 — 入池单位升级为「session × channel」，每个 channel 独立维护分布与规则</figcaption>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th>Channel</th><th>绑定二级指标</th><th>典型 case</th><th>现网 source 对应</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>ch_task_completion</code></td><td>任务完成度</td><td>good / bad</td><td><code>auto_tn</code> / <code>auto_tp</code></td></tr>
+        <tr><td><code>ch_format_compliance</code></td><td>输出格式合规性</td><td>good / bad</td><td>可新建</td></tr>
+        <tr><td><code>ch_decision_accuracy</code></td><td>筛选决策准确率</td><td>需金标后才有意义</td><td>待补 expected</td></tr>
+        <tr><td><code>ch_uncertainty</code></td><td>低置信 / 多指标分歧</td><td>待人工复核</td><td><code>auto_uncertainty</code></td></tr>
+        <tr><td><code>ch_human_gold</code></td><td>人工确认金标</td><td>高质量 good</td><td><code>manual_gold</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== 6. RLHF ===== -->
+  <section id="rlhf">
+    <h2>六、类 RLHF 学习路径（100 条人工标定）</h2>
+    <p>当积累约 <strong>100 条人工校验队列入池数据</strong>后，按 channel 学习分数分布特征，逐步建立自动化入池规则。本方案采用<strong>静态规则 Policy</strong>（见<a href="#policy-static">七（补）</a>），不训练 reward 小模型。</p>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RLHF 类比">
+        <text x="20" y="28" font-size="14" font-weight="600">RLHF ↔ Zeval 入池 类比</text>
+
+        <rect x="20" y="50" width="240" height="130" rx="10" fill="#f7f5f0" stroke="#5c5c66"/>
+        <text x="140" y="75" text-anchor="middle" font-size="12" font-weight="600" fill="#5c5c66">RLHF</text>
+        <text x="40" y="100" font-size="11" fill="#5c5c66">① Human preference (A &gt; B)</text>
+        <text x="40" y="122" font-size="11" fill="#5c5c66">② Reward model 训练</text>
+        <text x="40" y="144" font-size="11" fill="#5c5c66">③ PPO 策略更新</text>
+        <text x="40" y="166" font-size="11" fill="#5c5c66">④ 在线强化学习</text>
+
+        <text x="410" y="115" text-anchor="middle" font-size="24" fill="#2d5a8a">≈</text>
+
+        <rect x="560" y="50" width="240" height="130" rx="10" fill="#e8f0f8" stroke="#2d5a8a"/>
+        <text x="680" y="75" text-anchor="middle" font-size="12" font-weight="600" fill="#2d5a8a">Zeval 入池</text>
+        <text x="580" y="100" font-size="11" fill="#2d5a8a">① accept/reject + qualityTier</text>
+        <text x="580" y="122" font-size="11" fill="#2d5a8a">② Channel policy（分位数/规则）</text>
+        <text x="580" y="144" font-size="11" fill="#2d5a8a">③ 定期重训 policy 版本化</text>
+        <text x="580" y="166" font-size="11" fill="#2d5a8a">④ 离线重算，无需在线 RL</text>
+      </svg>
+      <figcaption>图 7 — MVP 不需要在线 RL；人类标定 + 统计学习 + 规则 policy 即可</figcaption>
+    </figure>
+
+    <h3>三步实施</h3>
+    <div class="grid-2">
+      <div class="phase-card">
+        <div class="label">Step 1 · 标定</div>
+        <h4>人工标定 Schema</h4>
+        <ul>
+          <li><code>sessionId</code> + <code>channel</code></li>
+          <li><code>humanVerdict</code>: accept / reject / needs_evidence</li>
+          <li><code>qualityTier</code>: gold / silver / reject</li>
+          <li>各二级指标人工分 1–5 + notes</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="label">Step 2 · 学习</div>
+        <h4>每 Channel 估计分布</h4>
+        <ul>
+          <li>P(score | accept) vs P(score | reject)</li>
+          <li>confidence 与 accept 率关系</li>
+          <li>qualityScore 百分位动态阈值</li>
+          <li>自动分 vs 人工分一致率（校准 judge）</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>产出物：Channel Admission Policy（示例）</h3>
+    <pre>{
+  "channel": "ch_task_completion",
+  "version": "admission-policy-v1",
+  "acceptRules": [
+    { "metric": "task_success", "scoreGte": 4, "confidenceGte": 0.75 },
+    { "qualityPercentileGte": 0.6 }
+  ],
+  "rejectRules": [
+    { "metric": "task_success", "scoreLte": 2 }
+  ],
+  "sampleRateForHuman": 0.3
+}</pre>
+  </section>
+
+  <!-- ===== 7. 引擎 ===== -->
+  <section id="engine">
+    <h2>七、自动化入池引擎（概念架构）</h2>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="入池引擎架构">
+        <defs><marker id="arr4" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2d5a8a"/></marker></defs>
+        <text x="20" y="28" font-size="14" font-weight="600" fill="#1a1a1f">入池引擎数据流（Admission Engine）</text>
+
+        <!-- 主流程 -->
+        <rect x="10" y="55" width="130" height="52" rx="8" fill="#e8f0f8" stroke="#2d5a8a"/>
+        <text x="75" y="76" text-anchor="middle" font-size="11" font-weight="600" fill="#2d5a8a">指标结果</text>
+        <text x="75" y="92" text-anchor="middle" font-size="8" fill="#5c5c66">metricResults</text>
+        <text x="75" y="102" text-anchor="middle" font-size="8" fill="#5c5c66">+ 重排序 reRank</text>
+
+        <line x1="140" y1="81" x2="158" y2="81" stroke="#2d5a8a" marker-end="url(#arr4)"/>
+        <rect x="163" y="55" width="130" height="52" rx="8" fill="#f3f0fa" stroke="#5b4b8a"/>
+        <text x="228" y="76" text-anchor="middle" font-size="11" font-weight="600" fill="#5b4b8a">特征提取器</text>
+        <text x="228" y="92" text-anchor="middle" font-size="8" fill="#5c5c66">FeatureExtractor</text>
+        <text x="228" y="102" text-anchor="middle" font-size="8" fill="#5c5c66">按 session×channel</text>
+
+        <line x1="293" y1="81" x2="311" y2="81" stroke="#2d5a8a" marker-end="url(#arr4)"/>
+        <rect x="316" y="55" width="130" height="52" rx="8" fill="#fdf3ed" stroke="#c45c26"/>
+        <text x="381" y="76" text-anchor="middle" font-size="11" font-weight="600" fill="#c45c26">入池打分器</text>
+        <text x="381" y="92" text-anchor="middle" font-size="8" fill="#5c5c66">AdmissionScorer</text>
+        <text x="381" y="102" text-anchor="middle" font-size="8" fill="#5c5c66">对照 Policy 规则</text>
+
+        <line x1="446" y1="81" x2="464" y2="81" stroke="#2d5a8a" marker-end="url(#arr4)"/>
+        <rect x="469" y="55" width="130" height="52" rx="8" fill="#f0ede6" stroke="#5c5c66"/>
+        <text x="534" y="76" text-anchor="middle" font-size="11" font-weight="600" fill="#5c5c66">入池路由器</text>
+        <text x="534" y="92" text-anchor="middle" font-size="8" fill="#5c5c66">AdmissionRouter</text>
+        <text x="534" y="102" text-anchor="middle" font-size="8" fill="#5c5c66">多 Channel 优先级</text>
+
+        <line x1="599" y1="81" x2="617" y2="81" stroke="#2d5a8a" marker-end="url(#arr4)"/>
+        <rect x="622" y="55" width="130" height="52" rx="8" fill="#edf7f2" stroke="#2a7d5f"/>
+        <text x="687" y="76" text-anchor="middle" font-size="11" font-weight="600" fill="#2a7d5f">入池写入器</text>
+        <text x="687" y="92" text-anchor="middle" font-size="8" fill="#5c5c66">PoolWriter</text>
+        <text x="687" y="102" text-anchor="middle" font-size="8" fill="#5c5c66">写数据集池</text>
+
+        <!-- 策略库 -->
+        <rect x="10" y="130" width="130" height="52" rx="8" fill="#f3f0fa" stroke="#5b4b8a" stroke-dasharray="5,3"/>
+        <text x="75" y="151" text-anchor="middle" font-size="11" font-weight="600" fill="#5b4b8a">策略库</text>
+        <text x="75" y="167" text-anchor="middle" font-size="8" fill="#5c5c66">PolicyStore</text>
+        <text x="75" y="177" text-anchor="middle" font-size="8" fill="#5c5c66">按 Channel 存规则</text>
+        <line x1="140" y1="156" x2="316" y2="100" stroke="#5b4b8a" stroke-dasharray="4,3"/>
+
+        <!-- 决策分支 -->
+        <line x1="534" y1="107" x2="534" y2="200" stroke="#5c5c66"/>
+        <line x1="200" y1="200" x2="620" y2="200" stroke="#5c5c66"/>
+
+        <rect x="130" y="215" width="150" height="48" rx="8" fill="#edf7f2" stroke="#2a7d5f"/>
+        <text x="205" y="236" text-anchor="middle" font-size="11" font-weight="600" fill="#2a7d5f">通过 · 入池</text>
+        <text x="205" y="252" text-anchor="middle" font-size="8" fill="#5c5c66">accept</text>
+
+        <rect x="335" y="215" width="150" height="48" rx="8" fill="#fdf3ed" stroke="#c45c26"/>
+        <text x="410" y="236" text-anchor="middle" font-size="11" font-weight="600" fill="#c45c26">拒绝 · 丢弃</text>
+        <text x="410" y="252" text-anchor="middle" font-size="8" fill="#5c5c66">reject</text>
+
+        <rect x="540" y="215" width="150" height="48" rx="8" fill="#e8f0f8" stroke="#2d5a8a"/>
+        <text x="615" y="236" text-anchor="middle" font-size="11" font-weight="600" fill="#2d5a8a">人工队列</text>
+        <text x="615" y="252" text-anchor="middle" font-size="8" fill="#5c5c66">human_queue</text>
+
+        <line x1="205" y1="200" x2="205" y2="215" stroke="#5c5c66" marker-end="url(#arr4)"/>
+        <line x1="410" y1="200" x2="410" y2="215" stroke="#5c5c66" marker-end="url(#arr4)"/>
+        <line x1="615" y1="200" x2="615" y2="215" stroke="#5c5c66" marker-end="url(#arr4)"/>
+
+        <text x="410" y="290" text-anchor="middle" font-size="9" fill="#5c5c66">策略库由人工标定数据统计生成（静态 JSON），不训练小模型</text>
+      </svg>
+      <figcaption>图 8 — 入池引擎：特征提取 → 打分 → 路由 → 写池；策略库（PolicyStore）承载各 Channel 的静态入池规则</figcaption>
+    </figure>
+
+    <div class="callout purple">
+      <strong>收敛建议</strong>
+      将 <code>eval-datasets/admission/pipeline.ts</code>（主 evaluate 五通道）与 <code>benchmark/case-admission.ts</code>（Benchmark 人工入池）统一为同一套 Policy 接口，避免两套逻辑分叉。
+    </div>
+  </section>
+
+  <!-- ===== 7b. 静态 Policy ===== -->
+  <section id="policy-static">
+    <h2>七（补）、人工标定 → 静态入池 Policy（不训练小模型）</h2>
+    <p class="lead">在<a href="#ui-review">两级标签 UI</a>中完成人工校验后，将标定记录聚合为<strong>可版本化的静态规则 JSON</strong>，供后续 run 自动建议入池决策。全程用统计分位数 / 阈值拟合，<strong>不训练入池小模型</strong>。</p>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="人工标定到静态 Policy 流程">
+        <defs><marker id="arr5" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2d5a8a"/></marker></defs>
+        <text x="20" y="28" font-size="14" font-weight="600" fill="#1a1a1f">人工标定 → 静态 Policy 闭环（当前 UI 集成）</text>
+
+        <!-- Step 1 -->
+        <rect x="20" y="50" width="150" height="70" rx="8" fill="#edf7f2" stroke="#2a7d5f"/>
+        <text x="95" y="72" text-anchor="middle" font-size="10" font-weight="600" fill="#2a7d5f">① 两级标签 UI</text>
+        <text x="95" y="88" text-anchor="middle" font-size="8" fill="#5c5c66">审阅 session×指标</text>
+        <text x="95" y="102" text-anchor="middle" font-size="8" fill="#5c5c66">认可/驳回/补证据</text>
+
+        <line x1="170" y1="85" x2="195" y2="85" stroke="#2d5a8a" marker-end="url(#arr5)"/>
+
+        <!-- Step 2 -->
+        <rect x="200" y="50" width="150" height="70" rx="8" fill="#e8f0f8" stroke="#2d5a8a"/>
+        <text x="275" y="72" text-anchor="middle" font-size="10" font-weight="600" fill="#2d5a8a">② 写入标定记录</text>
+        <text x="275" y="88" text-anchor="middle" font-size="8" fill="#5c5c66">humanReviewRecords</text>
+        <text x="275" y="102" text-anchor="middle" font-size="8" fill="#5c5c66">+ admit-cases 入池</text>
+
+        <line x1="350" y1="85" x2="375" y2="85" stroke="#2d5a8a" marker-end="url(#arr5)"/>
+
+        <!-- Step 3 -->
+        <rect x="380" y="50" width="150" height="70" rx="8" fill="#f3f0fa" stroke="#5b4b8a"/>
+        <text x="455" y="72" text-anchor="middle" font-size="10" font-weight="600" fill="#5b4b8a">③ 累积 ≥100 条</text>
+        <text x="455" y="88" text-anchor="middle" font-size="8" fill="#5c5c66">按 Channel 分组</text>
+        <text x="455" y="102" text-anchor="middle" font-size="8" fill="#5c5c66">accept / reject 样本</text>
+
+        <line x1="530" y1="85" x2="555" y2="85" stroke="#2d5a8a" marker-end="url(#arr5)"/>
+
+        <!-- Step 4 -->
+        <rect x="560" y="50" width="150" height="70" rx="8" fill="#fdf3ed" stroke="#c45c26"/>
+        <text x="635" y="72" text-anchor="middle" font-size="10" font-weight="600" fill="#c45c26">④ 统计学习</text>
+        <text x="635" y="88" text-anchor="middle" font-size="8" fill="#5c5c66">分位数 / 阈值拟合</text>
+        <text x="635" y="102" text-anchor="middle" font-size="8" fill="#5c5c66">纯规则，无 ML</text>
+
+        <line x1="710" y1="85" x2="735" y2="85" stroke="#2d5a8a" marker-end="url(#arr5)"/>
+
+        <!-- Step 5 -->
+        <rect x="650" y="140" width="150" height="70" rx="8" fill="#edf7f2" stroke="#2a7d5f"/>
+        <text x="725" y="162" text-anchor="middle" font-size="10" font-weight="600" fill="#2a7d5f">⑤ 发布 Policy</text>
+        <text x="725" y="178" text-anchor="middle" font-size="8" fill="#5c5c66">admission-policy-v1.json</text>
+        <text x="725" y="192" text-anchor="middle" font-size="8" fill="#5c5c66">写入 PolicyStore</text>
+
+        <line x1="635" y1="120" x2="725" y2="140" stroke="#2d5a8a" marker-end="url(#arr5)"/>
+
+        <!-- Step 6 loop back -->
+        <rect x="20" y="140" width="600" height="70" rx="8" fill="#faf9f6" stroke="#e2dfd6"/>
+        <text x="320" y="162" text-anchor="middle" font-size="10" font-weight="600" fill="#2d5a8a">⑥ 后续 Benchmark Run 自动建议入池</text>
+        <text x="320" y="178" text-anchor="middle" font-size="8" fill="#5c5c66">AdmissionScorer 读取 Policy → 高置信自动 accept/reject · 低置信仍进人工队列</text>
+        <text x="320" y="194" text-anchor="middle" font-size="8" fill="#5c5c66">UI 展示「Policy 建议」与人工最终决定并排，新标定可增量刷新 Policy</text>
+
+        <line x1="725" y1="210" x2="725" y2="240" stroke="#5c5c66" stroke-dasharray="4,3"/>
+        <line x1="725" y1="240" x2="95" y2="240" stroke="#5c5c66" stroke-dasharray="4,3"/>
+        <line x1="95" y1="240" x2="95" y2="120" stroke="#5c5c66" stroke-dasharray="4,3" marker-end="url(#arr5)"/>
+        <text x="400" y="258" text-anchor="middle" font-size="9" fill="#5c5c66">增量标定 → 重新生成 v2、v3…（离线重算，非在线 RL）</text>
+
+        <!-- 数据存储 -->
+        <text x="20" y="290" font-size="11" font-weight="600" fill="#1a1a1f">存储与 API（建议）</text>
+        <rect x="20" y="300" width="250" height="50" rx="6" fill="#f0ede6"/>
+        <text x="145" y="322" text-anchor="middle" font-size="9" fill="#5c5c66">.zeval-db/admission-policies/{projectId}.json</text>
+        <text x="145" y="338" text-anchor="middle" font-size="8" fill="#5c5c66">静态策略文件 · 可 diff · 可回滚</text>
+
+        <rect x="285" y="300" width="250" height="50" rx="6" fill="#f0ede6"/>
+        <text x="410" y="322" text-anchor="middle" font-size="9" fill="#5c5c66">POST /api/benchmarks/admission-policy/generate</text>
+        <text x="410" y="338" text-anchor="middle" font-size="8" fill="#5c5c66">输入标定记录 + metricResults → 输出 Policy</text>
+
+        <rect x="550" y="300" width="250" height="50" rx="6" fill="#f0ede6"/>
+        <text x="675" y="322" text-anchor="middle" font-size="9" fill="#5c5c66">GET /api/benchmarks/admission-policy</text>
+        <text x="675" y="338" text-anchor="middle" font-size="8" fill="#5c5c66">评测结果页读取当前生效 Policy</text>
+      </svg>
+      <figcaption>图 8b — 在当前 Benchmark UI 内闭环：人工标定 → 统计生成静态 Policy → 后续 run 自动建议入池</figcaption>
+    </figure>
+
+    <h3>标定记录 Schema（与 UI 两级标签对齐）</h3>
+    <pre>{
+  "reviewId": "rev_...",
+  "runId": "benchmark_generic_...",
+  "caseId": "rubric_custom_..._case_001",
+  "sessionId": "companion_pos_001",
+  "metricKey": "task_success",
+  "channel": "ch_task_completion",
+  "decision": "accepted",
+  "qualityTier": "silver",
+  "autoScore": 3.6,
+  "autoConfidence": 0.71,
+  "reviewer": "user_001",
+  "note": "识别了局限但建议不足",
+  "reviewedAt": "2026-06-10T..."
+}</pre>
+
+    <h3>静态 Policy 生成算法（纯统计，无模型训练）</h3>
+    <p>对每个 <code>channel</code>，将人工标定样本分为 <code>accept</code> 与 <code>reject</code> 两组，提取特征并拟合规则：</p>
+    <table>
+      <thead>
+        <tr><th>特征字段</th><th>accept 组统计</th><th>reject 组统计</th><th>产出规则</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>autoScore</code>（0–5）</td>
+          <td>P20 分位数</td>
+          <td>P80 分位数</td>
+          <td><code>scoreGte</code> / <code>scoreLte</code></td>
+        </tr>
+        <tr>
+          <td><code>autoConfidence</code></td>
+          <td>中位数</td>
+          <td>—</td>
+          <td><code>confidenceGte</code></td>
+        </tr>
+        <tr>
+          <td><code>qualityScore</code>（reRank 后）</td>
+          <td>P30 百分位</td>
+          <td>—</td>
+          <td><code>qualityPercentileGte</code></td>
+        </tr>
+        <tr>
+          <td>人工与自动一致率</td>
+          <td>按指标统计</td>
+          <td>—</td>
+          <td>低一致率 → 提高 <code>sampleRateForHuman</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Policy JSON 示例（静态、可审阅）</h3>
+    <pre>{
+  "policyId": "admission-policy-v1",
+  "projectId": "default",
+  "generatedAt": "2026-06-10T12:00:00Z",
+  "labelCount": 128,
+  "channels": {
+    "ch_task_completion": {
+      "acceptRules": [
+        { "metric": "task_success", "scoreGte": 4, "confidenceGte": 0.72 },
+        { "qualityPercentileGte": 0.55 }
+      ],
+      "rejectRules": [
+        { "metric": "task_success", "scoreLte": 2 }
+      ],
+      "uncertaintyRules": [
+        { "confidenceLt": 0.65 },
+        { "scoreBetween": [2.5, 3.5] }
+      ],
+      "sampleRateForHuman": 0.25,
+      "stats": { "acceptN": 64, "rejectN": 22, "agreementRate": 0.81 }
+    }
+  }
+}</pre>
+
+    <h3>在当前 UI 中的集成方式</h3>
+    <div class="grid-2">
+      <div class="phase-card">
+        <div class="label">评测结果页</div>
+        <h4>人工校验时</h4>
+        <ul>
+          <li>两级标签内展示当前 Channel 与 Policy 建议（若有）</li>
+          <li>人工决定覆盖 Policy 建议，写入 <code>humanReviewRecords</code></li>
+          <li>顶栏显示「已标定 N / 目标 100」进度条</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="label">标定达标后</div>
+        <h4>生成 Policy</h4>
+        <ul>
+          <li>「生成入池策略」按钮（N≥100 可点）</li>
+          <li>弹窗预览各 Channel 规则 + 覆盖率模拟</li>
+          <li>确认后写入 PolicyStore，显示版本号 v1</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="label">后续 Run</div>
+        <h4>自动建议</h4>
+        <ul>
+          <li>跑分完成后 AdmissionScorer 预填建议</li>
+          <li>高置信命中 acceptRule → 绿色「建议入池」</li>
+          <li>命中 uncertaintyRule → 仍进人工队列（与现网一致）</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="label">模块边界</div>
+        <h4>建议新增</h4>
+        <ul>
+          <li><code>src/benchmark/admission-policy-learner.ts</code> — 纯函数统计</li>
+          <li><code>src/benchmark/admission-policy-store.ts</code> — 读写 JSON</li>
+          <li><code>src/benchmark/admission-scorer.ts</code> — 规则求值</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <strong>与 RLHF 的边界</strong>
+      人类标定 = preference signal；静态 Policy = 手工可读的 reward 规则表；版本化发布 = 策略更新。不需要训练神经网络，标定满 100 条即可产出 v1，后续增量标定离线重算 v2。
+    </div>
+  </section>
+
+  <!-- ===== 8. Roadmap ===== -->
+  <section id="roadmap">
+    <h2>八、分阶段实施优先级</h2>
+
+    <figure class="figure">
+      <svg viewBox="0 0 820 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="实施时间线">
+        <text x="20" y="28" font-size="14" font-weight="600" fill="#1a1a1f">实施时间线（P0+ 最优先）</text>
+        <line x1="40" y1="100" x2="780" y2="100" stroke="#e2dfd6" stroke-width="4" stroke-linecap="round"/>
+
+        <circle cx="80" cy="100" r="12" fill="#9b2c2c" stroke="#fff" stroke-width="2"/>
+        <text x="80" y="72" text-anchor="middle" font-size="10" font-weight="700" fill="#9b2c2c">P0+</text>
+        <text x="80" y="130" text-anchor="middle" font-size="9" fill="#5c5c66">两级标签 UI</text>
+        <text x="80" y="145" text-anchor="middle" font-size="8" fill="#9b2c2c">最高优先</text>
+
+        <circle cx="220" cy="100" r="10" fill="#c45c26"/>
+        <text x="220" y="72" text-anchor="middle" font-size="10" font-weight="600" fill="#c45c26">Phase 0</text>
+        <text x="220" y="130" text-anchor="middle" font-size="9" fill="#5c5c66">Rubric + 区分度</text>
+
+        <circle cx="380" cy="100" r="10" fill="#2d5a8a"/>
+        <text x="380" y="72" text-anchor="middle" font-size="10" font-weight="600" fill="#2d5a8a">Phase 1</text>
+        <text x="380" y="130" text-anchor="middle" font-size="9" fill="#5c5c66">reRank + 标定</text>
+
+        <circle cx="540" cy="100" r="10" fill="#5b4b8a"/>
+        <text x="540" y="72" text-anchor="middle" font-size="10" font-weight="600" fill="#5b4b8a">Phase 2</text>
+        <text x="540" y="130" text-anchor="middle" font-size="9" fill="#5c5c66">100 条金标</text>
+
+        <circle cx="700" cy="100" r="10" fill="#2a7d5f"/>
+        <text x="700" y="72" text-anchor="middle" font-size="10" font-weight="600" fill="#2a7d5f">Phase 3</text>
+        <text x="700" y="130" text-anchor="middle" font-size="9" fill="#5c5c66">静态 Policy v1</text>
+      </svg>
+      <figcaption>图 9 — P0+ 两级标签 UI 先于一切；静态 Policy 在 100 条标定后发布，不依赖小模型</figcaption>
+    </figure>
+
+    <table class="priority-table">
+      <thead>
+        <tr><th>优先级</th><th>事项</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="p0-top">P0+</td>
+          <td><a href="#ui-review">评测结果两级标签 UI</a></td>
+          <td>Session ID → 二级指标；单 session 焦点 + 人工校验入池；<strong>全项目最高优先</strong></td>
+        </tr>
+        <tr>
+          <td class="p0">P0</td>
+          <td>修 Rubric + 跑分区分度</td>
+          <td>最低 6 指标、禁用空 expected、rubricForm 强制、评 transcript 本体</td>
+        </tr>
+        <tr>
+          <td class="p1">P1</td>
+          <td>reRank + 标定 schema</td>
+          <td>Q 分 / qualityTier；与两级 UI 的人工校验字段对齐</td>
+        </tr>
+        <tr>
+          <td class="p1">P1</td>
+          <td><a href="#policy-static">静态 Policy 管线</a></td>
+          <td>标定 ≥100 条 → 统计生成 JSON → 后续 run 自动建议；<strong>不训练小模型</strong></td>
+        </tr>
+        <tr>
+          <td class="p2">P2</td>
+          <td>Channel 规则收敛</td>
+          <td>与 evaluate 五通道统一 Policy 接口；低置信进 uncertainty 队列</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="grid-2">
+      <div class="phase-card">
+        <div class="label p0-top">P0+ · 最高优先</div>
+        <h4>评测结果两级标签 UI</h4>
+        <ul>
+          <li>合并「可解释性分析」与「人工校验队列」</li>
+          <li>一级 Tab：Session ID；二级 Tab：二级指标</li>
+          <li>内容区：原始会话（折叠）+ 总览 + 单维度 + 人工校验</li>
+          <li>单条 / 单 session 入池，避免平铺错乱</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="label p0">P0 · 立刻</div>
+        <h4>修 Rubric + 评测区分度</h4>
+        <ul>
+          <li>首轮 Rubric 最低 6 指标门禁，无金标禁用 exact_match</li>
+          <li>Rubric Agent 自动提示维度不足并建议增补</li>
+          <li>LLM judge 强制按 rubricForm 打分</li>
+          <li>支持「评 transcript 本体」模式</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="label p1">P1 · 短期</div>
+        <h4>reRank + 静态 Policy 准备</h4>
+        <ul>
+          <li>实现 Q 分与 qualityTier</li>
+          <li>标定记录写入 channel / qualityTier 字段</li>
+          <li>「生成入池策略」按钮 + Policy 预览弹窗</li>
+        </ul>
+      </div>
+      <div class="phase-card">
+        <div class="label p2">P2 · 中期</div>
+        <h4>静态 Policy 上线</h4>
+        <ul>
+          <li>100 条标定 → admission-policy-v1.json</li>
+          <li>AdmissionScorer 自动建议入池</li>
+          <li>增量标定离线重算 v2、v3</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 9. 代码映射 ===== -->
+  <section id="mapping">
+    <h2>九、与现有代码的映射</h2>
+
+    <table>
+      <thead>
+        <tr><th>能力</th><th>现有模块</th><th>缺口</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Rubric 生成</td><td><code>src/benchmark/copilot.ts</code>、<code>rubric-agent.ts</code></td><td>首轮指标偏少；无最低指标数门禁；领域维度覆盖不足</td></tr>
+        <tr><td>指标评测</td><td><code>src/benchmark/evaluators.ts</code></td><td>rubricForm 未强制；exact_match 空 expected</td></tr>
+        <tr><td>Case 构建</td><td><code>src/benchmark/generic-run.ts</code></td><td>只评 8 session；评新生成答案非历史对话</td></tr>
+        <tr><td>Run 聚合</td><td><code>src/benchmark/runner.ts</code></td><td>仅加权平均，无 reRank</td></tr>
+        <tr><td>Benchmark 入池</td><td><code>src/benchmark/case-admission.ts</code></td><td>90/60 二元阈值，无 tier</td></tr>
+        <tr><td>主链路五通道</td><td><code>src/eval-datasets/admission/pipeline.ts</code></td><td>与 benchmark 未统一；无 policy 学习</td></tr>
+        <tr><td>评测结果 UI</td><td><code>NotebookLayout.tsx</code> · <code>BenchmarkResultPanel</code></td><td>可解释性分析全量平铺；需改为 Session×指标两级标签</td></tr>
+        <tr><td>人工复核 UI</td><td><code>humanReviewRecords</code> + <code>/api/benchmarks/admit-cases</code></td><td>与可解释性分析分离；缺 channel、tier、Policy 建议并排展示</td></tr>
+        <tr><td>静态 Policy</td><td>（待建）<code>admission-policy-learner.ts</code></td><td>无标定聚合、无 PolicyStore、无自动建议入池</td></tr>
+        <tr><td>金标资产</td><td><code>calibration/gold-sets/</code></td><td>可复用为 Policy 统计学习的输入样本</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout ok">
+      <strong>验证建议</strong>
+      使用 <code>companion-autofind-20sessions.csv</code>（10 正样本 <code>companion_pos_*</code> + 10 负样本 <code>companion_neg_*</code>），改成评历史 assistant 表现后，正负样本应出现明显分数差距 — 这是区分度修复是否有效的直观验收标准。
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Zeval 2.x · 评测区分度与自动化入池策略分析 · 2026-06-10<br />
+  文件路径：<code>docs/admission-pool-strategy.html</code> · 浏览器直接打开即可阅读
+</footer>
+
+</body>
+</html>

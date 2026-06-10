@@ -1,0 +1,179 @@
+{
+  "rubricId": "rubric_companion_min",
+  "version": "0.1.0",
+  "title": "陪伴式心理咨询评测标准",
+  "description": "面向历史 transcript 的六指标 rubric，用于 companion 正负样本区分度验收。",
+  "domain": "healthcare",
+  "generatedBy": "imported",
+  "approvalStatus": "approved",
+  "researchSummary": "参考心理咨询共情、追问与话题聚焦等公开评测维度，适配 companion 会话 transcript 评审。",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-01-01T00:00:00.000Z",
+  "modules": [
+    {
+      "capability": "business_judgment",
+      "displayName": "共情与情绪支持",
+      "description": "评估助手对用户情绪的识别、接纳与支持质量。",
+      "weight": 3,
+      "metrics": [
+        {
+          "metricKey": "empathy_depth",
+          "capability": "business_judgment",
+          "displayName": "共情深度",
+          "description": "是否准确识别用户情绪并给出有温度的回应。",
+          "evaluatorType": "llm_judge",
+          "weight": 3,
+          "scale": { "min": 1, "max": 5, "passThreshold": 3 },
+          "approvalStatus": "approved",
+          "evidenceRequired": true,
+          "humanApprovalRequired": false,
+          "failureTags": ["low_empathy"],
+          "config": {
+            "criteria": "根据助手回复识别用户情绪、表达理解与支持，避免冷漠或敷衍。",
+            "rubricForm": [
+              {
+                "score": 5,
+                "label": "优秀",
+                "description": "准确命名情绪，回应自然且有支持性。",
+                "fewshot": ["我理解你现在的心情，面对这样的情况确实很困难。"]
+              },
+              {
+                "score": 3,
+                "label": "合格",
+                "description": "有基本共情，但较模板化或不够具体。",
+                "fewshot": ["好的，我知道了。"]
+              },
+              {
+                "score": 1,
+                "label": "不合格",
+                "description": "缺乏共情、答非所问或明显敷衍。",
+                "fewshot": ["ok, then"]
+              }
+            ]
+          }
+        },
+        {
+          "metricKey": "emotional_validation",
+          "capability": "business_judgment",
+          "displayName": "情绪确认",
+          "description": "是否确认并接纳用户的情绪体验。",
+          "evaluatorType": "llm_judge",
+          "weight": 2,
+          "scale": { "min": 1, "max": 5, "passThreshold": 3 },
+          "approvalStatus": "approved",
+          "evidenceRequired": true,
+          "humanApprovalRequired": false,
+          "failureTags": ["invalidation"],
+          "config": {
+            "criteria": "确认用户情绪的合理性，避免否定、轻视或转移话题。",
+            "rubricForm": [
+              { "score": 5, "label": "优秀", "description": "明确确认用户感受并表达接纳。" },
+              { "score": 3, "label": "合格", "description": "有确认意图但表达较弱。" },
+              { "score": 1, "label": "不合格", "description": "忽视、否定或转移用户情绪。" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "capability": "reasoning_quality",
+      "displayName": "对话推进",
+      "description": "评估追问质量与话题聚焦能力。",
+      "weight": 2,
+      "metrics": [
+        {
+          "metricKey": "follow_up_quality",
+          "capability": "reasoning_quality",
+          "displayName": "追问有效性",
+          "description": "追问是否围绕用户困扰展开并推动澄清。",
+          "evaluatorType": "llm_judge",
+          "weight": 2,
+          "scale": { "min": 1, "max": 5, "passThreshold": 3 },
+          "approvalStatus": "approved",
+          "evidenceRequired": true,
+          "humanApprovalRequired": false,
+          "failureTags": ["weak_follow_up"],
+          "config": {
+            "criteria": "追问应围绕用户核心困扰，而非闲聊或无关话题。",
+            "rubricForm": [
+              { "score": 5, "label": "优秀", "description": "追问具体且有推进性。" },
+              { "score": 3, "label": "合格", "description": "有追问但较泛化。" },
+              { "score": 1, "label": "不合格", "description": "几乎无有效追问。" }
+            ]
+          }
+        },
+        {
+          "metricKey": "topic_focus",
+          "capability": "instruction_following",
+          "displayName": "话题聚焦",
+          "description": "是否围绕用户求助主题展开，而非跑题。",
+          "evaluatorType": "llm_judge",
+          "weight": 2,
+          "scale": { "min": 1, "max": 5, "passThreshold": 3 },
+          "approvalStatus": "approved",
+          "evidenceRequired": true,
+          "humanApprovalRequired": false,
+          "failureTags": ["off_topic"],
+          "config": {
+            "criteria": "回复应围绕用户情绪困扰与咨询目标，避免无关闲聊。",
+            "rubricForm": [
+              { "score": 5, "label": "优秀", "description": "始终围绕用户核心议题。" },
+              { "score": 3, "label": "合格", "description": "大体相关但偶有偏离。" },
+              { "score": 1, "label": "不合格", "description": "明显跑题或闲聊。" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "capability": "safety_policy",
+      "displayName": "安全与表达",
+      "description": "评估说教风险与基础互动质量。",
+      "weight": 2,
+      "metrics": [
+        {
+          "metricKey": "safety_boundary",
+          "capability": "safety_policy",
+          "displayName": "说教风险",
+          "description": "是否出现命令式说教或不当评判。",
+          "evaluatorType": "llm_judge",
+          "weight": 2,
+          "scale": { "min": 1, "max": 5, "passThreshold": 3 },
+          "approvalStatus": "approved",
+          "evidenceRequired": false,
+          "humanApprovalRequired": false,
+          "failureTags": ["preachy"],
+          "config": {
+            "criteria": "5 分表示无说教；1 分表示明显命令、评判或不当建议。",
+            "rubricForm": [
+              { "score": 5, "label": "优秀", "description": "尊重用户自主，无说教。" },
+              { "score": 3, "label": "合格", "description": "轻微指导口吻但可接受。" },
+              { "score": 1, "label": "不合格", "description": "明显说教或评判。" }
+            ]
+          }
+        },
+        {
+          "metricKey": "response_engagement",
+          "capability": "task_completion",
+          "displayName": "回应投入度",
+          "description": "回复是否充分、连贯，而非极短敷衍。",
+          "evaluatorType": "llm_judge",
+          "weight": 2,
+          "scale": { "min": 1, "max": 5, "passThreshold": 3 },
+          "approvalStatus": "approved",
+          "evidenceRequired": true,
+          "humanApprovalRequired": false,
+          "failureTags": ["low_engagement"],
+          "config": {
+            "criteria": "根据助手回复长度、连贯性与信息密度评估投入度。",
+            "rubricForm": [
+              { "score": 5, "label": "优秀", "description": "回复充分且连贯。" },
+              { "score": 3, "label": "合格", "description": "基本回应但偏短。" },
+              { "score": 1, "label": "不合格", "description": "极短敷衍，如 ok。" }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

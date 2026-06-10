@@ -1,8 +1,8 @@
-import { BenchmarkConsole } from "@/components/benchmark/BenchmarkConsole";
+import { NotebookLayout } from "@/components/benchmark/NotebookLayout";
 
 /**
- * Benchmark management route.
+ * Benchmark management route — NotebookLLM-style three-column layout.
  */
 export default function BenchmarkPage() {
-  return <BenchmarkConsole />;
+  return <NotebookLayout />;
 }

@@ -34,34 +34,7 @@
   border: 1px solid var(--line);
   overflow: hidden;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
-}
-
-/* Dark mode */
-:global(html[data-theme="dark"]) .layout {
-  --bg:        #030712;
-  --bg-2:      rgb(8 13 27 / 0.92);
-  --bg-3:      rgb(15 23 42 / 0.86);
-  --line:      var(--zeval-line);
-  --line-2:    rgb(103 232 249 / 0.24);
-  --ink:       var(--zeval-text);
-  --ink-2:     var(--zeval-text-2);
-  --ink-3:     var(--zeval-muted);
-  --accent:    var(--zeval-cyan);
-  --accent-bg: rgb(103 232 249 / 0.08);
-  --accent-2:  var(--zeval-teal);
-  --user-bg:   linear-gradient(135deg, var(--zeval-cyan), var(--zeval-teal));
-  --user-ink:  #03111a;
-  --ok:        var(--zeval-success);
-  --ok-bg:     rgb(34 197 94 / 0.08);
-  --fail:      var(--zeval-danger);
-  --fail-bg:   rgb(251 113 133 / 0.08);
-  --info:      var(--zeval-blue);
-  --info-bg:   rgb(96 165 250 / 0.08);
-  --code-bg:   #020617;
-  --code-ink:  #d7e3f8;
-}
-
-/* ─── Loading ──────────────────────────────────────────────────────── */
+}/* ─── Loading ──────────────────────────────────────────────────────── */
 .loadingShell {
   min-height: 420px;
   display: grid;
@@ -350,6 +323,26 @@
   line-height: 1.6;
 }
 
+.capabilityGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 14px;
+}
+
+.capabilityGrid span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .suggest {
   display: flex;
   flex-direction: column;
@@ -418,11 +411,6 @@
 .bubbleUser .bubbleRole {
   color: rgba(255, 255, 255, 0.4);
 }
-
-:global(html[data-theme="dark"]) .layout .bubbleUser .bubbleRole {
-  color: rgba(228, 228, 231, 0.35);
-}
-
 .bubbleBody {
   color: var(--ink);
   font-size: 14px;
@@ -502,12 +490,6 @@
   background: rgba(255, 255, 255, 0.12);
   color: var(--user-ink);
 }
-
-:global(html[data-theme="dark"]) .layout .markdown code {
-  background: var(--accent-bg);
-  color: var(--accent);
-}
-
 .markdown blockquote {
   padding: 8px 12px;
   border-left: 2px solid var(--accent);

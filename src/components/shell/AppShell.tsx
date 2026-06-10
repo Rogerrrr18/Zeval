@@ -6,74 +6,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useSyncExternalStore, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { ZevalLogo } from "@/components/brand/ZevalLogo";
 import { useProject } from "./ProjectContext";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import styles from "./appShell.module.css";
 
 const NAV_ITEMS = [
-  { label: "总览", href: "/", match: "/", group: "Project" },
-  { label: "评估", href: "/workbench", match: "/workbench", group: "Quality Loop" },
-  { label: "案例校准", href: "/datasets", match: "/datasets", group: "Quality Loop" },
-  { label: "Benchmark", href: "/benchmark", match: "/benchmark", group: "Quality Loop" },
-  { label: "合成补样本", href: "/synthesize", match: "/synthesize", group: "Quality Loop" },
-  { label: "修复验证", href: "/remediation-packages", match: "/remediation-packages", group: "Quality Loop" },
-  { label: "Copilot", href: "/chat", match: "/chat", group: "Assistants" },
-  { label: "集成", href: "/integrations", match: "/integrations", group: "Assistants" },
+  { label: "总览", href: "/", match: "/", group: "工作台" },
+  { label: "评测工作台", href: "/benchmark", match: "/benchmark", group: "工作台" },
+  { label: "案例校准", href: "/datasets", match: "/datasets", group: "数据" },
+  { label: "合成补样本", href: "/synthesize", match: "/synthesize", group: "数据" },
+  { label: "修复验证", href: "/remediation-packages", match: "/remediation-packages", group: "数据" },
 ];
-
-const THEME_STORAGE_KEY = "zeval:theme";
-
-type Theme = "light" | "dark";
-
-const DEFAULT_THEME: Theme = "dark";
-const themeListeners = new Set<() => void>();
-
-function readStoredTheme(): Theme {
-  if (typeof window === "undefined") return DEFAULT_THEME;
-
-  try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return stored === "light" || stored === "dark" ? stored : DEFAULT_THEME;
-  } catch {
-    return DEFAULT_THEME;
-  }
-}
-
-function subscribeTheme(listener: () => void) {
-  themeListeners.add(listener);
-
-  const handleStorage = (event: StorageEvent) => {
-    if (event.key === THEME_STORAGE_KEY) listener();
-  };
-
-  window.addEventListener("storage", handleStorage);
-
-  return () => {
-    themeListeners.delete(listener);
-    window.removeEventListener("storage", handleStorage);
-  };
-}
-
-function emitThemeChange() {
-  themeListeners.forEach((listener) => listener());
-}
-
-function syncDocumentTheme(theme: Theme) {
-  document.documentElement.setAttribute("data-theme", theme);
-}
-
-function applyThemePreference(theme: Theme) {
-  syncDocumentTheme(theme);
-  try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-  } catch {
-    // localStorage can be unavailable in restricted browsing contexts.
-  }
-
-  emitThemeChange();
-}
 
 type AppShellProps = {
   children: ReactNode;
@@ -86,7 +31,6 @@ type AppShellProps = {
  */
 export function AppShell({ children, subheader }: AppShellProps) {
   const pathname = usePathname();
-  const theme = useSyncExternalStore(subscribeTheme, readStoredTheme, () => DEFAULT_THEME);
   const { activeProject } = useProject();
   const activeItem = NAV_ITEMS.find((item) => {
     if (item.href === "/") return pathname === "/";
@@ -102,14 +46,6 @@ export function AppShell({ children, subheader }: AppShellProps) {
     return groups;
   }, []);
 
-  useEffect(() => {
-    syncDocumentTheme(theme);
-  }, [theme]);
-
-  const toggleTheme = useCallback(() => {
-    applyThemePreference(theme === "dark" ? "light" : "dark");
-  }, [theme]);
-
   return (
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
@@ -117,26 +53,6 @@ export function AppShell({ children, subheader }: AppShellProps) {
           <Link href="/" className={styles.brand} aria-label="Zeval home">
             <ZevalLogo subtitle="Eval OS" />
           </Link>
-          <button
-            type="button"
-            className={`${styles.themeSwitch} ${theme === "dark" ? styles.themeSwitchDark : ""}`}
-            onClick={toggleTheme}
-            aria-label={theme === "dark" ? "切换到亮色主题" : "切换到暗色主题"}
-            title={theme === "dark" ? "切换到亮色主题" : "切换到暗色主题"}
-          >
-            <span className={`${styles.themeGlyph} ${styles.themeGlyphSun}`} aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2.4M12 19.6V22M4.93 4.93l1.7 1.7M17.37 17.37l1.7 1.7M2 12h2.4M19.6 12H22M4.93 19.07l1.7-1.7M17.37 6.63l1.7-1.7" />
-              </svg>
-            </span>
-            <span className={`${styles.themeGlyph} ${styles.themeGlyphMoon}`} aria-hidden="true">
-              <svg viewBox="0 0 24 24" focusable="false">
-                <path d="M20.4 14.4A7.7 7.7 0 0 1 9.6 3.6 8.7 8.7 0 1 0 20.4 14.4Z" />
-              </svg>
-            </span>
-            <span className={styles.themeThumb} aria-hidden="true" />
-          </button>
         </div>
         {/* Project switcher */}
         <div className={styles.projectSwitcherWrap}>
@@ -178,8 +94,8 @@ export function AppShell({ children, subheader }: AppShellProps) {
           </div>
           <div className={styles.topBarActions}>
             <span className={styles.projectBadge} title={activeProject.description ?? activeProject.name}>{activeProject.name}</span>
-            <Link href="/workbench" className={styles.evaluateButton}>
-              Evaluate
+            <Link href="/benchmark" className={styles.evaluateButton}>
+              Benchmark
             </Link>
           </div>
         </header>

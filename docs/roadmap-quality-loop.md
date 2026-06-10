@@ -54,7 +54,7 @@ Zeval 不是一个只看图表的 eval dashboard，而是一套把失败案例�
 
 下一阶段的数据层采用 SEAR 启发的 schema-first 思路：评测不再被视为一个总分或一份 JSON 报告，而是一组可以 join、可追踪、可解释、可回放的结构化质量信号。
 
-具体策略已沉淀到 `eval-system-概述/5-SEAR数据哲学与下一阶段架构.md`：
+当前策略：
 
 - JSON artifact 继续保留为导出、调试和审计快照。
 - 生产主路径逐步迁移到 PostgreSQL/Supabase 风格的关系型数据模型。

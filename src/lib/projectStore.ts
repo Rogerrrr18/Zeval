@@ -50,7 +50,7 @@ export function getActiveProjectId(): string {
 
 /**
  * Persist the active project ID to both localStorage and a cookie.
- * The cookie is read by Next.js middleware and forwarded as x-zeval-project-id.
+ * The cookie is read by the Next.js edge proxy and forwarded as x-zeval-project-id.
  */
 export function setActiveProjectId(id: string): void {
   if (typeof window === "undefined") return;

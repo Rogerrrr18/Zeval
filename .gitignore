@@ -19,6 +19,8 @@
 
 # production
 /build
+/dist/
+*.tgz
 
 # misc
 .DS_Store
@@ -40,6 +42,7 @@ supabase/.temp/
 # local workspace runtime data
 /workspaces/
 /eval-runs/
+/artifacts/
 
 # vercel
 .vercel

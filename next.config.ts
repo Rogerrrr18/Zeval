@@ -8,6 +8,17 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: projectRoot,
   },
+  outputFileTracingExcludes: {
+    "/*": [
+      ".next/**",
+      ".zeval-db/**",
+      "artifacts/**",
+      "dist/**",
+      "eval-runs/**",
+      "node_modules/**",
+      "workspaces/**",
+    ],
+  },
 };
 
 export default nextConfig;

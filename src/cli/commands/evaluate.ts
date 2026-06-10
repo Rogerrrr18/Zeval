@@ -95,7 +95,7 @@ export function registerEvaluateCommand(program: Command): void {
         onProgress: (event) => {
           if (event.stage !== lastStage) {
             lastStage = event.stage;
-            spinner.update(`${event.label ?? event.stage}…`);
+            spinner.update(`${event.message ?? event.stage}…`);
           }
         },
       }).catch((e: unknown) => {
@@ -171,8 +171,8 @@ export function registerEvaluateCommand(program: Command): void {
           auto_disagreement:"Disagreement",
         };
 
-        kv("total accepted",       admission.savedCount);
-        kv("skipped (duplicates)", admission.skippedCount);
+        kv("total accepted",       admission.savedCaseIds.length);
+        kv("skipped (duplicates)", admission.skippedDuplicates);
         for (const [src, n] of Object.entries(admission.acceptedBySource ?? {})) {
           if ((n ?? 0) > 0) kv(`  ${LABELS[src] ?? src}`, n!);
         }

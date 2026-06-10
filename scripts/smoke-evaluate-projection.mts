@@ -20,9 +20,10 @@ async function main(): Promise<void> {
   await loadDotEnvFile();
 
   const workspaceId = process.env.DB_SMOKE_WORKSPACE_ID ?? "db-smoke";
-  const rawCsvPath = path.resolve(
-    process.env.DB_SMOKE_RAW_CSV ?? "mock-chatlog/raw-data/support-refund-short.csv",
-  );
+  if (!process.env.DB_SMOKE_RAW_CSV) {
+    throw new Error("DB_SMOKE_RAW_CSV is required. Mock chatlog defaults were removed.");
+  }
+  const rawCsvPath = path.resolve(process.env.DB_SMOKE_RAW_CSV);
   const scenarioId = process.env.DB_SMOKE_SCENARIO_ID ?? "toB-customer-support";
   const runId = `db_projection_smoke_${Date.now()}`;
 

@@ -151,7 +151,10 @@ const { buildSubjectiveMetrics } = await loadModule<typeof import("@/pipeline/su
 const { synthesizeConversations } = await loadModule<typeof import("@/synthesis/synthesizer")>(
   "@/synthesis/synthesizer",
 );
-const fixtureCsv = await readFile("mock-chatlog/raw-data/support-refund-short.csv", "utf8");
+if (!process.env.PROBE_FIXTURE_CSV) {
+  throw new Error("PROBE_FIXTURE_CSV is required. Mock chatlog defaults were removed.");
+}
+const fixtureCsv = await readFile(process.env.PROBE_FIXTURE_CSV, "utf8");
 const fixtureRows = parseFixtureCsv(fixtureCsv);
 const fixtureEnriched = enrichRows(fixtureRows).enrichedRows;
 

@@ -9,7 +9,7 @@ import { maybeWorkspacePath } from "@/workspaces/paths";
 import type { WorkbenchBaselineStore } from "@/workbench/baseline-store";
 import type { WorkbenchBaselineIndexRow, WorkbenchBaselineLookup, WorkbenchBaselineSnapshot } from "@/workbench/types";
 
-const BASELINE_ROOT = path.join("mock-chatlog", "baselines");
+const BASELINE_ROOT = path.join(/*turbopackIgnore: true*/ process.cwd(), ".zeval-db", "workbench-baselines");
 
 /**
  * Filesystem-backed workbench baseline store.
@@ -25,21 +25,21 @@ export class FileSystemWorkbenchBaselineStore implements WorkbenchBaselineStore 
    * @inheritdoc
    */
   async save(snapshot: WorkbenchBaselineSnapshot): Promise<void> {
-    const directory = path.join(this.rootDirectory, sanitizeCustomerId(snapshot.customerId));
-    await mkdir(directory, { recursive: true });
+    const directory = path.join(/*turbopackIgnore: true*/ this.rootDirectory, sanitizeCustomerId(snapshot.customerId));
+    await mkdir(/*turbopackIgnore: true*/ directory, { recursive: true });
     const fileName = `${sanitizeRunIdForFile(snapshot.runId)}.json`;
-    const filePath = path.join(directory, fileName);
-    await writeFile(filePath, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+    const filePath = path.join(/*turbopackIgnore: true*/ directory, fileName);
+    await writeFile(/*turbopackIgnore: true*/ filePath, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
   }
 
   /**
    * @inheritdoc
    */
   async list(customerId: string): Promise<WorkbenchBaselineIndexRow[]> {
-    const directory = path.join(this.rootDirectory, sanitizeCustomerId(customerId));
+    const directory = path.join(/*turbopackIgnore: true*/ this.rootDirectory, sanitizeCustomerId(customerId));
     let names: string[] = [];
     try {
-      names = await readdir(directory);
+      names = await readdir(/*turbopackIgnore: true*/ directory);
     } catch {
       return [];
     }
@@ -48,11 +48,11 @@ export class FileSystemWorkbenchBaselineStore implements WorkbenchBaselineStore 
     const rows: Array<WorkbenchBaselineIndexRow & { mtimeMs: number }> = [];
 
     for (const fileName of jsonFiles) {
-      const filePath = path.join(directory, fileName);
+      const filePath = path.join(/*turbopackIgnore: true*/ directory, fileName);
       try {
-        const raw = await readFile(filePath, "utf8");
+        const raw = await readFile(/*turbopackIgnore: true*/ filePath, "utf8");
         const parsed = JSON.parse(raw) as WorkbenchBaselineSnapshot;
-        const fileStat = await stat(filePath);
+        const fileStat = await stat(/*turbopackIgnore: true*/ filePath);
         rows.push({
           runId: parsed.runId,
           createdAt: parsed.createdAt,
@@ -80,10 +80,10 @@ export class FileSystemWorkbenchBaselineStore implements WorkbenchBaselineStore 
    * @inheritdoc
    */
   async read(customerId: string, runId: string): Promise<WorkbenchBaselineSnapshot | null> {
-    const directory = path.join(this.rootDirectory, sanitizeCustomerId(customerId));
-    const filePath = path.join(directory, `${sanitizeRunIdForFile(runId)}.json`);
+    const directory = path.join(/*turbopackIgnore: true*/ this.rootDirectory, sanitizeCustomerId(customerId));
+    const filePath = path.join(/*turbopackIgnore: true*/ directory, `${sanitizeRunIdForFile(runId)}.json`);
     try {
-      const raw = await readFile(filePath, "utf8");
+      const raw = await readFile(/*turbopackIgnore: true*/ filePath, "utf8");
       return JSON.parse(raw) as WorkbenchBaselineSnapshot;
     } catch {
       return null;
@@ -96,7 +96,7 @@ export class FileSystemWorkbenchBaselineStore implements WorkbenchBaselineStore 
   async findByRunId(runId: string): Promise<WorkbenchBaselineLookup | null> {
     let entries: Array<{ name: string; isDirectory: () => boolean }> = [];
     try {
-      entries = await readdir(this.rootDirectory, { withFileTypes: true });
+      entries = await readdir(/*turbopackIgnore: true*/ this.rootDirectory, { withFileTypes: true });
     } catch {
       return null;
     }
@@ -107,9 +107,9 @@ export class FileSystemWorkbenchBaselineStore implements WorkbenchBaselineStore 
         continue;
       }
 
-      const filePath = path.join(this.rootDirectory, entry.name, fileName);
+      const filePath = path.join(/*turbopackIgnore: true*/ this.rootDirectory, entry.name, fileName);
       try {
-        const raw = await readFile(filePath, "utf8");
+        const raw = await readFile(/*turbopackIgnore: true*/ filePath, "utf8");
         const snapshot = JSON.parse(raw) as WorkbenchBaselineSnapshot;
         return {
           customerId: snapshot.customerId,

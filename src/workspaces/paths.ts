@@ -13,7 +13,7 @@ import { sanitizeContextId } from "@/auth/context";
  * @returns Local path.
  */
 export function resolveWorkspacePath(workspaceId: string, ...segments: string[]): string {
-  return path.join("workspaces", sanitizeContextId(workspaceId), ...segments);
+  return path.join(/*turbopackIgnore: true*/ process.cwd(), "workspaces", sanitizeContextId(workspaceId), ...segments);
 }
 
 /**
@@ -21,11 +21,14 @@ export function resolveWorkspacePath(workspaceId: string, ...segments: string[])
  *
  * @param workspaceId Workspace identifier.
  * @param legacyPath Existing root-level path.
- * @returns Workspace path when enabled, otherwise legacy path.
+ * @returns Project-scoped path for non-default projects, otherwise legacy path.
  */
 export function maybeWorkspacePath(workspaceId: string | undefined, legacyPath: string): string {
   const workspaceStorage = process.env.ZEVAL_WORKSPACE_STORAGE ?? process.env.ZERORE_WORKSPACE_STORAGE;
-  if (workspaceStorage !== "enabled" || !workspaceId) {
+  if (!workspaceId || workspaceStorage === "disabled") {
+    return legacyPath;
+  }
+  if (workspaceStorage !== "enabled" && sanitizeContextId(workspaceId) === "default") {
     return legacyPath;
   }
   return resolveWorkspacePath(workspaceId, legacyPath);

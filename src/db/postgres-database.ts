@@ -3,7 +3,7 @@
  *
  * P1 重构：使用 projectId（uuid）替代 workspaceId 作为分区键。
  * 底层仍写入 zerore_records JSONB 桥接表，但主键改为 (project_id, type, id)。
- * 类型化表写入由 supabase-typed-database.ts 负责。
+ * Typed projection writes are handled by the projection layer.
  */
 
 import { Pool } from "pg";
@@ -204,7 +204,7 @@ function delay(ms: number): Promise<void> {
 
 /**
  * P1 bridge table: JSONB storage keyed by (project_id, type, id).
- * Typed tables are written by supabase-typed-database.ts.
+ * Typed tables are written by the projection layer.
  */
 const BRIDGE_TABLE_SQL = `
   create table if not exists zerore_records (

@@ -8,7 +8,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { DbRecord, ZeroreDatabase } from "@/db";
 
-const LOCAL_DB_BASE_DIR = process.env.ZEVAL_LOCAL_DB_DIR ?? path.join(process.cwd(), ".zeval-db");
+const LOCAL_DB_BASE_DIR = process.env.ZEVAL_LOCAL_DB_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), ".zeval-db");
 
 /**
  * JSON-backed database adapter with project-level partitioning.
@@ -42,7 +42,7 @@ export class LocalJsonDatabase implements ZeroreDatabase {
     for (const name of names.filter((item) => item.endsWith(".json"))) {
       try {
         records.push(
-          JSON.parse(await readFile(path.join(directory, name), "utf8")) as DbRecord,
+          JSON.parse(await readFile(path.join(/*turbopackIgnore: true*/ directory, name), "utf8")) as DbRecord,
         );
       } catch {
         continue;

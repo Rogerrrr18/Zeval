@@ -12,7 +12,7 @@ import {
   listPersistedEvaluateRuns,
   readPersistedEvaluateResult,
 } from "@/persistence/evaluateResultStore";
-import { c, err, header, kv, table, warn, ok } from "@/cli/display";
+import { c, err, header, table, warn, ok } from "@/cli/display";
 
 export function registerRunsCommand(program: Command): void {
   const runs = program

@@ -14,6 +14,7 @@ export const datasetCaseSourceSchema = z.enum([
   "auto_tn",
   "auto_uncertainty",
   "auto_disagreement",
+  "manual_gold",
   "synthesized",
   "imported",
 ]);

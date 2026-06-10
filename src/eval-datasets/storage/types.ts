@@ -18,6 +18,7 @@ export type CaseSetType = "goodcase" | "badcase";
  * - `auto_tn`           : Stratified-sampled high-quality session used as a golden positive baseline.
  * - `auto_uncertainty`  : Judge confidence ∈ [0.4, 0.6]; high-information boundary case pending human review.
  * - `auto_disagreement` : Rule verdict and LLM judge verdict disagree; surfaces evaluator reliability gaps.
+ * - `manual_gold`       : Human-approved golden case used as a regression guard.
  * - `synthesized`       : LLM-assisted synthetic sample. Must NOT feed into baseline or online eval statistics.
  * - `imported`          : Batch-imported from an external system.
  *
@@ -30,6 +31,7 @@ export type DatasetCaseSource =
   | "auto_tn"
   | "auto_uncertainty"
   | "auto_disagreement"
+  | "manual_gold"
   | "synthesized"
   | "imported";
 

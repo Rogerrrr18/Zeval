@@ -1,0 +1,72 @@
+.chartGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.chartCard {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid rgb(0 0 0 / 0.06);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.chartCard h3 {
+  margin: 0;
+  color: #0b0b0b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chartCard p {
+  margin: 6px 0 0;
+  color: #6b6b6b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.chartCanvas {
+  min-width: 0;
+  width: 100%;
+  min-height: 280px;
+  margin-top: 14px;
+}
+
+.chartRenderStack {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.chartSampleNotice {
+  padding: 8px 10px;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 10px;
+  background: #f8fbff;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.emptyState {
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 24px;
+  border: 1px dashed rgb(0 0 0 / 0.1);
+  border-radius: 18px;
+  background: #fafafa;
+  color: #8a8a8a;
+  font-size: 14px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .chartGrid {
+    grid-template-columns: 1fr;
+  }
+}

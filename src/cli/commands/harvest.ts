@@ -80,8 +80,8 @@ export function registerHarvestCommand(program: Command): void {
 
       // ── 3. Print results ──────────────────────────────────────────────────────
       header("Admission Results");
-      kv("total accepted",       admission.savedCount);
-      kv("skipped (duplicates)", admission.skippedCount);
+      kv("total accepted",       admission.savedCaseIds.length);
+      kv("skipped (duplicates)", admission.skippedDuplicates);
       if ((admission.humanReviewQueueCount ?? 0) > 0) {
         kv("queued for human review", admission.humanReviewQueueCount!);
       }
@@ -97,13 +97,13 @@ export function registerHarvestCommand(program: Command): void {
         }
       }
 
-      if (admission.savedCount === 0) {
+      if (admission.savedCaseIds.length === 0) {
         console.log();
         warn("No cases admitted — all candidates may be duplicates or filtered out.");
       }
 
       console.log();
-      ok(`Harvest complete. ${c.bold(String(admission.savedCount))} case(s) added to the pool.`);
+      ok(`Harvest complete. ${c.bold(String(admission.savedCaseIds.length))} case(s) added to the pool.`);
       console.log(`  ${c.dim("Next: ")} zeval package --run-id ${opts.runId}`);
       console.log();
     });

@@ -3,6 +3,8 @@
 **Zeval** is an AI conversation quality evaluation workbench.  
 Upload chatlog files, run objective + LLM-judge subjective metrics, harvest bad cases into a dataset pool, and generate remediation skill bundles — all from a browser UI **or a terminal CLI**.
 
+> 中文文档：[README-zh.md](README-zh.md)
+
 ```
 chatlog file
     │
@@ -49,12 +51,16 @@ zeval evaluate           ← parse → enrich → objective + subjective metrics
 
 ## Installation
 
-### Option A — Global CLI Install (Recommended for CLI-only use)
+### Option A — Build a Global CLI From Source
 
-Install `zeval` as a global command in one step — no repo clone needed:
+Build the CLI bundle, then install this project as a global command:
 
 ```bash
-npm install -g https://raw.githubusercontent.com/Rogerrrr18/Zeval_2.0/zeval-2.1/zeval-eval-system-2.1.0.tgz
+git clone https://github.com/Rogerrrr18/Zeval_2.0.git -b zeval-2.1
+cd Zeval_2.0
+npm install
+npm run build:cli
+npm install -g .
 ```
 
 Verify it works:
@@ -125,7 +131,7 @@ zeval runs show <run-id>
 **If using the full project** (Option B), prefix commands with `npm run zeval --`:
 
 ```bash
-npm run zeval -- evaluate mock-chatlog/raw-data/support-refund-short.csv --no-llm
+npm run zeval -- evaluate your-chatlog.csv --no-llm
 npm run zeval -- runs list
 ```
 
@@ -163,7 +169,7 @@ Open **http://localhost:3000** and use the browser interface:
 
 | Page | Path | Purpose |
 |---|---|---|
-| Workbench 评估工作台 | `/workbench` | Upload files, run evaluation, view charts |
+| Command Center 项目指挥台 | `/` | Review project status and quality-loop next steps |
 | Dataset Pool 案例校准 | `/datasets` | Browse harvested bad cases, human review |
 | Remediation 修复验证 | `/remediation-packages` | View & validate skill bundles |
 | Benchmark | `/benchmark` | Offline regression testing |
@@ -468,6 +474,8 @@ ZEVAL_JUDGE_MODEL=Qwen/Qwen3-7B
 | `ZEVAL_JUDGE_API_KEY` | LLM API key (OpenAI-compatible) | — |
 | `ZEVAL_JUDGE_BASE_URL` | LLM gateway base URL | — |
 | `ZEVAL_JUDGE_MODEL` | Model name | — |
+| `ZEVAL_RUBRIC_DEEPSEARCH_MODEL` | Optional DeepSearch/web-research model for rubric source discovery | falls back to judge model |
+| `ZEVAL_RUBRIC_DEEPSEARCH_EXTRA_BODY` | Optional JSON merged into rubric DeepSearch chat request for provider-specific search flags | — |
 | `ZEVAL_JUDGE_CONCURRENCY` | Max concurrent judge calls | `4` |
 | `ZEVAL_JUDGE_ENABLE_THINKING` | Enable chain-of-thought (model-dependent) | `false` |
 | `ZEVAL_DATABASE_ADAPTER` | `local-json` or `postgres` | `local-json` |
@@ -570,7 +578,6 @@ bin/
 eval-runs/                  Saved evaluate result artifacts (auto-created)
 eval-datasets/              Dataset pool: bad cases, good cases, sample batches
 artifacts/                  Remediation packages (auto-created)
-mock-chatlog/               Sample chatlog files for testing
 docs/                       Project documentation
 ```
 
@@ -584,7 +591,7 @@ npm run dev                  # Start web UI at http://localhost:3000
 
 # CLI
 npm run zeval -- --help      # Show all CLI commands
-npm run zeval -- evaluate mock-chatlog/raw-data/support-refund-short.csv --no-llm
+npm run zeval -- evaluate your-chatlog.csv --no-llm
 
 # Type checking and linting
 npx tsc --noEmit

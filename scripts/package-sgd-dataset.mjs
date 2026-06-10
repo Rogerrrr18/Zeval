@@ -92,7 +92,7 @@ function filterSchema(schema, dialogues) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const sourceDir = args.source ?? "/private/tmp/dstc8-schema-guided-dialogue/train";
-  const outputPath = args.out ?? "public/datasets/sgd-package-sample.json";
+  const outputPath = args.out ?? ".zeval-db/datasets/sgd-package-sample.json";
   const limit = Number(args.limit ?? "1");
   const split = args.split ?? path.basename(sourceDir);
   const fileNames = await resolveDialogueFiles(sourceDir, args.files, Number.isFinite(limit) ? limit : 1);

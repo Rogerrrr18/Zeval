@@ -108,7 +108,7 @@ export function registerPackageCommand(program: Command): void {
       if (snap.targetMetrics.length > 0) {
         console.log();
         for (const tm of snap.targetMetrics) {
-          kv(`  target: ${tm.metricKey}`, `${tm.currentValue.toFixed(2)} → >${tm.targetValue.toFixed(2)}`);
+          kv(`  target: ${tm.metricId}`, `${tm.currentValue.toFixed(2)} → >${tm.targetValue.toFixed(2)}`);
         }
       }
 

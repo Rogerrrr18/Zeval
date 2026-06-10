@@ -10,6 +10,7 @@
  *   2. summarize_findings —— 从评估结果里提炼 top 风险（仅本地聚合，无 LLM）
  *   3. build_remediation —— 基于 bad case 生成 Skill bundle 调优包
  *   4. save_baseline / run_validation / compare_baselines —— 串起基线、回放与对比
+ *   5. diagnose_workspace —— 诊断当前 agent 权限、数据和工作流状态
  */
 
 import { z } from "zod";
@@ -25,6 +26,7 @@ import {
   type ValidationRunSnapshot,
 } from "@/validation";
 import { createWorkbenchBaselineStore, type WorkbenchBaselineSnapshot } from "@/workbench";
+import { ZEVAL_AGENT_PERMISSION_SUMMARY } from "@/copilot/agent-contract";
 import type { EvaluateResponse, RawChatlogRow } from "@/types/pipeline";
 
 /**
@@ -368,6 +370,84 @@ const compareBaselinesSkill: Skill = {
   },
 };
 
+// -------- Skill 7: diagnose_workspace -----------------------------------------
+
+const diagnoseWorkspaceParams = z.object({
+  focus: z.enum(["capabilities", "data", "tools", "workflow", "all"]).optional().default("all"),
+});
+
+const diagnoseWorkspaceSkill: Skill = {
+  name: "diagnose_workspace",
+  description: "诊断当前 Chat Agent 的工具权限、数据附件、最近评测/调优/验证状态，并给出下一步建议。",
+  paramsSchema: diagnoseWorkspaceParams,
+  async execute(params, ctx) {
+    const args = diagnoseWorkspaceParams.parse(params);
+    const attachedRows = getAttachedRawRows(ctx);
+    const lastEvaluate = ctx.scratch.lastEvaluate as EvaluateResponse | undefined;
+    const lastRemediation = ctx.scratch.lastRemediation as RemediationPackageSnapshot | undefined;
+    const lastValidation = ctx.scratch.lastValidationRun as ValidationRunSnapshot | undefined;
+    const lastBaseline = ctx.scratch.lastBaseline as
+      | { customerId?: string; snapshot?: WorkbenchBaselineSnapshot }
+      | undefined;
+
+    const status = {
+      focus: args.focus,
+      workspaceId: ctx.workspaceId ?? "default",
+      permissions: ZEVAL_AGENT_PERMISSION_SUMMARY,
+      attachedData: attachedRows
+        ? {
+            rows: attachedRows.length,
+            sourceFileName: getScratchString(ctx, "attachedFileName") ?? null,
+            scenarioId: getScratchString(ctx, "attachedScenarioId") ?? null,
+          }
+        : null,
+      lastEvaluate: lastEvaluate
+        ? {
+            runId: lastEvaluate.runId,
+            messages: lastEvaluate.meta.messages,
+            sessions: lastEvaluate.meta.sessions,
+            badCaseCount: lastEvaluate.badCaseAssets?.length ?? 0,
+            scenarioScore: lastEvaluate.scenarioEvaluation?.averageScore ?? null,
+          }
+        : null,
+      lastBaseline: lastBaseline?.snapshot
+        ? {
+            customerId: lastBaseline.customerId,
+            runId: lastBaseline.snapshot.runId,
+            createdAt: lastBaseline.snapshot.createdAt,
+          }
+        : null,
+      lastRemediation: lastRemediation
+        ? {
+            packageId: lastRemediation.packageId,
+            artifactDir: lastRemediation.artifactDir,
+            skillFolder: lastRemediation.skillFolder ?? null,
+          }
+        : null,
+      lastValidation: lastValidation
+        ? {
+            validationRunId: lastValidation.validationRunId,
+            mode: lastValidation.mode,
+            status: lastValidation.status,
+          }
+        : null,
+      recommendations: buildWorkspaceDiagnosisRecommendations({
+        attachedRows,
+        lastEvaluate,
+        lastBaseline: lastBaseline?.snapshot,
+        lastRemediation,
+        lastValidation,
+      }),
+    };
+
+    return {
+      ok: true,
+      summary: renderWorkspaceDiagnosisSummary(status),
+      data: status,
+    };
+  },
+};
+
 // -------- Registry -------------------------------------------------------------
 
 export const SKILL_REGISTRY: Record<string, Skill> = {
@@ -377,6 +457,7 @@ export const SKILL_REGISTRY: Record<string, Skill> = {
   [saveBaselineSkill.name]: saveBaselineSkill,
   [runValidationSkill.name]: runValidationSkill,
   [compareBaselinesSkill.name]: compareBaselinesSkill,
+  [diagnoseWorkspaceSkill.name]: diagnoseWorkspaceSkill,
 };
 
 /**
@@ -583,6 +664,67 @@ function summarizeBaselineComparison(baseline: EvaluateResponse | undefined, cur
   const scoreText = scoreDelta === null ? "业务 KPI 暂无可比口径" : `业务 KPI ${formatSigned(scoreDelta)}`;
   const badText = badDelta === 0 ? "bad case 数持平" : `bad case ${badDelta > 0 ? "增加" : "减少"} ${Math.abs(badDelta)} 条`;
   return `对比完成：${scoreText}，${badText}。当前 runId=${current.runId}。`;
+}
+
+function buildWorkspaceDiagnosisRecommendations(input: {
+  attachedRows?: RawChatlogRow[];
+  lastEvaluate?: EvaluateResponse;
+  lastBaseline?: WorkbenchBaselineSnapshot;
+  lastRemediation?: RemediationPackageSnapshot;
+  lastValidation?: ValidationRunSnapshot;
+}): string[] {
+  const items: string[] = [];
+  if (!input.attachedRows?.length && !input.lastEvaluate) {
+    items.push("先附加一份真实 chatlog，或选择一个已有评测 run，Agent 才能做实证诊断。");
+  }
+  if (input.attachedRows?.length && !input.lastEvaluate) {
+    items.push("下一步建议运行 run_evaluate，先建立可解释的质量基线。");
+  }
+  if (input.lastEvaluate && !input.lastBaseline) {
+    items.push("建议保存 baseline，后续才能比较每次改动是否真的变好。");
+  }
+  if ((input.lastEvaluate?.badCaseAssets?.length ?? 0) > 0 && !input.lastRemediation) {
+    items.push("已有 bad case，建议生成调优包并把失败模式沉淀成可执行任务。");
+  }
+  if (input.lastRemediation && !input.lastValidation) {
+    items.push("已有调优包，建议运行 validation，确认修复没有引入退化。");
+  }
+  if (items.length === 0) {
+    items.push("当前闭环状态良好，可以继续扩大样本、接入线上回放或加入人工校验。");
+  }
+  return items;
+}
+
+function renderWorkspaceDiagnosisSummary(status: {
+  permissions: string;
+  attachedData: { rows: number; sourceFileName: string | null; scenarioId: string | null } | null;
+  lastEvaluate: { runId: string; messages: number; sessions: number; badCaseCount: number; scenarioScore: number | null } | null;
+  lastBaseline: { customerId?: string; runId: string; createdAt: string } | null;
+  lastRemediation: { packageId: string; artifactDir: string; skillFolder: string | null } | null;
+  lastValidation: { validationRunId: string; mode: string; status: string } | null;
+  recommendations: string[];
+}): string {
+  const lines = [
+    "工作台诊断完成。",
+    `权限：${status.permissions}`,
+    status.attachedData
+      ? `数据：已附加 ${status.attachedData.rows} 行${status.attachedData.sourceFileName ? `，文件 ${status.attachedData.sourceFileName}` : ""}。`
+      : "数据：当前没有附件日志。",
+    status.lastEvaluate
+      ? `评测：最近 run=${status.lastEvaluate.runId}，${status.lastEvaluate.sessions} 个会话，bad case ${status.lastEvaluate.badCaseCount} 条。`
+      : "评测：当前会话还没有评测结果。",
+    status.lastBaseline
+      ? `基线：已保存 ${status.lastBaseline.runId}。`
+      : "基线：尚未保存 baseline。",
+    status.lastRemediation
+      ? `调优包：已有 ${status.lastRemediation.packageId}。`
+      : "调优包：尚未生成。",
+    status.lastValidation
+      ? `验证：${status.lastValidation.validationRunId}，状态 ${status.lastValidation.status}。`
+      : "验证：尚未运行。",
+    `建议：${status.recommendations.join("；")}`,
+  ];
+  return lines.join("\n");
 }
 
 /**

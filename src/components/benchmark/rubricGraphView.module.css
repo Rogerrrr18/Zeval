@@ -1,0 +1,44 @@
+.rubricGraphContainer {
+  width: 100%;
+  max-height: min(68vh, 760px);
+  overflow: auto;
+  padding: 8px 0;
+  border: 1px solid var(--bm-line-2, #dbe1ea);
+  border-radius: 8px;
+  background: var(--bm-bg-2, #f8fafc);
+}
+
+.rubricGraphSvg {
+  display: block;
+  min-width: 100%;
+}
+
+.rubricGraphLegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--bm-line-2, #dbe1ea);
+  color: var(--bm-ink-3, #64748b);
+  font-size: 11px;
+}
+
+.rubricGraphLegend span:first-child {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legendItem i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
