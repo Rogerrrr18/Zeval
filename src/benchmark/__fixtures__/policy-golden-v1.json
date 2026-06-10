@@ -1,0 +1,93 @@
+{
+  "channels": {
+    "ch_task_completion": {
+      "acceptRules": [
+        {
+          "type": "scoreGte",
+          "scoreGte": 3.88
+        },
+        {
+          "type": "confidenceGte",
+          "confidenceGte": 0.82
+        },
+        {
+          "type": "qualityPercentileGte",
+          "qualityPercentileGte": 0.79
+        }
+      ],
+      "rejectRules": [
+        {
+          "type": "scoreLte",
+          "scoreLte": 2.87
+        }
+      ],
+      "uncertaintyRules": [
+        {
+          "type": "scoreBetween",
+          "low": 2.87,
+          "high": 3.88
+        },
+        {
+          "type": "confidenceLt",
+          "confidenceLt": 0.82
+        },
+        {
+          "type": "judgeVarianceGt",
+          "judgeVarianceGt": 0.35
+        }
+      ],
+      "sampleRateForHuman": 0.1,
+      "stats": {
+        "acceptN": 42,
+        "rejectN": 18,
+        "agreementRate": 1,
+        "minSamplesMet": true
+      }
+    },
+    "ch_format_compliance": {
+      "acceptRules": [
+        {
+          "type": "scoreGte",
+          "scoreGte": 4.22
+        },
+        {
+          "type": "confidenceGte",
+          "confidenceGte": 0.87
+        },
+        {
+          "type": "qualityPercentileGte",
+          "qualityPercentileGte": 0.86
+        }
+      ],
+      "rejectRules": [
+        {
+          "type": "scoreLte",
+          "scoreLte": 3.04
+        }
+      ],
+      "uncertaintyRules": [
+        {
+          "type": "scoreBetween",
+          "low": 3.04,
+          "high": 4.22
+        },
+        {
+          "type": "confidenceLt",
+          "confidenceLt": 0.87
+        },
+        {
+          "type": "judgeVarianceGt",
+          "judgeVarianceGt": 0.35
+        }
+      ],
+      "sampleRateForHuman": 0.1,
+      "stats": {
+        "acceptN": 25,
+        "rejectN": 15,
+        "agreementRate": 1,
+        "minSamplesMet": true
+      }
+    }
+  },
+  "labelCount": 100
+}

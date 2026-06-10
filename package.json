@@ -37,7 +37,12 @@
     "gold:v2:import": "node --import tsx calibration/scripts/import-gold-labels.mts",
     "gold:v2:expand": "node --import tsx calibration/scripts/expand-gold-from-fixtures.mts",
     "gold:v2:coverage": "node --import tsx calibration/scripts/report-gold-coverage.mts",
-    "datasets:sgd:package": "node scripts/package-sgd-dataset.mjs"
+    "datasets:sgd:package": "node scripts/package-sgd-dataset.mjs",
+    "smoke:admission-policy": "node --import tsx scripts/smoke-admission-policy.mts",
+    "smoke:benchmark-rubric": "node --import tsx scripts/smoke-benchmark-rubric.mts",
+    "smoke:benchmark-fullflow": "node --import tsx scripts/smoke-benchmark-fullflow-real-api.mts",
+    "test:benchmark": "node --import tsx --test src/benchmark/rerank.test.ts src/benchmark/admission-policy-learner.test.ts src/benchmark/admission-scorer.test.ts src/benchmark/admission-feature-extractor.test.ts src/benchmark/evaluators.test.ts src/benchmark/companion-transcript-judge.test.ts",
+    "test:benchmark:log": "node --import tsx scripts/run-benchmark-tests-with-log.mts"
   },
   "dependencies": {},
   "peerDependencies": {

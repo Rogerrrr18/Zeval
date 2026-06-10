@@ -181,7 +181,8 @@ export async function draftBenchmarkRubric(
               "请根据用户真实业务任务和 DeepSearch research brief 生成领域化 benchmark rubric，不要套用 HR、客服或通用模板。",
               "所有面向用户展示的 title、description、displayName、criteria 必须使用中文。",
               "metricKey 和枚举字段可以使用英文机器标识，但不能作为展示名称。",
-              "每个能力维度生成 1-3 个强相关指标，总指标数控制在 4-10 个。",
+              "每个能力维度生成 1-3 个强相关指标，总指标数控制在 4-10 个；首轮建议至少生成 6 个可区分指标，最低可运行门槛为 3 个。",
+              "每个 metric 的 rubricForm 必须包含至少 3 个离散档位（建议 1/3/5），并为每个档位提供可复核 description；可为档位补充 fewshot 示例片段。",
               "指标必须贴合该领域的真实验收标准，例如金融风控、采购比价、代码修复、医疗问诊、研究综述等领域应生成完全不同的指标。",
               "必须基于 DeepSearch research brief 中的论文、公开 benchmark、标准或框架设计指标；不要编造不存在的论文、URL 或 benchmark。",
               "每个 metric.references 必须包含 1-3 个来源，且至少一个来源的 sourceType 为 paper、public_benchmark 或 standard。",
@@ -249,13 +250,19 @@ export async function draftBenchmarkRubric(
     }
   }
 
-  if (llmRubric) {
-    return {
-      rubric: llmRubric,
-      reviewMarkdown: renderRubricReviewMarkdown(llmRubric),
-      source,
-      warnings,
-    };
+  if (input.useLlm) {
+    if (llmRubric) {
+      return {
+        rubric: llmRubric,
+        reviewMarkdown: renderRubricReviewMarkdown(llmRubric),
+        source,
+        warnings,
+      };
+    }
+    throw new Error(
+      warnings.join("；")
+      || "LLM 评分标准生成失败，未返回可用指标。请重试或补充任务描述，系统不会自动套用稀疏模板。",
+    );
   }
 
   const rubric = buildRubricDraftFromRequirement({

@@ -54,6 +54,8 @@ export type BenchmarkRubricScoreLevel = {
   score: number;
   label: string;
   description: string;
+  /** Optional few-shot excerpts illustrating this score level. */
+  fewshot?: string[];
 };
 
 export type BenchmarkReferenceSourceType =
@@ -248,6 +250,7 @@ export type BenchmarkHumanLabel = {
 
 export type BenchmarkMetricEvaluationStatus =
   | "scored"
+  | "blocked"
   | "needs_human_review"
   | "unsupported"
   | "skipped"
@@ -277,6 +280,8 @@ export type BenchmarkMetricEvaluationResult = {
   humanLabel?: BenchmarkHumanLabel;
   needsHumanReview: boolean;
   failureTags: string[];
+  /** Multi-model judge variance when ensemble scoring is enabled. */
+  judgeVariance?: number;
 };
 
 export type BenchmarkCapabilityScore = {
@@ -286,6 +291,15 @@ export type BenchmarkCapabilityScore = {
   metricCount: number;
   passedMetricCount: number;
   evidence: string[];
+};
+
+export type BenchmarkCaseRerank = {
+  qualityScore: number;
+  qualityTier: "gold" | "silver" | "borderline";
+  rankInRun: number;
+  qualityPercentile: number;
+  metricVector: Record<string, number>;
+  confVector: Record<string, number>;
 };
 
 export type BenchmarkCaseScore = {
@@ -300,6 +314,7 @@ export type BenchmarkCaseScore = {
   passed: boolean;
   capabilityScores: BenchmarkCapabilityScore[];
   metricResults: BenchmarkMetricEvaluationResult[];
+  rerank?: BenchmarkCaseRerank;
 };
 
 export type BenchmarkLeaderboardRow = {

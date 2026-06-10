@@ -12,6 +12,7 @@ import {
   type RubricResearchBrief,
 } from "@/benchmark/copilot";
 import { getBenchmarkCapabilityDefinition } from "@/benchmark/capabilities";
+import { buildRubricMetricCountWarnings } from "@/benchmark/rubric-guards";
 import { benchmarkReferencesForCapability, cloneMetricReferences } from "@/benchmark/reference-catalog";
 import { ZEVAL_AGENT_CAPABILITY_CONTRACT, ZEVAL_AGENT_PERMISSION_SUMMARY } from "@/copilot/agent-contract";
 import { parseJsonObjectFromLlmOutput, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
@@ -167,6 +168,7 @@ export async function runBenchmarkRubricAgent(
     if (result.summary) toolCalls.push({ name: tool.name ?? "unknown", summary: result.summary });
   }
 
+  warnings.push(...buildRubricMetricCountWarnings(rubric));
   const reply = buildReply(payload?.reply, toolCalls, rubric, requirementText, latestUserText);
   return {
     reply,

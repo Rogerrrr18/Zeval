@@ -10,6 +10,13 @@ import {
   readBenchmarkRunArtifact,
   type BenchmarkGenericRunArtifact,
 } from "@/benchmark/progress-artifacts";
+import { snapScoreToRubricLevels } from "@/benchmark/rubric-judge";
+import {
+  buildBenchmarkTaskPackage,
+  buildCasesFromRawRows,
+  buildTranscriptSubmission,
+  getMaxDatasetCases,
+} from "@/benchmark/transcript-benchmark";
 import { parseJsonObjectFromLlmOutput, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
 import type {
   BenchmarkAgentSubmission,
@@ -21,8 +28,6 @@ import type {
   BenchmarkTaskPackage,
 } from "@/benchmark/types";
 import type { BenchmarkDatasetSnapshot } from "@/benchmark/session-store";
-import type { RawChatlogRow } from "@/types/pipeline";
-
 export type RunGenericBenchmarkInput = {
   runId: string;
   requirementText: string;
@@ -53,7 +58,7 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
   }
 
   const rubric = approveRubricMetrics(input.rubric, approvedMetricKeys);
-  const task = buildTaskPackage(input.requirementText, rubric);
+  const task = buildBenchmarkTaskPackage(input.requirementText, rubric);
   const cases = buildCasesFromDataset(task, input.dataset);
   const matrix = DEFAULT_MATRIX;
   const totalMetrics = cases.length * matrix.length * approvedMetricKeys.length;
@@ -90,7 +95,7 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
     phase: "building_cases",
     status: cases.length < input.dataset.ingestMeta.sessions ? "warning" : "completed",
     title: "案例构建完成",
-    detail: `已从上传数据中构建 ${cases.length} 个评测案例；当前 MVP 为控制耗时最多抽取前 ${MAX_DATASET_CASES} 个 session。`,
+    detail: `已从上传数据中构建 ${cases.length} 个评测案例；当前 MVP 为控制耗时最多抽取前 ${getMaxDatasetCases()} 个 session。`,
   });
   if (reusableArtifact) {
     benchmarkProgress.addEvent(input.runId, {
@@ -172,96 +177,8 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
   return { task, result };
 }
 
-const MAX_DATASET_CASES = 8;
-
-function buildTaskPackage(requirementText: string, rubric: BenchmarkRubricSet): BenchmarkTaskPackage {
-  return {
-    benchmarkId: `benchmark_${rubric.rubricId}`,
-    taskId: `${rubric.rubricId}_task`,
-    version: "0.1.0",
-    title: rubric.title,
-    description: rubric.description,
-    domain: rubric.domain,
-    requirementText,
-    inputSchema: { required: ["requirement"] },
-    outputSchema: { required: ["answer", "evidence"] },
-    rubric,
-  };
-}
-
-/**
- * Build benchmark cases from normalized uploaded rows.
- *
- * @param task Runnable benchmark task package.
- * @param dataset Ingested and normalized dataset snapshot from the workspace.
- * @returns Session-level benchmark cases capped for MVP runtime.
- */
 function buildCasesFromDataset(task: BenchmarkTaskPackage, dataset: BenchmarkDatasetSnapshot): BenchmarkCase[] {
-  const groupedRows = groupRowsBySession(dataset.rawRows);
-  const acceptanceCriteria = task.rubric.modules.flatMap((module) =>
-    module.metrics.map((metric) => ({
-      metric: metric.displayName,
-      criteria: metric.config?.criteria ?? metric.description,
-      rubricForm: metric.config?.rubricForm ?? [],
-      references: metric.config?.references ?? [],
-    })),
-  );
-
-  return [...groupedRows.entries()].slice(0, MAX_DATASET_CASES).map(([sessionId, rows], index) => ({
-    caseId: `${task.taskId}_case_${String(index + 1).padStart(3, "0")}`,
-    taskId: task.taskId,
-    input: {
-      requirement: task.requirementText,
-      sessionId,
-      transcript: rows.map(formatTranscriptRow).join("\n"),
-      messageCount: rows.length,
-      sourceFileName: dataset.fileName,
-    },
-    expected: {
-      requirement: task.requirementText,
-      acceptanceCriteria,
-      sourceSummary: {
-        sessionId,
-        messageCount: rows.length,
-        hasTimestamp: rows.every((row) => Boolean(row.timestamp)),
-      },
-    },
-    source: "imported",
-    metadata: {
-      sourceFileName: dataset.fileName,
-      sourceFormat: dataset.format,
-      originalSessionId: sessionId,
-      sampled: groupedRows.size > MAX_DATASET_CASES,
-    },
-  }));
-}
-
-/**
- * Group normalized chat rows by session id while preserving upload order.
- *
- * @param rows Ingested raw chatlog rows.
- * @returns Map keyed by session id.
- */
-function groupRowsBySession(rows: RawChatlogRow[]): Map<string, RawChatlogRow[]> {
-  const grouped = new Map<string, RawChatlogRow[]>();
-  for (const row of rows) {
-    const sessionId = row.sessionId || "unknown";
-    if (!grouped.has(sessionId)) grouped.set(sessionId, []);
-    grouped.get(sessionId)!.push(row);
-  }
-  return grouped;
-}
-
-/**
- * Format one raw row into the compact transcript used in prompts.
- *
- * @param row Ingested chat row.
- * @returns Human-readable transcript line.
- */
-function formatTranscriptRow(row: RawChatlogRow): string {
-  const time = row.timestamp ? `[${row.timestamp}] ` : "";
-  const role = row.role === "assistant" ? "助手" : row.role === "user" ? "用户" : "系统";
-  return `${time}${role}: ${row.content}`;
+  return buildCasesFromRawRows(task, dataset.rawRows, dataset.fileName);
 }
 
 async function buildSubmissions(input: {
@@ -325,6 +242,36 @@ async function buildSubmissions(input: {
       const startedAt = new Date().toISOString();
       const startedMs = Date.now();
       try {
+        if (isTranscriptEvalMode()) {
+          const submission = buildTranscriptSubmission({
+            runId: input.runId,
+            task: input.task,
+            matrixCell,
+            taskCase,
+            startedAt,
+            startedMs,
+          });
+          submissions.push(submission);
+          markSubmissionDone(input.runId, matrixCell, taskCase, true, submission.durationMs);
+          await persistGenericArtifact(
+            input.runId,
+            input.task.requirementText,
+            input.task,
+            input.cases,
+            submissions,
+            input.metricResultsForArtifact,
+          );
+          benchmarkProgress.addEvent(input.runId, {
+            phase: "submitting",
+            status: "completed",
+            title: "复用历史 transcript",
+            detail: `案例 ${taskCase.caseId} 使用 transcript 评测模式，直接评历史助手回复。`,
+            caseId: taskCase.caseId,
+            evidence: extractOutputEvidence(submission.parsedOutput ?? {}),
+          });
+          continue;
+        }
+
         const rawOutput = await requestSiliconFlowChatCompletion(
           [
             {
@@ -515,8 +462,21 @@ function extractOutputEvidence(parsedOutput: Record<string, unknown>): string[] 
   return typeof answer === "string" ? [answer.slice(0, 180)] : [];
 }
 
+/**
+ * Whether benchmark should score historical assistant turns instead of re-generating outputs.
+ *
+ * @returns True when `ZEVAL_BENCHMARK_EVAL_MODE=transcript`.
+ */
+function isTranscriptEvalMode(): boolean {
+  return process.env.ZEVAL_BENCHMARK_EVAL_MODE === "transcript";
+}
+
 function createLlmJudge(): BenchmarkLlmJudge {
   return async ({ metric, taskCase, submission }) => {
+    const allowedScores = (metric.config?.rubricForm ?? [])
+      .map((level) => level.score)
+      .filter((score, index, scores) => scores.indexOf(score) === index)
+      .sort((left, right) => left - right);
     const raw = await requestSiliconFlowChatCompletion(
       [
         {
@@ -524,8 +484,12 @@ function createLlmJudge(): BenchmarkLlmJudge {
           content: [
             "你是 Zeval benchmark 评测器。",
             "请严格根据指标准则、案例输入、期望标准和被测输出评分。",
+            allowedScores.length > 0
+              ? `score 必须且只能是以下离散档位之一：${allowedScores.join("、")}。`
+              : "score 必须落在 rubricForm 定义的离散档位上，禁止给出中间分。",
+            "若给最高分，evidence 必须引用 transcript 中的具体片段。",
             "只返回 JSON，不要输出 Markdown。",
-            '输出格式：{"score":0-5,"reason":"中文理由","evidence":["证据1"],"confidence":0-1}',
+            '输出格式：{"score":离散档位,"reason":"中文理由","evidence":["证据1"],"confidence":0-1}',
           ].join("\n"),
         },
         {
@@ -536,6 +500,13 @@ function createLlmJudge(): BenchmarkLlmJudge {
               description: metric.description,
               criteria: metric.config?.criteria,
               rubricForm: metric.config?.rubricForm,
+              fewshotExamples: (metric.config?.rubricForm ?? []).flatMap((level) =>
+                (level.fewshot ?? []).map((excerpt) => ({
+                  score: level.score,
+                  label: level.label,
+                  excerpt,
+                })),
+              ),
               references: metric.config?.references ?? [],
               scale: metric.scale,
             },
@@ -548,8 +519,9 @@ function createLlmJudge(): BenchmarkLlmJudge {
       { stage: "benchmark_generic_llm_judge", temperature: 0.1, seed: 42 },
     );
     const parsed = parseRecord(raw);
+    const rawScore = readNumber(parsed.score, metric.scale.min);
     return {
-      score: readNumber(parsed.score, metric.scale.min),
+      score: snapScoreToRubricLevels(rawScore, metric.config?.rubricForm, metric.scale),
       reason: typeof parsed.reason === "string" ? parsed.reason : "模型评审未返回理由。",
       evidence: Array.isArray(parsed.evidence) ? parsed.evidence.map(String).slice(0, 5) : [],
       confidence: readNumber(parsed.confidence, 0.6),

@@ -6,7 +6,11 @@ import { randomBytes } from "node:crypto";
 import { computeNormalizedTranscriptHash } from "@/eval-datasets/case-transcript-hash";
 import type { DatasetStore } from "@/eval-datasets/storage/dataset-store";
 import type { DatasetCaseRecord, DatasetCaseHumanVerdict, DatasetCaseReviewStatus } from "@/eval-datasets/storage/types";
+import { capabilityToAdmissionChannel, extractAdmissionFeatures } from "@/benchmark/admission-feature-extractor";
+import type { AdmissionPolicy } from "@/benchmark/admission-policy-types";
+import { scoreAdmission } from "@/benchmark/admission-scorer";
 import type {
+  BenchmarkCaseRerank,
   BenchmarkDatasetCaseCandidate,
   BenchmarkMetricEvaluationResult,
   BenchmarkRunResult,
@@ -53,6 +57,68 @@ type BenchmarkDatasetCaseCandidateWithReview = BenchmarkDatasetCaseCandidate & {
 /**
  * Build badcase/goldencase candidates from metric-level benchmark results.
  */
+/**
+ * Attach static policy suggestions to benchmark dataset candidates.
+ *
+ * @param candidates Dataset candidates built from a benchmark run.
+ * @param runResult Source benchmark run with metric results and optional rerank.
+ * @param policy Learned admission policy; when null suggestions are omitted.
+ * @returns Candidates enriched with `metadata.policySuggestion`.
+ */
+export function attachPolicySuggestionsToCandidates(
+  candidates: BenchmarkDatasetCaseCandidate[],
+  runResult: BenchmarkRunResult,
+  policy: AdmissionPolicy | null,
+): BenchmarkDatasetCaseCandidate[] {
+  if (!policy) return candidates;
+
+  const rerankBySubmissionId = new Map<string, BenchmarkCaseRerank>();
+  for (const caseScore of runResult.caseScores) {
+    if (caseScore.rerank) {
+      rerankBySubmissionId.set(caseScore.submissionId, caseScore.rerank);
+    }
+  }
+
+  const sessionIdByCaseId = new Map(
+    runResult.cases.map((benchmarkCase) => [
+      benchmarkCase.caseId,
+      String(benchmarkCase.input.sessionId ?? benchmarkCase.caseId),
+    ]),
+  );
+  const features = extractAdmissionFeatures(
+    runResult.metricResults,
+    rerankBySubmissionId,
+    sessionIdByCaseId,
+  );
+  const featureByKey = new Map(
+    features.map((feature) => [`${feature.caseId}::${feature.metricKey}`, feature]),
+  );
+
+  return candidates.map((candidate) => {
+    const feature = featureByKey.get(`${candidate.caseId}::${candidate.metricKey}`);
+    const channel = capabilityToAdmissionChannel(candidate.capability);
+    const channelPolicy = policy.channels[channel];
+    if (!feature || !channelPolicy) {
+      return candidate;
+    }
+
+    const suggestion = scoreAdmission(feature, channelPolicy);
+    return {
+      ...candidate,
+      metadata: {
+        ...candidate.metadata,
+        policySuggestion: {
+          decision: suggestion.decision,
+          channel,
+          matchedAcceptRules: suggestion.matchedAcceptRules,
+          matchedRejectRules: suggestion.matchedRejectRules,
+          matchedUncertaintyRules: suggestion.matchedUncertaintyRules,
+        },
+      },
+    };
+  });
+}
+
 export function buildBenchmarkDatasetCaseCandidates(
   runResult: BenchmarkRunResult,
   options: BuildBenchmarkCaseCandidatesOptions = {},

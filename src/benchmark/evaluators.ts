@@ -2,6 +2,10 @@
  * @fileoverview Metric evaluator registry for Benchmark Mode.
  */
 
+import {
+  shouldBlockMaxScoreWithoutEvidence,
+  snapScoreToRubricLevels,
+} from "@/benchmark/rubric-judge";
 import type {
   BenchmarkAgentSubmission,
   BenchmarkCase,
@@ -84,7 +88,21 @@ function evaluateExactMatch(
 ): BenchmarkMetricEvaluationResult {
   const expected = getExpectedValue(taskCase, metric.config?.expectedPath);
   const actual = getSubmissionValue(submission, metric.config?.outputPath);
-  const matched = normalizeScalar(actual) === normalizeScalar(expected);
+  const expectedNorm = normalizeScalar(expected);
+  const actualNorm = normalizeScalar(actual);
+  if (expectedNorm === "" && actualNorm === "") {
+    return buildResult(metric, taskCase, submission, {
+      score: metric.scale.min,
+      status: "blocked",
+      reason: "Exact match blocked: expected and actual are both missing.",
+      evidence: [`expected=${String(expected)}`, `actual=${String(actual)}`],
+      confidence: 0,
+      expected,
+      actual,
+      needsHumanReview: true,
+    });
+  }
+  const matched = actualNorm === expectedNorm;
   return buildResult(metric, taskCase, submission, {
     score: matched ? metric.scale.max : metric.scale.min,
     status: "scored",
@@ -219,8 +237,33 @@ async function evaluateLlmJudge(
   }
 
   const judged = await context.llmJudge({ metric, taskCase, submission });
+  const snappedScore = snapScoreToRubricLevels(
+    judged.score,
+    metric.config?.rubricForm,
+    metric.scale,
+  );
+  if (
+    shouldBlockMaxScoreWithoutEvidence(
+      snappedScore,
+      judged.evidence,
+      metric.scale,
+      metric.evidenceRequired,
+    )
+  ) {
+    return buildResult(metric, taskCase, submission, {
+      score: metric.scale.min,
+      status: "blocked",
+      reason: "LLM judge blocked: top rubric score requires non-empty evidence.",
+      evidence: judged.evidence,
+      confidence: 0,
+      expected: taskCase.expected,
+      actual: submission.parsedOutput ?? submission.rawOutput,
+      needsHumanReview: true,
+    });
+  }
+
   return buildResult(metric, taskCase, submission, {
-    score: clamp(judged.score, metric.scale.min, metric.scale.max),
+    score: snappedScore,
     status: "scored",
     reason: judged.reason,
     evidence: judged.evidence,
@@ -372,7 +415,14 @@ function parseJsonObject(raw: string): Record<string, unknown> | undefined {
   }
 }
 
-function normalizeScore(score: number, scale: { min: number; max: number }): number {
+/**
+ * Normalize a rubric score into a 0–100 percentage.
+ *
+ * @param score Raw rubric score.
+ * @param scale Metric scale bounds.
+ * @returns Percentage in [0, 100].
+ */
+export function normalizeScore(score: number, scale: { min: number; max: number }): number {
   if (scale.max === scale.min) return 0;
   return round2(((score - scale.min) / (scale.max - scale.min)) * 100);
 }

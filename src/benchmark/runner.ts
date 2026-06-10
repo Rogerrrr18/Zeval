@@ -3,7 +3,9 @@
  */
 
 import { evaluateBenchmarkMetric, type BenchmarkEvaluatorContext } from "@/benchmark/evaluators";
+import { assignQualityTiers, type RerankCaseInput } from "@/benchmark/rerank";
 import { getApprovedRubricMetrics, validateApprovedRubric } from "@/benchmark/rubric";
+import { assertMinimumApprovedMetrics, MIN_APPROVED_METRICS } from "@/benchmark/rubric-guards";
 import type {
   AgentFrameworkId,
   BenchmarkAgentSubmission,
@@ -47,6 +49,10 @@ export async function runBenchmarkEvaluation(
   }
 
   const approvedMetrics = getApprovedRubricMetrics(input.task.rubric);
+  const minimumMetrics = Number(process.env.ZEVAL_BENCHMARK_MIN_METRICS ?? MIN_APPROVED_METRICS);
+  if (Number.isFinite(minimumMetrics) && minimumMetrics > 0) {
+    assertMinimumApprovedMetrics(approvedMetrics.length, minimumMetrics);
+  }
   const caseById = new Map(input.cases.map((taskCase) => [taskCase.caseId, taskCase]));
   const existingMetricByKey = new Map(
     (input.existingMetricResults ?? []).map((result) => [metricCacheKey(result.submissionId, result.metricKey), result]),
@@ -71,7 +77,7 @@ export async function runBenchmarkEvaluation(
     }
   }
 
-  const caseScores = buildBenchmarkCaseScores(metricResults);
+  const caseScores = applyRerankToCaseScores(buildBenchmarkCaseScores(metricResults));
   const leaderboard = buildBenchmarkLeaderboard(caseScores);
   const averageScore = caseScores.length
     ? round2(caseScores.reduce((sum, row) => sum + row.taskScore, 0) / caseScores.length)
@@ -101,6 +107,67 @@ export async function runBenchmarkEvaluation(
     },
     generatedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Attach re-rank tiers to passed benchmark case scores.
+ *
+ * @param caseScores Aggregated per-case scores.
+ * @returns Case scores enriched with rerank metadata.
+ */
+function applyRerankToCaseScores(caseScores: BenchmarkCaseScore[]): BenchmarkCaseScore[] {
+  const rerankInputs: RerankCaseInput[] = caseScores.map((row) => ({
+    caseId: row.caseId,
+    submissionId: row.submissionId,
+    passed: row.passed,
+    judgeVariance: readJudgeVariance(row.metricResults),
+    metrics: Object.fromEntries(
+      row.metricResults
+        .filter((result) => result.status === "scored")
+        .map((result) => [
+          result.metricKey,
+          {
+            score: result.score,
+            weight: result.metricWeight,
+            confidence: result.confidence,
+            capabilityWeight: findCapabilityWeight(row.capabilityScores, result.capability),
+          },
+        ]),
+    ),
+  }));
+
+  const ranked = assignQualityTiers(rerankInputs);
+  const rankedBySubmission = new Map(ranked.map((row) => [row.submissionId, row]));
+
+  return caseScores.map((row) => {
+    const rerank = rankedBySubmission.get(row.submissionId);
+    if (!rerank) return row;
+    return {
+      ...row,
+      rerank: {
+        qualityScore: rerank.qualityScore,
+        qualityTier: rerank.qualityTier,
+        rankInRun: rerank.rankInRun,
+        qualityPercentile: rerank.qualityPercentile,
+        metricVector: rerank.metricVector,
+        confVector: rerank.confVector,
+      },
+    };
+  });
+}
+
+function readJudgeVariance(metricResults: BenchmarkMetricEvaluationResult[]): number {
+  const values = metricResults
+    .map((result) => result.judgeVariance)
+    .filter((value): value is number => typeof value === "number");
+  return values.length ? Math.max(...values) : 0;
+}
+
+function findCapabilityWeight(
+  capabilityScores: BenchmarkCaseScore["capabilityScores"],
+  capability: BenchmarkCapabilityDimension,
+): number {
+  return capabilityScores.find((row) => row.capability === capability)?.weight ?? 1;
 }
 
 function buildBenchmarkCaseScores(

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getZeroreRequestContext } from "@/auth/context";
+import { readAdmissionPolicy } from "@/benchmark/admission-policy-store";
 import {
+  attachPolicySuggestionsToCandidates,
   buildBenchmarkDatasetCaseCandidatesFromReviews,
   persistBenchmarkDatasetCases,
   type BenchmarkHumanReviewDecision,
@@ -28,6 +30,7 @@ const benchmarkAdmitCasesBodySchema = z.object({
     note: z.string().max(4000).optional(),
     reviewedAt: z.string().optional(),
   })).min(1),
+  usePolicySuggestion: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -46,10 +49,13 @@ export async function POST(request: Request) {
       ...review,
       decision: review.decision as BenchmarkHumanReviewDecision,
     }));
-    const candidates = buildBenchmarkDatasetCaseCandidatesFromReviews(
-      parsedBody.data.runResult as BenchmarkRunResult,
-      reviews,
-    ).map((candidate) => ({
+    const runResult = parsedBody.data.runResult as BenchmarkRunResult;
+    let candidates = buildBenchmarkDatasetCaseCandidatesFromReviews(runResult, reviews);
+    if (parsedBody.data.usePolicySuggestion !== false) {
+      const policy = await readAdmissionPolicy(context.projectId);
+      candidates = attachPolicySuggestionsToCandidates(candidates, runResult, policy);
+    }
+    candidates = candidates.map((candidate) => ({
       ...candidate,
       metadata: {
         ...candidate.metadata,
