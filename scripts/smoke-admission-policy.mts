@@ -5,12 +5,12 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import admissionFeatureExtractor from "../src/benchmark/admission-feature-extractor.ts";
-import admissionPolicyHoldout from "../src/benchmark/admission-policy-holdout.ts";
-import admissionPolicyLearner from "../src/benchmark/admission-policy-learner.ts";
-import admissionPolicyStore from "../src/benchmark/admission-policy-store.ts";
+import { extractAdmissionFeatures } from "../src/benchmark/admission-feature-extractor.ts";
+import { evaluatePolicyHoldoutAgreement } from "../src/benchmark/admission-policy-holdout.ts";
+import { learnAdmissionPolicy } from "../src/benchmark/admission-policy-learner.ts";
+import { readAdmissionPolicy, saveAdmissionPolicy } from "../src/benchmark/admission-policy-store.ts";
 import type { AdmissionLabelRow } from "../src/benchmark/admission-policy-types.ts";
-import admissionScorer from "../src/benchmark/admission-scorer.ts";
+import { scoreAdmission } from "../src/benchmark/admission-scorer.ts";
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), "../src/benchmark/__fixtures__");
 const labels = JSON.parse(
@@ -18,18 +18,18 @@ const labels = JSON.parse(
 ) as AdmissionLabelRow[];
 
 const projectId = "smoke-default";
-const policy = admissionPolicyLearner.learnAdmissionPolicy(labels, {
+const policy = learnAdmissionPolicy(labels, {
   projectId,
   policyId: "smoke-policy-v1",
 });
-await admissionPolicyStore.saveAdmissionPolicy(policy);
+await saveAdmissionPolicy(policy);
 
-const loaded = await admissionPolicyStore.readAdmissionPolicy(projectId);
+const loaded = await readAdmissionPolicy(projectId);
 if (!loaded) {
   throw new Error("Failed to read persisted admission policy.");
 }
 
-const holdout = admissionPolicyHoldout.evaluatePolicyHoldoutAgreement(labels, { seed: 42 });
+const holdout = evaluatePolicyHoldoutAgreement(labels, { seed: 42 });
 const sampleFeature = {
   sessionId: labels[0].sessionId,
   caseId: labels[0].caseId,
@@ -41,8 +41,8 @@ const sampleFeature = {
   qualityPercentile: labels[0].qualityScore,
   judgeVariance: labels[0].judgeVariance,
 };
-const scored = admissionScorer.scoreAdmission(sampleFeature, loaded.channels[labels[0].channel]);
-const features = admissionFeatureExtractor.extractAdmissionFeatures([]);
+const scored = scoreAdmission(sampleFeature, loaded.channels[labels[0].channel]);
+const features = extractAdmissionFeatures([]);
 
 console.log(JSON.stringify({
   projectId,

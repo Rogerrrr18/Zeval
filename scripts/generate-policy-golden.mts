@@ -12,7 +12,7 @@ import { dirname, join } from "node:path";
 
 import { fileURLToPath } from "node:url";
 
-import admissionPolicyLearner from "../src/benchmark/admission-policy-learner.ts";
+import { learnAdmissionPolicy } from "../src/benchmark/admission-policy-learner.ts";
 
 
 
@@ -20,7 +20,7 @@ const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), "../src/benchma
 
 const labels = JSON.parse(readFileSync(join(fixtureDir, "human-labels-mock-100.json"), "utf8"));
 
-const policy = admissionPolicyLearner.learnAdmissionPolicy(labels, {
+const policy = learnAdmissionPolicy(labels, {
 
   projectId: "golden",
 
@@ -45,5 +45,4 @@ writeFileSync(
 
 
 console.log("Wrote policy-golden-v1.json");
-
 

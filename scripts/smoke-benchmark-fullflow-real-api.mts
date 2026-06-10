@@ -8,24 +8,30 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import autofindSkill from "../src/benchmark/agent/skills/autofind-data-skill.ts";
-import admissionFeatureExtractor from "../src/benchmark/admission-feature-extractor.ts";
-import admissionPolicyHoldout from "../src/benchmark/admission-policy-holdout.ts";
-import admissionPolicyLearner from "../src/benchmark/admission-policy-learner.ts";
-import admissionPolicyStore from "../src/benchmark/admission-policy-store.ts";
+import { runAutoFindDataSkill } from "../src/benchmark/agent/skills/autofind-data-skill.ts";
+import { extractAdmissionFeatures } from "../src/benchmark/admission-feature-extractor.ts";
+import { evaluatePolicyHoldoutAgreement } from "../src/benchmark/admission-policy-holdout.ts";
+import { learnAdmissionPolicy } from "../src/benchmark/admission-policy-learner.ts";
+import { saveAdmissionPolicy } from "../src/benchmark/admission-policy-store.ts";
 import type { AdmissionLabelRow } from "../src/benchmark/admission-policy-types.ts";
-import admissionScorer from "../src/benchmark/admission-scorer.ts";
-import rubricJudge from "../src/benchmark/rubric-judge.ts";
-import runner from "../src/benchmark/runner.ts";
-import transcriptBenchmark from "../src/benchmark/transcript-benchmark.ts";
+import { scoreAdmission } from "../src/benchmark/admission-scorer.ts";
+import { snapScoreToRubricLevels } from "../src/benchmark/rubric-judge.ts";
+import { runBenchmarkEvaluation } from "../src/benchmark/runner.ts";
+import {
+  buildBenchmarkTaskPackage,
+  buildCasesFromRawRows,
+  buildTranscriptSubmission,
+  classifyCompanionSession,
+  groupRowsBySession,
+} from "../src/benchmark/transcript-benchmark.ts";
 import type {
   BenchmarkLlmJudge,
   BenchmarkMatrixCell,
   BenchmarkRubricMetric,
   BenchmarkRubricSet,
 } from "../src/benchmark/types.ts";
-import siliconflow from "../src/lib/siliconflow.ts";
-import csvParser from "../src/parsers/csvParser.ts";
+import { parseJsonObjectFromLlmOutput, requestSiliconFlowChatCompletion } from "../src/lib/siliconflow.ts";
+import { parseCsvRows } from "../src/parsers/csvParser.ts";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const fixtureDir = join(root, "../src/benchmark/__fixtures__");
@@ -58,7 +64,7 @@ function createRealLlmJudge(): BenchmarkLlmJudge {
       .map((level) => level.score)
       .filter((score, index, scores) => scores.indexOf(score) === index)
       .sort((left, right) => left - right);
-    const raw = await siliconflow.requestSiliconFlowChatCompletion(
+    const raw = await requestSiliconFlowChatCompletion(
       [
         {
           role: "system",
@@ -87,10 +93,10 @@ function createRealLlmJudge(): BenchmarkLlmJudge {
       ],
       { stage: "benchmark_fullflow_llm_judge", temperature: 0.1, seed: 42 },
     );
-    const parsed = siliconflow.parseJsonObjectFromLlmOutput(raw) as Record<string, unknown>;
+    const parsed = parseJsonObjectFromLlmOutput(raw) as Record<string, unknown>;
     const rawScore = typeof parsed.score === "number" ? parsed.score : metric.scale.min;
     return {
-      score: rubricJudge.snapScoreToRubricLevels(rawScore, metric.config?.rubricForm, metric.scale),
+      score: snapScoreToRubricLevels(rawScore, metric.config?.rubricForm, metric.scale),
       reason: typeof parsed.reason === "string" ? parsed.reason : "real api judge",
       evidence: Array.isArray(parsed.evidence) ? parsed.evidence.map(String).slice(0, 5) : [],
       confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.7,
@@ -98,8 +104,8 @@ function createRealLlmJudge(): BenchmarkLlmJudge {
   };
 }
 
-function pickLimitedCases(rows: ReturnType<typeof csvParser.parseCsvRows>) {
-  const grouped = transcriptBenchmark.groupRowsBySession(rows);
+function pickLimitedCases(rows: ReturnType<typeof parseCsvRows>) {
+  const grouped = groupRowsBySession(rows);
   const pos = [...grouped.entries()].filter(([id]) => id.startsWith("companion_pos_")).slice(0, Math.ceil(maxCases / 2));
   const neg = [...grouped.entries()].filter(([id]) => id.startsWith("companion_neg_")).slice(0, Math.floor(maxCases / 2));
   return [...pos, ...neg].flatMap(([, sessionRows]) => sessionRows);
@@ -107,12 +113,12 @@ function pickLimitedCases(rows: ReturnType<typeof csvParser.parseCsvRows>) {
 
 const startedAt = new Date().toISOString();
 const rubric = loadRubric();
-const limitedRows = pickLimitedCases(csvParser.parseCsvRows(readFileSync(sampleCsvPath, "utf8")));
-const task = transcriptBenchmark.buildBenchmarkTaskPackage(
+const limitedRows = pickLimitedCases(parseCsvRows(readFileSync(sampleCsvPath, "utf8")));
+const task = buildBenchmarkTaskPackage(
   "真实 API 全流程：陪伴式心理咨询 transcript 评测 + policy 标定验证。",
   rubric,
 );
-const cases = transcriptBenchmark.buildCasesFromRawRows(
+const cases = buildCasesFromRawRows(
   task,
   limitedRows,
   "companion-autofind-20sessions.csv",
@@ -127,7 +133,7 @@ const matrix: BenchmarkMatrixCell[] = [{
   concurrency: 1,
 }];
 const runId = `fullflow_real_${Date.now()}`;
-const submissions = cases.map((taskCase) => transcriptBenchmark.buildTranscriptSubmission({
+const submissions = cases.map((taskCase) => buildTranscriptSubmission({
   runId,
   task,
   matrixCell: matrix[0],
@@ -135,7 +141,7 @@ const submissions = cases.map((taskCase) => transcriptBenchmark.buildTranscriptS
 }));
 
 console.log(`[fullflow] judging ${cases.length} cases × ${rubric.modules.flatMap((m) => m.metrics).length} metrics via real API...`);
-const benchmarkResult = await runner.runBenchmarkEvaluation({
+const benchmarkResult = await runBenchmarkEvaluation({
   runId,
   task,
   cases,
@@ -147,18 +153,18 @@ const benchmarkResult = await runner.runBenchmarkEvaluation({
 const labels = JSON.parse(
   readFileSync(join(fixtureDir, "human-labels-mock-100.json"), "utf8"),
 ) as AdmissionLabelRow[];
-const policy = admissionPolicyLearner.learnAdmissionPolicy(labels, {
+const policy = learnAdmissionPolicy(labels, {
   projectId,
   policyId: "fullflow-policy-v1",
 });
-await admissionPolicyStore.saveAdmissionPolicy(policy);
+await saveAdmissionPolicy(policy);
 
 const rerankBySubmissionId = new Map(
   benchmarkResult.caseScores
     .filter((item) => item.rerank)
     .map((item) => [item.submissionId, item.rerank!]),
 );
-const features = admissionFeatureExtractor.extractAdmissionFeatures(
+const features = extractAdmissionFeatures(
   benchmarkResult.metricResults,
   rerankBySubmissionId,
 );
@@ -176,12 +182,12 @@ const scored = features.slice(0, 8).flatMap((feature) => {
   }
   return [{
     feature,
-    ...admissionScorer.scoreAdmission(feature, channelPolicy),
+    ...scoreAdmission(feature, channelPolicy),
   }];
 });
-const holdout = admissionPolicyHoldout.evaluatePolicyHoldoutAgreement(labels, { seed: 42 });
+const holdout = evaluatePolicyHoldoutAgreement(labels, { seed: 42 });
 
-const autofind = await autofindSkill.runAutoFindDataSkill({
+const autofind = await runAutoFindDataSkill({
   action: "search",
   requirementText: "寻找陪伴式心理咨询正负样本多轮对话，用于 benchmark 区分度验证。",
   state: {
@@ -200,7 +206,7 @@ const negScores: number[] = [];
 for (const caseScore of benchmarkResult.caseScores) {
   const benchmarkCase = cases.find((item) => item.caseId === caseScore.caseId);
   const sessionId = String(benchmarkCase?.input.sessionId ?? "");
-  const bucket = transcriptBenchmark.classifyCompanionSession(sessionId);
+  const bucket = classifyCompanionSession(sessionId);
   if (bucket === "pos") posScores.push(caseScore.taskScore);
   if (bucket === "neg") negScores.push(caseScore.taskScore);
 }

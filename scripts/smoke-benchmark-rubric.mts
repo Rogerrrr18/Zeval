@@ -6,11 +6,16 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import companionJudge from "../src/benchmark/companion-transcript-judge.ts";
-import runner from "../src/benchmark/runner.ts";
-import transcriptBenchmark from "../src/benchmark/transcript-benchmark.ts";
+import { createCompanionTranscriptJudge } from "../src/benchmark/companion-transcript-judge.ts";
+import { runBenchmarkEvaluation } from "../src/benchmark/runner.ts";
+import {
+  buildBenchmarkTaskPackage,
+  buildCasesFromRawRows,
+  buildTranscriptSubmission,
+  classifyCompanionSession,
+} from "../src/benchmark/transcript-benchmark.ts";
 import type { BenchmarkMatrixCell, BenchmarkRubricSet } from "../src/benchmark/types.ts";
-import csvParser from "../src/parsers/csvParser.ts";
+import { parseCsvRows } from "../src/parsers/csvParser.ts";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const fixtureDir = join(root, "../src/benchmark/__fixtures__");
@@ -20,12 +25,12 @@ const rubric = JSON.parse(
 ) as BenchmarkRubricSet;
 
 process.env.ZEVAL_BENCHMARK_MAX_CASES = "20";
-const rows = csvParser.parseCsvRows(readFileSync(sampleCsvPath, "utf8"));
-const task = transcriptBenchmark.buildBenchmarkTaskPackage(
+const rows = parseCsvRows(readFileSync(sampleCsvPath, "utf8"));
+const task = buildBenchmarkTaskPackage(
   "评估陪伴式心理咨询 transcript 的共情、追问与话题聚焦质量。",
   rubric,
 );
-const cases = transcriptBenchmark.buildCasesFromRawRows(
+const cases = buildCasesFromRawRows(
   task,
   rows,
   "companion-autofind-20sessions.csv",
@@ -40,20 +45,20 @@ const matrix: BenchmarkMatrixCell[] = [{
   concurrency: 1,
 }];
 const runId = `smoke_${Date.now()}`;
-const submissions = cases.map((taskCase) => transcriptBenchmark.buildTranscriptSubmission({
+const submissions = cases.map((taskCase) => buildTranscriptSubmission({
   runId,
   task,
   matrixCell: matrix[0],
   taskCase,
 }));
 
-const result = await runner.runBenchmarkEvaluation({
+const result = await runBenchmarkEvaluation({
   runId,
   task,
   cases,
   submissions,
   matrix,
-  evaluatorContext: { llmJudge: companionJudge.createCompanionTranscriptJudge() },
+  evaluatorContext: { llmJudge: createCompanionTranscriptJudge() },
 });
 
 const posScores: number[] = [];
@@ -61,7 +66,7 @@ const negScores: number[] = [];
 for (const caseScore of result.caseScores) {
   const benchmarkCase = cases.find((item) => item.caseId === caseScore.caseId);
   const sessionId = String(benchmarkCase?.input.sessionId ?? "");
-  const bucket = transcriptBenchmark.classifyCompanionSession(sessionId);
+  const bucket = classifyCompanionSession(sessionId);
   if (bucket === "pos") posScores.push(caseScore.taskScore);
   if (bucket === "neg") negScores.push(caseScore.taskScore);
 }
