@@ -2335,7 +2335,12 @@
 }
 
 .explainPanel,
-.caseExplainCard,
+.focusReviewPanel,
+.transcriptDrawer,
+.sessionOverviewCard,
+.metricFocusCard,
+.rubricCompareCard,
+.reviewFocusCard,
 .metricExplainCard,
 .reviewItem,
 .reviewEmpty {
@@ -2365,7 +2370,6 @@
 
 .gapList,
 .metricExplainList,
-.caseExplainList,
 .reviewQueue {
   display: flex;
   flex-direction: column;
@@ -2389,18 +2393,611 @@
   text-align: right;
 }
 
-.caseExplainCard {
+.focusReviewPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   padding: 14px;
+  background: rgba(236, 253, 245, 0.55);
+  border-color: rgba(14, 116, 144, 0.25);
 }
 
-.caseExplainHeader,
+.focusToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.focusToolbar div,
+.metricTabsBlock > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.focusToolbar strong,
+.metricTabsBlock strong {
+  color: var(--nl-text-primary);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.focusToolbar span,
+.metricTabsBlock span {
+  color: var(--nl-text-muted);
+  font-size: 12px;
+}
+
+.focusToolbar button,
+.reviewSaveButton {
+  min-height: 34px;
+  flex-shrink: 0;
+  padding: 0 13px;
+  border: 1px solid var(--nl-accent);
+  border-radius: 7px;
+  background: var(--nl-accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.focusToolbar button:disabled,
+.reviewSaveButton:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.metricTabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.metricTabs button {
+  position: relative;
+  min-height: 42px;
+  flex-shrink: 0;
+  border: 1px solid var(--nl-border);
+  border-radius: 8px;
+  background: var(--nl-bg-2);
+  color: var(--nl-text-secondary);
+  cursor: pointer;
+}
+
+.metricTabs button:hover,
+.metricTabActive {
+  border-color: var(--nl-accent) !important;
+  background: var(--nl-accent-soft) !important;
+  color: var(--nl-accent) !important;
+}
+
+.caseSelectorShell {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.caseFocusHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.currentCaseCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid rgba(14, 116, 144, 0.24);
+  border-radius: 8px;
+  background: var(--nl-bg-2);
+}
+
+.currentCaseIdentity {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.currentCaseCard strong {
+  color: var(--nl-text-primary);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.currentCaseCard span {
+  color: var(--nl-text-muted);
+  font-size: 12px;
+}
+
+.currentCaseStats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.currentCaseStats b,
+.currentCaseStats span {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--nl-surface);
+  color: var(--nl-text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.currentCaseStats b {
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+  font-size: 13px;
+}
+
+.caseDropdownButton {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid var(--nl-border);
+  border-radius: 7px;
+  background: var(--nl-surface);
+  color: var(--nl-text-secondary);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.caseDropdownButton:hover,
+.caseDropdownButton[aria-expanded="true"] {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.caseDropdownButton[aria-expanded="true"] {
+  transform: rotate(180deg);
+}
+
+.caseNavActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--nl-border);
+  border-radius: 999px;
+  background: var(--nl-bg-2);
+  align-self: center;
+}
+
+.caseNavActions button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--nl-text-primary);
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.caseNavActions button:hover {
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.caseNavActions button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.casePickerPanel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(14, 116, 144, 0.28);
+  border-radius: 8px;
+  background: var(--nl-bg-2);
+  box-shadow: 0 18px 40px rgb(15 23 42 / 0.1);
+}
+
+.casePickerControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 156px;
+  gap: 10px;
+}
+
+.casePickerControls label {
+  display: grid;
+  gap: 6px;
+}
+
+.casePickerControls span {
+  color: var(--nl-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.casePickerControls input,
+.casePickerControls select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--nl-border);
+  border-radius: 7px;
+  background: var(--nl-surface);
+  color: var(--nl-text-primary);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.casePickerControls input {
+  padding: 0 10px;
+}
+
+.casePickerControls select {
+  padding: 0 8px;
+}
+
+.casePickerControls input:focus,
+.casePickerControls select:focus {
+  border-color: var(--nl-accent);
+}
+
+.caseFilterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.caseFilterChips button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--nl-border);
+  border-radius: 999px;
+  background: var(--nl-surface);
+  color: var(--nl-text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.caseFilterChips button:hover,
+.caseFilterActive {
+  border-color: var(--nl-accent) !important;
+  background: var(--nl-accent-soft) !important;
+  color: var(--nl-accent) !important;
+}
+
+.casePickerList {
+  display: grid;
+  gap: 6px;
+  max-height: 330px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.casePickerList button {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(118px, 0.5fr) minmax(160px, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid var(--nl-border);
+  border-radius: 7px;
+  background: var(--nl-surface);
+  color: var(--nl-text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.casePickerList button:hover,
+.casePickerItemActive {
+  border-color: var(--nl-accent) !important;
+  background: var(--nl-accent-soft) !important;
+}
+
+.casePickerList button > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.casePickerList strong,
+.casePickerList b {
+  color: var(--nl-text-primary);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.casePickerList span,
+.casePickerList em {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--nl-text-muted);
+  font-size: 11px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.casePickerEmpty {
+  padding: 18px;
+  color: var(--nl-text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.metricTabsBlock {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.metricTabs button {
+  min-width: 132px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 11px;
+}
+
+.metricTabs button span {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 780;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metricTabs button b {
+  flex-shrink: 0;
+  color: inherit;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.focusContentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.transcriptDrawer,
+.sessionOverviewCard,
+.metricFocusCard,
+.rubricCompareCard,
+.reviewFocusCard {
+  padding: 12px;
+  background: var(--nl-bg-2);
+}
+
+.transcriptDrawer {
+  grid-column: 1 / -1;
+}
+
+.transcriptDrawer summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  color: var(--nl-text-primary);
+  font-size: 12px;
+  font-weight: 850;
+  list-style-position: inside;
+}
+
+.transcriptDrawer summary b {
+  color: var(--nl-text-muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.transcriptDrawer pre {
+  max-height: 260px;
+  overflow: auto;
+  margin: 12px 0 0;
+  padding: 12px;
+  border-radius: 7px;
+  background: var(--nl-surface);
+  color: var(--nl-text-secondary);
+  font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sessionOverviewCard,
+.metricFocusCard,
+.rubricCompareCard,
+.reviewFocusCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sessionOverviewHeader,
+.metricFocusHeader,
+.rubricCompareHeader,
+.reviewFocusHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sessionOverviewHeader div,
+.metricFocusHeader div,
+.rubricCompareHeader div,
+.reviewFocusHeader div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sessionOverviewHeader strong,
+.metricFocusHeader strong,
+.rubricCompareHeader strong,
+.reviewFocusHeader strong {
+  color: var(--nl-text-primary);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.sessionOverviewHeader span,
+.metricFocusHeader span,
+.rubricCompareHeader span,
+.reviewFocusHeader span {
+  color: var(--nl-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.sessionOverviewHeader b,
+.metricFocusHeader b,
+.rubricCompareHeader b,
+.reviewFocusHeader b {
+  flex-shrink: 0;
+  color: var(--nl-accent);
+  font-size: 14px;
+  font-weight: 850;
+  text-align: right;
+}
+
+.sessionOverviewMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sessionOverviewMeta span {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--nl-surface);
+  color: var(--nl-text-secondary);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.sessionMetricBars {
+  display: grid;
+  gap: 8px;
+}
+
+.sessionMetricBar {
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) minmax(90px, 1.4fr) 42px;
+  align-items: center;
+  gap: 8px;
+  color: var(--nl-text-secondary);
+  font-size: 11px;
+}
+
+.sessionMetricBar span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionMetricBar div {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--nl-surface);
+}
+
+.sessionMetricBar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nl-accent);
+}
+
+.sessionMetricBar b {
+  color: var(--nl-text-primary);
+  font-weight: 850;
+  text-align: right;
+}
+
+.rubricCompareLevels {
+  display: grid;
+  gap: 8px;
+}
+
+.rubricCompareLevels div {
+  padding: 9px 10px;
+  border: 1px solid var(--nl-border);
+  border-radius: 7px;
+  background: var(--nl-surface);
+}
+
+.rubricCompareLevels span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--nl-text-primary);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.rubricCompareLevels p {
+  margin: 0;
+  color: var(--nl-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.rubricCompareLevelActive {
+  border-color: var(--nl-accent) !important;
+  background: var(--nl-accent-soft) !important;
+}
+
+.reviewFocusFields {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.75fr) minmax(220px, 1.25fr);
+  gap: 10px;
+}
+
+.reviewSaveButton {
+  justify-self: end;
+}
+
 .metricExplainHeader {
   display: flex;
   justify-content: space-between;
   gap: 12px;
 }
 
-.caseExplainHeader > div,
 .metricExplainHeader > div {
   display: flex;
   min-width: 0;
@@ -2408,13 +3005,11 @@
   gap: 3px;
 }
 
-.caseExplainHeader strong,
 .metricExplainHeader strong {
   color: var(--nl-text-primary);
   font-size: 13px;
 }
 
-.caseExplainHeader span,
 .metricExplainHeader span {
   color: var(--nl-text-muted);
   font-size: 11px;
@@ -2423,7 +3018,6 @@
   white-space: nowrap;
 }
 
-.caseExplainHeader b,
 .metricExplainHeader b {
   flex-shrink: 0;
   color: var(--nl-accent);
@@ -2460,6 +3054,55 @@
   color: var(--nl-text-secondary);
   font-size: 12px;
   line-height: 1.55;
+}
+
+.judgePanelTrace {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--nl-border);
+  border-radius: 8px;
+  background: var(--nl-bg);
+}
+
+.judgePanelTrace > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.judgePanelTrace strong {
+  color: var(--nl-text-primary);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.judgePanelTrace > div span {
+  color: var(--nl-text-muted);
+  font-size: 11px;
+}
+
+.judgePanelTrace p {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: var(--nl-surface);
+}
+
+.judgePanelTrace p b {
+  color: var(--nl-text-primary);
+  font-size: 11px;
+}
+
+.judgePanelTrace p span {
+  min-width: 0;
+  color: var(--nl-text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .compareDrawer {
@@ -2844,9 +3487,65 @@
   }
 
   .explainGrid,
+  .focusContentGrid,
   .readableCompare,
+  .reviewFocusFields,
   .reviewItem {
     grid-template-columns: 1fr;
+  }
+
+  .focusToolbar,
+  .caseFocusHeader,
+  .transcriptDrawer summary,
+  .sessionOverviewHeader,
+  .metricFocusHeader,
+  .rubricCompareHeader,
+  .reviewFocusHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .caseNavActions {
+    width: 100%;
+  }
+
+  .caseNavActions button {
+    min-height: 36px;
+    flex: 1;
+  }
+
+  .currentCaseCard {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .currentCaseIdentity {
+    max-width: calc(100% - 46px);
+  }
+
+  .currentCaseStats {
+    order: 2;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+
+  .caseDropdownButton {
+    margin-left: auto;
+  }
+
+  .casePickerPanel {
+    position: static;
+  }
+
+  .caseFocusHeader,
+  .casePickerControls,
+  .casePickerList button {
+    grid-template-columns: 1fr;
+  }
+
+  .reviewSaveButton {
+    width: 100%;
+    justify-self: stretch;
   }
 
   .reviewActions {

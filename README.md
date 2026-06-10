@@ -173,6 +173,10 @@ Open **http://localhost:3000** and use the browser interface:
 | Benchmark | `/benchmark` | Offline regression testing |
 | Copilot | `/chat` | AI assistant for result interpretation |
 
+### Benchmark Philosophy
+
+Zeval Benchmark Mode is aligned with [Eval-Anything](https://github.com/Rogerrrr18/Eval-Anything): evaluations are modeled as an LLM x Target x Harness x Environment matrix, not a one-off model score. Generated rubrics now preserve public benchmark/paper/standard references, task-world metadata, raw-baseline harness reasoning, and panel-ready judge traces. For subjective metrics, enable `ZEVAL_JUDGE_PANEL_MODE=panel` to aggregate independent judges and route `panel_disagree` cases into human review.
+
 ---
 
 ## CLI Command Reference
@@ -474,6 +478,10 @@ ZEVAL_JUDGE_MODEL=Qwen/Qwen3-7B
 | `ZEVAL_JUDGE_MODEL` | Model name | — |
 | `ZEVAL_RUBRIC_DEEPSEARCH_MODEL` | Optional DeepSearch/web-research model for rubric source discovery | falls back to judge model |
 | `ZEVAL_RUBRIC_DEEPSEARCH_EXTRA_BODY` | Optional JSON merged into rubric DeepSearch chat request for provider-specific search flags | — |
+| `ZEVAL_JUDGE_PANEL_MODE` | `single` or `panel`; panel mode runs Eval-Anything-style independent judges before aggregation | `single` |
+| `ZEVAL_JUDGE_PANEL_MEMBERS` | Comma-separated `judge_id:model:family` members for panel mode | — |
+| `ZEVAL_JUDGE_PANEL_AGGREGATION` | Judge panel aggregation: `trimmed_mean`, `mean`, `median`, or `majority` | `trimmed_mean` |
+| `ZEVAL_JUDGE_PANEL_DISAGREEMENT_THRESHOLD` | 0-5 score spread that adds `panel_disagree` and triggers human review | `1.5` |
 | `ZEVAL_JUDGE_CONCURRENCY` | Max concurrent judge calls | `4` |
 | `ZEVAL_JUDGE_ENABLE_THINKING` | Enable chain-of-thought (model-dependent) | `false` |
 | `ZEVAL_DATABASE_ADAPTER` | `local-json` or `postgres` | `local-json` |

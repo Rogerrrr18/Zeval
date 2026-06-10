@@ -27,6 +27,7 @@ import {
 } from "react";
 import Link from "next/link";
 import type {
+  BenchmarkCase,
   BenchmarkCaseScore,
   BenchmarkMetricEvaluationResult,
   BenchmarkMetricReference,
@@ -2322,23 +2323,95 @@ function ResultWorkspace(props: {
   const [admitting, setAdmitting] = useState(false);
   const [admissionMessage, setAdmissionMessage] = useState("");
   const [admissionError, setAdmissionError] = useState("");
-  const weakestCases = [...props.result.caseScores]
-    .sort((left, right) => left.taskScore - right.taskScore)
-    .slice(0, 6);
+  const [casePickerOpen, setCasePickerOpen] = useState(false);
+  const [caseSearch, setCaseSearch] = useState("");
+  const [caseFilter, setCaseFilter] = useState<CasePickerFilter>("all");
+  const [caseSort, setCaseSort] = useState<CasePickerSort>("risk");
+  const casePickerRef = useRef<HTMLDivElement>(null);
   const weakestMetrics = [...props.result.metricResults]
     .filter((result) => !result.passed || result.normalizedScore < 70)
     .sort((left, right) => left.normalizedScore - right.normalizedScore)
     .slice(0, 8);
-  const reviewQueue = buildHumanReviewQueue(props.result.metricResults);
   const capabilityGaps = buildCapabilityGapRows(props.result.caseScores);
   const runReviewRecords = props.humanReviewRecords.filter((record) => record.runId === props.result.runId);
+  const reviewQueue = buildHumanReviewQueue(props.result.metricResults);
   const completedReviews = runReviewRecords.filter((record) => record.decision).length;
   const savedReviews = runReviewRecords.filter((record) => record.savedAt).length;
-  const saveableReviews = runReviewRecords.filter((record) => record.decision && !record.savedAt);
   const metricNameMap = buildMetricDisplayNameMap(props.rubric);
+  const metricOrder = buildRubricMetricOrder(props.rubric);
+  const sessionRows = buildResultSessionRows(props.result, runReviewRecords, metricNameMap, metricOrder);
+  const defaultCaseId = sessionRows.find((row) => row.attentionMetricCount > 0)?.caseScore.caseId
+    ?? sessionRows[0]?.caseScore.caseId
+    ?? "";
+  const [activeCaseId, setActiveCaseId] = useState(defaultCaseId);
+  const selectedSession = sessionRows.find((row) => row.caseScore.caseId === activeCaseId) ?? sessionRows[0] ?? null;
+  const selectedMetricResults = selectedSession?.metricResults ?? [];
+  const selectedMetricKeyList = selectedMetricResults.map((result) => result.metricKey).join("|");
+  const defaultMetricKey = selectedMetricResults.find(isMetricAttention)?.metricKey
+    ?? selectedMetricResults[0]?.metricKey
+    ?? "";
+  const [activeMetricKey, setActiveMetricKey] = useState(defaultMetricKey);
+  const selectedMetricResult = selectedMetricResults.find((result) => result.metricKey === activeMetricKey)
+    ?? selectedMetricResults[0]
+    ?? null;
+  const selectedSessionIndex = selectedSession
+    ? sessionRows.findIndex((row) => row.caseScore.caseId === selectedSession.caseScore.caseId)
+    : -1;
+  const previousSession = selectedSessionIndex > 0 ? sessionRows[selectedSessionIndex - 1] : null;
+  const nextSession = selectedSessionIndex >= 0 && selectedSessionIndex < sessionRows.length - 1
+    ? sessionRows[selectedSessionIndex + 1]
+    : null;
+  const selectedReview = selectedMetricResult ? findReview(selectedMetricResult) : undefined;
+  const selectedRubricMetric = selectedMetricResult ? findRubricMetric(props.rubric, selectedMetricResult.metricKey) : null;
+  const selectedTranscript = getBenchmarkCaseTranscript(selectedSession?.benchmarkCase);
+  const selectedSessionReviews = selectedSession
+    ? runReviewRecords.filter((record) => record.submissionId === selectedSession.caseScore.submissionId)
+    : [];
+  const saveableSessionReviews = selectedSessionReviews.filter((record) => record.decision && !record.savedAt);
+  const selectedSaveableReview = selectedReview?.decision && !selectedReview.savedAt ? [selectedReview] : [];
+  const selectedSessionPendingReviews = selectedMetricResults.filter((result) =>
+    isMetricReviewCandidate(result) && !findReview(result)?.decision,
+  ).length;
+  const pickerRows = buildCasePickerRows(sessionRows, caseSearch, caseFilter, caseSort, metricNameMap);
+  const explainSignalLabel = `${weakestMetrics.length} 个指标 · ${sessionRows.filter((row) => row.attentionMetricCount > 0).length} 个会话`;
+
+  useEffect(() => {
+    if (!defaultCaseId) return;
+    setActiveCaseId((current) => sessionRows.some((row) => row.caseScore.caseId === current) ? current : defaultCaseId);
+  }, [defaultCaseId, props.result.runId, sessionRows]);
+
+  useEffect(() => {
+    if (!defaultMetricKey) return;
+    setActiveMetricKey((current) => selectedMetricResults.some((result) => result.metricKey === current) ? current : defaultMetricKey);
+  }, [activeCaseId, defaultMetricKey, props.result.runId, selectedMetricKeyList, selectedMetricResults]);
+
+  useEffect(() => {
+    if (!casePickerOpen) return;
+    function handleMouseDown(event: MouseEvent) {
+      if (!casePickerRef.current?.contains(event.target as Node)) {
+        setCasePickerOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setCasePickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [casePickerOpen]);
 
   function findReview(result: BenchmarkMetricEvaluationResult): BenchmarkHumanReviewRecord | undefined {
     return runReviewRecords.find((record) => record.submissionId === result.submissionId && record.metricKey === result.metricKey);
+  }
+
+  function selectSession(caseId: string) {
+    setActiveCaseId(caseId);
+    setCasePickerOpen(false);
   }
 
   function updateReview(
@@ -2366,10 +2439,10 @@ function ResultWorkspace(props: {
     });
   }
 
-  async function admitReviewedCases() {
-    const reviews = saveableReviews.filter((record) => record.decision);
+  async function admitReviewBatch(records: BenchmarkHumanReviewRecord[], emptyMessage: string) {
+    const reviews = records.filter((record) => record.decision && !record.savedAt);
     if (reviews.length === 0) {
-      setAdmissionError("请先完成至少一条人工判断。");
+      setAdmissionError(emptyMessage);
       return;
     }
 
@@ -2492,10 +2565,10 @@ function ResultWorkspace(props: {
       <section className={styles.resultSection}>
         <div className={styles.resultSectionHeader}>
           <div>
-            <h3>可解释性分析</h3>
-            <p>按案例、指标、证据和置信度拆解分数来源。</p>
+            <h3>全局诊断摘要</h3>
+            <p>保留跨会话的能力短板与重点指标，用来判断整体风险，不再混入逐条校验明细。</p>
           </div>
-          <span>{weakestMetrics.length} 个重点信号</span>
+          <span>{explainSignalLabel}</span>
         </div>
 
         <div className={styles.explainGrid}>
@@ -2528,112 +2601,275 @@ function ResultWorkspace(props: {
             )}
           </div>
         </div>
-
-        <div className={styles.caseExplainList}>
-          {weakestCases.map((caseScore) => (
-            <CaseExplainCard key={caseScore.submissionId} caseScore={caseScore} metricNameMap={metricNameMap} />
-          ))}
-        </div>
       </section>
 
       <section className={styles.resultSection}>
         <div className={styles.resultSectionHeader}>
           <div>
-            <h3>人工校验队列</h3>
-            <p>人工判断会写入数据池 channel，用于后续 badcase/gold label 校准。</p>
+            <h3>逐条校验工作台</h3>
+            <p>先选择 Session ID，再选择二级指标；面板只展示当前 session × 当前指标的证据和人工判断。</p>
           </div>
           <span>{completedReviews}/{reviewQueue.length} 已处理 · {savedReviews} 已入池</span>
         </div>
 
-        {reviewQueue.length === 0 ? (
-          <div className={styles.reviewEmpty}>当前没有需要人工校验的指标。</div>
-        ) : (
-          <>
-            <div className={styles.reviewToolbar}>
+        {admissionMessage && <div className={styles.reviewSuccess}>{admissionMessage}</div>}
+        {admissionError && <div className={styles.reviewError}>{admissionError}</div>}
+
+        {selectedSession && selectedMetricResult ? (
+          <div className={styles.focusReviewPanel}>
+            <div className={styles.focusToolbar}>
               <div>
-                <strong>审核出口</strong>
-                <span>认可失败: auto_tp · 驳回失败: manual_fp · 补证据: auto_uncertainty</span>
+                <strong>当前 Case 聚焦器</strong>
+                <span>主界面只保留当前 case；完整列表收进可搜索面板。</span>
               </div>
-              <button type="button" onClick={admitReviewedCases} disabled={admitting || saveableReviews.length === 0}>
-                {admitting ? "保存中..." : `保存入池 (${saveableReviews.length})`}
+              <button
+                type="button"
+                onClick={() => void admitReviewBatch(saveableSessionReviews, "当前 session 还没有可保存的人工判断。")}
+                disabled={admitting || saveableSessionReviews.length === 0}
+              >
+                {admitting ? "保存中..." : `保存本 session 已审 (${saveableSessionReviews.length})`}
               </button>
             </div>
-            {admissionMessage && <div className={styles.reviewSuccess}>{admissionMessage}</div>}
-            {admissionError && <div className={styles.reviewError}>{admissionError}</div>}
-            <div className={styles.reviewQueue}>
-              {reviewQueue.map((result) => {
-                const key = metricResultKey(result);
-                const review = findReview(result);
-                return (
-                  <div key={key} className={styles.reviewItem}>
-                    <MetricExplainCard result={result} metricNameMap={metricNameMap} />
-                    <div className={styles.reviewActions}>
-                      <div className={styles.reviewStatusLine}>
-                        <span>{review?.decision ? humanReviewDecisionLabel(review.decision) : "待人工判断"}</span>
-                        {review?.admission && (
-                          <b>{sourceDisplayName(review.admission.source)} · {review.admission.caseId}</b>
-                        )}
-                        {!review?.admission && review?.savedAt && <b>重复已跳过</b>}
-                      </div>
-                      <div className={styles.reviewDecisionButtons}>
-                        <button
-                          type="button"
-                          className={review?.decision === "accepted" ? styles.reviewDecisionActive : ""}
-                          onClick={() => updateReview(result, {
-                            decision: "accepted",
-                            reviewedAt: new Date().toISOString(),
-                            admission: undefined,
-                            savedAt: undefined,
-                          })}
-                        >
-                          认可
-                        </button>
-                        <button
-                          type="button"
-                          className={review?.decision === "rejected" ? styles.reviewDecisionActive : ""}
-                          onClick={() => updateReview(result, {
-                            decision: "rejected",
-                            reviewedAt: new Date().toISOString(),
-                            admission: undefined,
-                            savedAt: undefined,
-                          })}
-                        >
-                          驳回
-                        </button>
-                        <button
-                          type="button"
-                          className={review?.decision === "needs_evidence" ? styles.reviewDecisionActive : ""}
-                          onClick={() => updateReview(result, {
-                            decision: "needs_evidence",
-                            reviewedAt: new Date().toISOString(),
-                            admission: undefined,
-                            savedAt: undefined,
-                          })}
-                        >
-                          补证据
-                        </button>
-                      </div>
-                      <label className={styles.reviewField}>
-                        <span>审核人</span>
-                        <input
-                          value={review?.reviewer ?? "benchmark-reviewer"}
-                          onChange={(event) => updateReview(result, { reviewer: event.target.value })}
-                        />
-                      </label>
-                      <label className={styles.reviewField}>
-                        <span>人工备注</span>
-                        <textarea
-                          value={review?.note ?? ""}
-                          placeholder="写下你认可/驳回/补证据的依据"
-                          onChange={(event) => updateReview(result, { note: event.target.value })}
-                        />
-                      </label>
-                    </div>
+
+            <div className={styles.caseSelectorShell} ref={casePickerRef}>
+              <div className={styles.caseFocusHeader}>
+                <div className={styles.currentCaseCard}>
+                  <div className={styles.currentCaseIdentity}>
+                    <strong>{shortCaseId(selectedSession.caseScore.caseId)}</strong>
+                    <span>{getSourceSessionLabel(selectedSession.benchmarkCase)}</span>
                   </div>
-                );
-              })}
+                  <div className={styles.currentCaseStats}>
+                    <b>{selectedSession.caseScore.taskScore.toFixed(1)}%</b>
+                    <span>tier: {scoreTierLabel(selectedSession.caseScore.taskScore)}</span>
+                    <span>{selectedSessionPendingReviews} 待审</span>
+                    {selectedSession.weakestMetric && (
+                      <span>最弱：{metricDisplayNameFromEvent(selectedSession.weakestMetric.metricKey, metricNameMap)} {selectedSession.weakestMetric.normalizedScore.toFixed(0)}%</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.caseDropdownButton}
+                    aria-label={casePickerOpen ? "收起 Case 下拉选择器" : "打开 Case 下拉选择器"}
+                    aria-expanded={casePickerOpen}
+                    onClick={() => setCasePickerOpen((open) => !open)}
+                  >
+                    ▾
+                  </button>
+                </div>
+
+                <div className={styles.caseNavActions}>
+                  <button
+                    type="button"
+                    onClick={() => previousSession && selectSession(previousSession.caseScore.caseId)}
+                    disabled={!previousSession}
+                    aria-label="上一个 case"
+                    title="上一个 case"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => nextSession && selectSession(nextSession.caseScore.caseId)}
+                    disabled={!nextSession}
+                    aria-label="下一个 case"
+                    title="下一个 case"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+
+              {casePickerOpen && (
+                <div className={styles.casePickerPanel}>
+                  <div className={styles.casePickerControls}>
+                    <label>
+                      <span>搜索 Case</span>
+                      <input
+                        value={caseSearch}
+                        placeholder="输入 case_023 或来源会话"
+                        onChange={(event) => setCaseSearch(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>排序</span>
+                      <select value={caseSort} onChange={(event) => setCaseSort(event.target.value as CasePickerSort)}>
+                        <option value="risk">风险优先</option>
+                        <option value="pending">待审优先</option>
+                        <option value="score_asc">分数升序</option>
+                        <option value="original">原始顺序</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className={styles.caseFilterChips}>
+                    {CASE_PICKER_FILTERS.map((filter) => (
+                      <button
+                        key={filter.value}
+                        type="button"
+                        className={caseFilter === filter.value ? styles.caseFilterActive : ""}
+                        onClick={() => setCaseFilter(filter.value)}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className={styles.casePickerList}>
+                    {pickerRows.length === 0 ? (
+                      <div className={styles.casePickerEmpty}>没有符合条件的 case。</div>
+                    ) : (
+                      pickerRows.map((row) => (
+                        <button
+                          key={row.caseScore.caseId}
+                          type="button"
+                          className={row.caseScore.caseId === selectedSession.caseScore.caseId ? styles.casePickerItemActive : ""}
+                          onClick={() => selectSession(row.caseScore.caseId)}
+                        >
+                          <div>
+                            <strong>{shortCaseId(row.caseScore.caseId)}</strong>
+                            <span>{getSourceSessionLabel(row.benchmarkCase)}</span>
+                          </div>
+                          <div>
+                            <b>{row.caseScore.taskScore.toFixed(1)}%</b>
+                            <span>{row.pendingReviewCount} 待审 · {row.savedReviewCount} 已入池</span>
+                          </div>
+                          <em>{row.weakestMetric ? `最弱：${metricDisplayNameFromEvent(row.weakestMetric.metricKey, metricNameMap)} ${row.weakestMetric.normalizedScore.toFixed(0)}%` : "暂无指标"}</em>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          </>
+
+            <div className={styles.metricTabsBlock}>
+              <div>
+                <strong>二级标签 · 指标</strong>
+                <span>只切换当前 session 下的评分维度。</span>
+              </div>
+              <div className={styles.metricTabs} role="tablist" aria-label="二级指标">
+                {selectedMetricResults.map((result) => (
+                <button
+                  key={result.metricKey}
+                  type="button"
+                  className={result.metricKey === selectedMetricResult.metricKey ? styles.metricTabActive : ""}
+                  onClick={() => setActiveMetricKey(result.metricKey)}
+                >
+                  <span>{metricDisplayNameFromEvent(result.metricKey, metricNameMap)}</span>
+                  <b>{result.normalizedScore.toFixed(0)}%</b>
+                </button>
+              ))}
+              </div>
+            </div>
+
+            <div className={styles.focusContentGrid}>
+              <details className={styles.transcriptDrawer}>
+                <summary>
+                  <span>原始会话</span>
+                  <b>{getSourceSessionLabel(selectedSession.benchmarkCase)} · {selectedTranscript ? "可展开对照证据" : "暂无 transcript"}</b>
+                </summary>
+                <pre>{selectedTranscript || "当前案例没有保存原始会话 transcript。"}</pre>
+              </details>
+
+              <SessionOverviewCard
+                session={selectedSession}
+                metricNameMap={metricNameMap}
+                pendingReviewCount={selectedSessionPendingReviews}
+              />
+
+              <div className={styles.metricFocusCard}>
+                <div className={styles.metricFocusHeader}>
+                  <div>
+                    <strong>当前维度：{metricDisplayNameFromEvent(selectedMetricResult.metricKey, metricNameMap)}</strong>
+                    <span>{selectedMetricResult.evaluatorType ? evaluatorDisplayName(selectedMetricResult.evaluatorType) : "评估器"} · Channel: {reviewDecisionChannel(selectedMetricResult, selectedReview?.decision)}</span>
+                  </div>
+                  <b>{selectedMetricResult.normalizedScore.toFixed(1)}%</b>
+                </div>
+                <MetricExplainCard result={selectedMetricResult} metricNameMap={metricNameMap} />
+              </div>
+
+              <RubricFormCompare metric={selectedRubricMetric} result={selectedMetricResult} />
+
+              <div className={styles.reviewFocusCard}>
+                <div className={styles.reviewFocusHeader}>
+                  <div>
+                    <strong>人工校验</strong>
+                    <span>{selectedReview?.decision ? humanReviewDecisionLabel(selectedReview.decision) : "待人工判断"} · {reviewDecisionChannel(selectedMetricResult, selectedReview?.decision)}</span>
+                  </div>
+                  {selectedReview?.admission && <b>{sourceDisplayName(selectedReview.admission.source)} · {selectedReview.admission.caseId}</b>}
+                  {!selectedReview?.admission && selectedReview?.savedAt && <b>重复已跳过</b>}
+                </div>
+
+                <div className={styles.reviewDecisionButtons}>
+                  <button
+                    type="button"
+                    className={selectedReview?.decision === "accepted" ? styles.reviewDecisionActive : ""}
+                    onClick={() => updateReview(selectedMetricResult, {
+                      decision: "accepted",
+                      reviewedAt: new Date().toISOString(),
+                      admission: undefined,
+                      savedAt: undefined,
+                    })}
+                  >
+                    认可
+                  </button>
+                  <button
+                    type="button"
+                    className={selectedReview?.decision === "rejected" ? styles.reviewDecisionActive : ""}
+                    onClick={() => updateReview(selectedMetricResult, {
+                      decision: "rejected",
+                      reviewedAt: new Date().toISOString(),
+                      admission: undefined,
+                      savedAt: undefined,
+                    })}
+                  >
+                    驳回
+                  </button>
+                  <button
+                    type="button"
+                    className={selectedReview?.decision === "needs_evidence" ? styles.reviewDecisionActive : ""}
+                    onClick={() => updateReview(selectedMetricResult, {
+                      decision: "needs_evidence",
+                      reviewedAt: new Date().toISOString(),
+                      admission: undefined,
+                      savedAt: undefined,
+                    })}
+                  >
+                    补证据
+                  </button>
+                </div>
+
+                <div className={styles.reviewFocusFields}>
+                  <label className={styles.reviewField}>
+                    <span>审核人</span>
+                    <input
+                      value={selectedReview?.reviewer ?? "benchmark-reviewer"}
+                      onChange={(event) => updateReview(selectedMetricResult, { reviewer: event.target.value })}
+                    />
+                  </label>
+                  <label className={styles.reviewField}>
+                    <span>人工备注</span>
+                    <textarea
+                      value={selectedReview?.note ?? ""}
+                      placeholder="写下你认可 / 驳回 / 补证据的依据"
+                      onChange={(event) => updateReview(selectedMetricResult, { note: event.target.value })}
+                    />
+                  </label>
+                </div>
+
+                <button
+                  type="button"
+                  className={styles.reviewSaveButton}
+                  onClick={() => void admitReviewBatch(selectedSaveableReview, "请先完成当前指标的人工判断。")}
+                  disabled={admitting || selectedSaveableReview.length === 0}
+                >
+                  {admitting ? "保存中..." : "保存本条入池"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className={styles.reviewEmpty}>当前评测结果没有可校验的 session。</div>
         )}
       </section>
     </div>
@@ -2641,6 +2877,15 @@ function ResultWorkspace(props: {
 }
 
 type HumanReviewDecision = "accepted" | "rejected" | "needs_evidence";
+type CasePickerFilter = "all" | "pending" | "attention" | "saved";
+type CasePickerSort = "risk" | "pending" | "score_asc" | "original";
+
+const CASE_PICKER_FILTERS: Array<{ value: CasePickerFilter; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "pending", label: "待审" },
+  { value: "attention", label: "低分 / 风险" },
+  { value: "saved", label: "已入池" },
+];
 
 function buildHumanReviewQueue(results: BenchmarkMetricEvaluationResult[]): BenchmarkMetricEvaluationResult[] {
   return [...results]
@@ -2648,6 +2893,7 @@ function buildHumanReviewQueue(results: BenchmarkMetricEvaluationResult[]): Benc
       result.needsHumanReview ||
       result.status === "needs_human_review" ||
       !result.passed ||
+      result.normalizedScore < 70 ||
       result.confidence < 0.65,
     )
     .sort((left, right) => {
@@ -2675,30 +2921,223 @@ function buildCapabilityGapRows(caseScores: BenchmarkCaseScore[]): Array<{ capab
     .slice(0, 5);
 }
 
-function CaseExplainCard(props: { caseScore: BenchmarkCaseScore; metricNameMap: Map<string, string> }) {
-  const failed = props.caseScore.metricResults
-    .filter((result) => !result.passed || result.status === "needs_human_review")
-    .sort((left, right) => left.normalizedScore - right.normalizedScore)
-    .slice(0, 3);
+type ResultSessionRow = {
+  caseScore: BenchmarkCaseScore;
+  benchmarkCase?: BenchmarkCase;
+  metricResults: BenchmarkMetricEvaluationResult[];
+  attentionMetricCount: number;
+  pendingReviewCount: number;
+  savedReviewCount: number;
+  weakestMetric?: BenchmarkMetricEvaluationResult;
+};
+
+function buildResultSessionRows(
+  result: BenchmarkRunResult,
+  reviewRecords: BenchmarkHumanReviewRecord[],
+  metricNameMap: Map<string, string>,
+  metricOrder: Map<string, number>,
+): ResultSessionRow[] {
+  const casesById = new Map(result.cases.map((item) => [item.caseId, item]));
+  const metricsByCase = new Map<string, BenchmarkMetricEvaluationResult[]>();
+  for (const metricResult of result.metricResults) {
+    if (!metricsByCase.has(metricResult.caseId)) metricsByCase.set(metricResult.caseId, []);
+    metricsByCase.get(metricResult.caseId)!.push(metricResult);
+  }
+
+  return result.caseScores.map((caseScore) => {
+    const metricResults = [...(metricsByCase.get(caseScore.caseId) ?? caseScore.metricResults)]
+      .sort((left, right) => {
+        const orderDiff = (metricOrder.get(left.metricKey) ?? 999) - (metricOrder.get(right.metricKey) ?? 999);
+        if (orderDiff !== 0) return orderDiff;
+        return metricDisplayNameFromEvent(left.metricKey, metricNameMap)
+          .localeCompare(metricDisplayNameFromEvent(right.metricKey, metricNameMap), "zh-CN");
+      });
+    const caseReviews = reviewRecords.filter((record) => record.submissionId === caseScore.submissionId);
+    const reviewByMetric = new Map(caseReviews.map((record) => [record.metricKey, record]));
+    const weakestMetric = [...metricResults].sort((left, right) => left.normalizedScore - right.normalizedScore)[0];
+    return {
+      caseScore,
+      benchmarkCase: casesById.get(caseScore.caseId),
+      metricResults,
+      attentionMetricCount: metricResults.filter(isMetricAttention).length,
+      pendingReviewCount: metricResults.filter((metricResult) =>
+        isMetricReviewCandidate(metricResult) && !reviewByMetric.get(metricResult.metricKey)?.decision,
+      ).length,
+      savedReviewCount: caseReviews.filter((record) => record.savedAt).length,
+      weakestMetric,
+    };
+  });
+}
+
+function buildCasePickerRows(
+  rows: ResultSessionRow[],
+  search: string,
+  filter: CasePickerFilter,
+  sort: CasePickerSort,
+  metricNameMap: Map<string, string>,
+): ResultSessionRow[] {
+  const query = search.trim().toLowerCase();
+  return rows
+    .filter((row) => {
+      if (filter === "pending" && row.pendingReviewCount === 0) return false;
+      if (filter === "attention" && row.attentionMetricCount === 0) return false;
+      if (filter === "saved" && row.savedReviewCount === 0) return false;
+      if (!query) return true;
+      const haystack = [
+        row.caseScore.caseId,
+        shortCaseId(row.caseScore.caseId),
+        getSourceSessionLabel(row.benchmarkCase),
+        row.weakestMetric ? metricDisplayNameFromEvent(row.weakestMetric.metricKey, metricNameMap) : "",
+      ].join(" ").toLowerCase();
+      return haystack.includes(query);
+    })
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => {
+      if (sort === "original") return left.index - right.index;
+      if (sort === "score_asc") return left.row.caseScore.taskScore - right.row.caseScore.taskScore;
+      if (sort === "pending") {
+        const pendingDiff = right.row.pendingReviewCount - left.row.pendingReviewCount;
+        if (pendingDiff !== 0) return pendingDiff;
+        return left.row.caseScore.taskScore - right.row.caseScore.taskScore;
+      }
+      const attentionDiff = right.row.attentionMetricCount - left.row.attentionMetricCount;
+      if (attentionDiff !== 0) return attentionDiff;
+      const pendingDiff = right.row.pendingReviewCount - left.row.pendingReviewCount;
+      if (pendingDiff !== 0) return pendingDiff;
+      return left.row.caseScore.taskScore - right.row.caseScore.taskScore;
+    })
+    .map(({ row }) => row);
+}
+
+function buildRubricMetricOrder(rubric: BenchmarkRubricSet | null): Map<string, number> {
+  const order = new Map<string, number>();
+  let index = 0;
+  for (const metric of rubric?.modules.flatMap((module) => module.metrics) ?? []) {
+    order.set(metric.metricKey, index);
+    index += 1;
+  }
+  return order;
+}
+
+function findRubricMetric(rubric: BenchmarkRubricSet | null, metricKey: string): BenchmarkRubricMetric | null {
+  return rubric?.modules.flatMap((module) => module.metrics).find((metric) => metric.metricKey === metricKey) ?? null;
+}
+
+function isMetricAttention(result: BenchmarkMetricEvaluationResult): boolean {
+  return !result.passed ||
+    result.status === "needs_human_review" ||
+    result.normalizedScore < 70 ||
+    result.confidence < 0.65;
+}
+
+function isMetricReviewCandidate(result: BenchmarkMetricEvaluationResult): boolean {
+  return result.needsHumanReview ||
+    result.status === "needs_human_review" ||
+    !result.passed ||
+    result.normalizedScore < 70 ||
+    result.confidence < 0.65;
+}
+
+function getBenchmarkCaseTranscript(benchmarkCase?: BenchmarkCase): string {
+  const transcript = benchmarkCase?.input?.transcript;
+  return typeof transcript === "string" ? transcript.trim() : "";
+}
+
+function getSourceSessionLabel(benchmarkCase?: BenchmarkCase): string {
+  const sessionId = benchmarkCase?.input?.sessionId;
+  return typeof sessionId === "string" && sessionId.trim() ? sessionId.trim() : "来源会话";
+}
+
+function shortCaseId(caseId: string): string {
+  const match = caseId.match(/case[_-]?(\d+)$/i);
+  return match ? `case_${match[1]}` : caseId;
+}
+
+function scoreTierLabel(score: number): string {
+  if (score >= 90) return "gold";
+  if (score >= 75) return "silver";
+  if (score >= 60) return "bronze";
+  return "risk";
+}
+
+function averageMetricConfidence(results: BenchmarkMetricEvaluationResult[]): number {
+  if (results.length === 0) return 0;
+  return results.reduce((sum, result) => sum + result.confidence, 0) / results.length;
+}
+
+function reviewDecisionChannel(
+  result: BenchmarkMetricEvaluationResult,
+  decision?: HumanReviewDecision,
+): string {
+  if (!decision) return result.needsHumanReview || result.status === "needs_human_review" ? "auto_uncertainty" : "待选择";
+  if (decision === "needs_evidence") return "auto_uncertainty";
+  if (decision === "accepted") return result.passed ? "manual_gold" : "auto_tp";
+  return result.passed ? "auto_disagreement" : "manual_fp";
+}
+
+function SessionOverviewCard(props: {
+  session: ResultSessionRow;
+  metricNameMap: Map<string, string>;
+  pendingReviewCount: number;
+}) {
+  const score = props.session.caseScore.taskScore;
+  const qScore = averageMetricConfidence(props.session.metricResults);
+  const weakestMetric = props.session.weakestMetric;
   return (
-    <article className={styles.caseExplainCard}>
-      <div className={styles.caseExplainHeader}>
+    <section className={styles.sessionOverviewCard}>
+      <div className={styles.sessionOverviewHeader}>
         <div>
-          <strong>{props.caseScore.caseId}</strong>
-          <span>{agentFrameworkDisplayName(props.caseScore.agentFramework)} · {props.caseScore.model}</span>
+          <strong>本 Session 评测总览</strong>
+          <span>{getSourceSessionLabel(props.session.benchmarkCase)}</span>
         </div>
-        <b>{props.caseScore.taskScore.toFixed(1)}%</b>
+        <b>{score.toFixed(1)}%</b>
       </div>
-      {failed.length === 0 ? (
-        <p className={styles.explainEmpty}>该案例没有失败指标。</p>
+      <div className={styles.sessionOverviewMeta}>
+        <span>Q 分 {(qScore * 100).toFixed(0)}</span>
+        <span>tier: {scoreTierLabel(score)}</span>
+        <span>{props.pendingReviewCount} 个待审</span>
+        {weakestMetric && <span>最弱：{metricDisplayNameFromEvent(weakestMetric.metricKey, props.metricNameMap)} {weakestMetric.normalizedScore.toFixed(0)}%</span>}
+      </div>
+      <div className={styles.sessionMetricBars}>
+        {props.session.metricResults.map((result) => (
+          <div key={result.metricKey} className={styles.sessionMetricBar}>
+            <span>{metricDisplayNameFromEvent(result.metricKey, props.metricNameMap)}</span>
+            <div><i style={{ width: `${Math.max(2, Math.min(100, result.normalizedScore))}%` }} /></div>
+            <b>{result.normalizedScore.toFixed(0)}%</b>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function RubricFormCompare(props: { metric: BenchmarkRubricMetric | null; result: BenchmarkMetricEvaluationResult }) {
+  const rubricForm = props.metric?.config?.rubricForm ?? [];
+  return (
+    <section className={styles.rubricCompareCard}>
+      <div className={styles.rubricCompareHeader}>
+        <div>
+          <strong>rubricForm 对照</strong>
+          <span>{props.metric?.config?.criteria ?? "当前指标没有保存单独的 rubricForm。"}</span>
+        </div>
+        <b>{props.result.score.toFixed(1)} / 5</b>
+      </div>
+      {rubricForm.length === 0 ? (
+        <p className={styles.explainEmpty}>暂无评分档位。</p>
       ) : (
-        <div className={styles.metricExplainList}>
-          {failed.map((result) => (
-            <MetricExplainCard key={metricResultKey(result)} result={result} metricNameMap={props.metricNameMap} compact />
+        <div className={styles.rubricCompareLevels}>
+          {rubricForm.map((level) => (
+            <div
+              key={`${props.result.metricKey}-${level.score}-${level.label}`}
+              className={Math.abs(level.score - props.result.score) < 0.5 ? styles.rubricCompareLevelActive : ""}
+            >
+              <span>{level.score} 分 · {level.label}</span>
+              <p>{level.description}</p>
+            </div>
           ))}
         </div>
       )}
-    </article>
+    </section>
   );
 }
 
@@ -2725,8 +3164,29 @@ function MetricExplainCard(props: {
         <span>{statusText}</span>
         <span>置信度 {(props.result.confidence * 100).toFixed(0)}%</span>
         <span>{evaluatorDisplayName(props.result.evaluatorType)}</span>
+        {props.result.judge && <span>{props.result.judge.mode === "panel" ? "Judge Panel" : "Single Judge"}</span>}
+        {props.result.judge?.panelDisagree && <span>panel_disagree</span>}
+        {props.result.labels?.slice(0, 3).map((label) => (
+          <span key={`${props.result.submissionId}-${props.result.metricKey}-${label}`}>{label}</span>
+        ))}
       </div>
       <p>{props.result.reason}</p>
+      {!props.compact && props.result.judge && (
+        <div className={styles.judgePanelTrace}>
+          <div>
+            <strong>{props.result.judge.mode === "panel" ? "Judge Panel 聚合" : "Judge 追踪"}</strong>
+            <span>
+              {props.result.judge.memberCount} 个成员 · {props.result.judge.aggregation} · 分歧 {props.result.judge.disagreement.toFixed(2)}
+            </span>
+          </div>
+          {props.result.judge.members.slice(0, 4).map((member) => (
+            <p key={`${props.result.submissionId}-${props.result.metricKey}-${member.judgeId}`}>
+              <b>{member.judgeId}</b>
+              <span>{formatJudgeMemberSummary(member.score, member.passed, member.family, member.comment)}</span>
+            </p>
+          ))}
+        </div>
+      )}
       {props.result.evidence.length > 0 && (
         <div className={styles.explainEvidence}>
           {props.result.evidence.slice(0, props.compact ? 2 : 5).map((item, index) => (
@@ -2745,6 +3205,11 @@ function MetricExplainCard(props: {
       )}
     </article>
   );
+}
+
+function formatJudgeMemberSummary(score: number, passed: boolean, family: string | undefined, comment: string): string {
+  const prefix = `${family ?? "judge"} · ${score.toFixed(1)} 分 · ${passed ? "通过" : "未通过"}`;
+  return `${prefix} · ${comment.slice(0, 120)}`;
 }
 
 function ReadableComparison(props: { expected: unknown; actual: unknown }) {

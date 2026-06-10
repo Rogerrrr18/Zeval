@@ -221,8 +221,10 @@ async function runLlmJudgeEvaluation(input: SingleMetricEvalInput): Promise<Benc
     `{`,
     `  "score": 0-1 之间的数字,`,
     `  "passed": true/false,`,
+    `  "labels": ["missing_evidence", "near_threshold"],`,
     `  "reason": "详细的评估理由",`,
-    `  "evidence": ["证据1", "证据2"]`,
+    `  "evidence": ["证据1", "证据2"],`,
+    `  "dimensions": {"criteria_fit": 0-1, "evidence_grounding": 0-1}`,
     `}`,
   ].join("\n");
 
@@ -260,6 +262,8 @@ async function runLlmJudgeEvaluation(input: SingleMetricEvalInput): Promise<Benc
       reason: String(parsed.reason ?? "LLM 评估完成"),
       evidence: Array.isArray(parsed.evidence) ? parsed.evidence.map(String) : [String(parsed.evidence ?? "")],
       confidence: 0.85,
+      labels: Array.isArray(parsed.labels) ? parsed.labels.map(String).slice(0, 8) : undefined,
+      dimensions: normalizeDimensionScores(parsed.dimensions),
       expected: taskCase.expected,
       actual: submission.parsedOutput,
       needsHumanReview: metric.humanApprovalRequired && !passed,
@@ -318,6 +322,16 @@ function getValueByPath(obj: Record<string, unknown>, path: string): unknown {
 function normalizeScore(score: number, min: number, max: number): number {
   if (max === min) return 1;
   return (score - min) / (max - min);
+}
+
+function normalizeDimensionScores(value: unknown): Record<string, number> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const result: Record<string, number> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    const score = typeof raw === "number" ? raw : Number.parseFloat(String(raw));
+    if (Number.isFinite(score)) result[key] = clamp(score, 0, 1);
+  }
+  return Object.keys(result).length ? result : undefined;
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -42,6 +42,45 @@ export type BenchmarkEvaluatorType =
   | "human_label"
   | "hybrid";
 
+export type BenchmarkTaskType =
+  | "slot_filling"
+  | "tool_use"
+  | "reasoning"
+  | "code"
+  | "dialog_judge"
+  | "classification"
+  | "rag_qa"
+  | "app_agent"
+  | "custom";
+
+export type BenchmarkHarnessKind =
+  | "raw"
+  | "react"
+  | "function_call"
+  | "direct"
+  | "zeval"
+  | "custom";
+
+export type BenchmarkEnvironmentKind =
+  | "dialog"
+  | "rag_qa"
+  | "workspace"
+  | "generic_dataset"
+  | "custom";
+
+export type BenchmarkTargetKind =
+  | "llm"
+  | "http_app"
+  | "agent_framework"
+  | "mock"
+  | "custom";
+
+export type BenchmarkJudgeAggregationMode =
+  | "mean"
+  | "median"
+  | "trimmed_mean"
+  | "majority";
+
 export type BenchmarkRubricApprovalStatus = "candidate" | "approved" | "rejected";
 
 export type BenchmarkScoringScale = {
@@ -169,6 +208,7 @@ export type BenchmarkTaskPackage = {
   inputSchema: Record<string, unknown>;
   outputSchema: Record<string, unknown>;
   rubric: BenchmarkRubricSet;
+  evalDesign?: BenchmarkEvalDesign;
   files?: Array<{
     fileId: string;
     relativePath: string;
@@ -176,6 +216,40 @@ export type BenchmarkTaskPackage = {
     description?: string;
   }>;
   metadata?: Record<string, unknown>;
+};
+
+export type BenchmarkEvalDesign = {
+  philosophy: "eval_anything_aligned";
+  sourceRepo: string;
+  taskType: BenchmarkTaskType;
+  environment: {
+    kind: BenchmarkEnvironmentKind;
+    description: string;
+  };
+  target: {
+    kind: BenchmarkTargetKind;
+    description: string;
+  };
+  harness: {
+    selected: BenchmarkHarnessKind[];
+    baselineRequired: boolean;
+    reasoning: string;
+    maxStepsByHarness?: Partial<Record<BenchmarkHarnessKind, number>>;
+  };
+  judge: {
+    mode: "single" | "panel";
+    recommendedMode: "panel";
+    aggregation: BenchmarkJudgeAggregationMode;
+    requireDiverseFamilies: boolean;
+    disagreementThreshold: number;
+    reviewPolicy: string;
+  };
+  safetyGates: {
+    dryRunRequired: boolean;
+    smallSampleFirst: boolean;
+    humanReviewTriggers: string[];
+  };
+  references: BenchmarkMetricReference[];
 };
 
 export type BenchmarkCase = {
@@ -272,11 +346,24 @@ export type BenchmarkMetricEvaluationResult = {
   reason: string;
   evidence: string[];
   confidence: number;
+  labels?: string[];
+  dimensions?: Record<string, number>;
+  judge?: BenchmarkJudgeTrace;
   expected?: unknown;
   actual?: unknown;
   humanLabel?: BenchmarkHumanLabel;
   needsHumanReview: boolean;
   failureTags: string[];
+};
+
+export type BenchmarkJudgeTrace = {
+  mode: "single" | "panel";
+  aggregation: BenchmarkJudgeAggregationMode;
+  memberCount: number;
+  disagreement: number;
+  disagreementThreshold: number;
+  panelDisagree: boolean;
+  members: BenchmarkLlmJudgeMemberResult[];
 };
 
 export type BenchmarkCapabilityScore = {
@@ -356,8 +443,25 @@ export type BenchmarkDatasetCaseCandidate = {
 
 export type BenchmarkLlmJudgeResult = {
   score: number;
+  passed?: boolean;
   reason: string;
   evidence: string[];
+  confidence: number;
+  labels?: string[];
+  dimensions?: Record<string, number>;
+  judge?: BenchmarkJudgeTrace;
+};
+
+export type BenchmarkLlmJudgeMemberResult = {
+  judgeId: string;
+  model?: BenchmarkModelId;
+  family?: string;
+  score: number;
+  passed: boolean;
+  labels: string[];
+  comment: string;
+  evidence: string[];
+  dimensions: Record<string, number>;
   confidence: number;
 };
 
