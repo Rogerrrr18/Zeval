@@ -5,3 +5,4 @@
 export * from "./eval-skill";
 export * from "./report-skill";
 export * from "./analysis-skill";
+export * from "./autofind-data-skill";

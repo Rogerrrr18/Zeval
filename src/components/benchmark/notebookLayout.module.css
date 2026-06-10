@@ -408,6 +408,66 @@
   letter-spacing: 0.02em;
 }
 
+.copilotTabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid var(--nl-border);
+  border-radius: 8px;
+  background: var(--nl-surface);
+}
+
+.copilotTab,
+.copilotTabActive {
+  min-height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.copilotTab {
+  background: transparent;
+  color: var(--nl-text-muted);
+}
+
+.copilotTabActive {
+  background: var(--nl-accent-soft);
+  color: var(--nl-accent);
+}
+
+.autofindQuickActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.autofindQuickAction {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--nl-border);
+  border-radius: 999px;
+  background: var(--nl-bg-2);
+  color: var(--nl-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.autofindQuickAction:hover:not(:disabled) {
+  border-color: var(--nl-border-hover);
+  color: var(--nl-accent);
+}
+
+.autofindQuickAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .panelTitleGroup {
   display: flex;
   align-items: center;
@@ -820,11 +880,20 @@
 }
 .chatInputArea {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 16px;
   border-top: 1px solid var(--nl-border);
   background: var(--nl-bg-2);
   flex-shrink: 0;
+}
+
+.chatInputArea > textarea {
+  flex: 1 1 180px;
+}
+
+.chatInputArea > .chatSendButton {
+  align-self: flex-end;
 }
 
 .chatInputArea textarea {
@@ -1719,15 +1788,17 @@
 
 .datasetHeader {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 14px;
+  flex-wrap: nowrap;
 }
 
-.datasetHeader div {
+.datasetHeaderIntro {
   display: grid;
   gap: 4px;
   min-width: 0;
+  flex: 1;
 }
 
 .datasetHeader strong {
@@ -1740,6 +1811,15 @@
   color: var(--nl-text-muted);
   font-size: 12px;
   line-height: 1.55;
+}
+
+.datasetHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .datasetUploadButton {
@@ -1764,6 +1844,11 @@
 
 .datasetUploadButton input {
   display: none;
+}
+
+button.datasetUploadButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .datasetSummaryGrid,

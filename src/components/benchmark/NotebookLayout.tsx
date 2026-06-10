@@ -45,6 +45,10 @@ import type {
   BenchmarkWorkspaceSession,
   BenchmarkWorkspaceViewMode,
 } from "@/benchmark/session-store";
+import type {
+  AutoFindRubricContext,
+  AutoFindWorkflowState,
+} from "@/benchmark/agent/skills/autofind-data-skill";
 import type { IngestResponse, UploadFormat } from "@/types/pipeline";
 import { useProject } from "@/components/shell/ProjectContext";
 import { DEFAULT_PROJECT } from "@/lib/projectStore";
@@ -90,6 +94,15 @@ type BenchmarkRubricAgentResponse = {
   error?: string;
 };
 
+type BenchmarkAutoFindResponse = {
+  reply?: string;
+  state?: AutoFindWorkflowState;
+  suggestedActions?: string[];
+  error?: string;
+};
+
+type CopilotTabId = "rubric" | "autofind";
+
 type BenchmarkDataUploadState = "idle" | "uploading" | "ready" | "error";
 
 type BenchmarkAdmitCasesResponse = {
@@ -113,6 +126,13 @@ type BenchmarkAdmitCasesResponse = {
 
 const DEFAULT_COPILOT_TURNS: ChatTurn[] = [
   { kind: "ai", text: "你好，我是 Zeval 评测 Agent。你可以直接告诉我评测任务、业务约束或想调整的评分标准，我会调用工具生成、修改、确认或解释当前 rubric。" },
+];
+
+const DEFAULT_AUTOFIND_TURNS: ChatTurn[] = [
+  {
+    kind: "ai",
+    text: "我是 AutoFind 数据助手。点击「AutoFind」或告诉我「开始搜索」，我会从公开数据集整理 10 正 + 10 负多轮对话，并保存到 public/sample-data。",
+  },
 ];
 
 const SESSION_STORAGE_PREFIX = "zeval:benchmark-sessions";
@@ -520,10 +540,16 @@ export function NotebookLayout() {
   const [resizingRightPanel, setResizingRightPanel] = useState(false);
 
   // ── Copilot chat state ─
+  const [activeCopilotTab, setActiveCopilotTab] = useState<CopilotTabId>("rubric");
   const [copilotInput, setCopilotInput] = useState("");
   const [copilotTurns, setCopilotTurns] = useState<ChatTurn[]>(DEFAULT_COPILOT_TURNS);
   const [copilotRunning, setCopilotRunning] = useState(false);
+  const [autofindInput, setAutofindInput] = useState("");
+  const [autofindTurns, setAutofindTurns] = useState<ChatTurn[]>(DEFAULT_AUTOFIND_TURNS);
+  const [autofindState, setAutofindState] = useState<AutoFindWorkflowState | null>(null);
+  const [autofindRunning, setAutofindRunning] = useState(false);
   const copilotInputRef = useRef<HTMLTextAreaElement>(null);
+  const autofindInputRef = useRef<HTMLTextAreaElement>(null);
   const copilotScrollRef = useRef<HTMLDivElement>(null);
 
   // ── Benchmark state ─
@@ -679,7 +705,7 @@ export function NotebookLayout() {
   useEffect(() => {
     const el = copilotScrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [copilotTurns, copilotRunning]);
+  }, [copilotTurns, copilotRunning, autofindTurns, autofindRunning, activeCopilotTab]);
 
   useEffect(() => {
     if (!resizingRightPanel) return;
@@ -862,7 +888,195 @@ export function NotebookLayout() {
     }
   }
 
+  /**
+   * 将 CSV 文本通过 ingest 流程加载为当前评测数据集。
+   *
+   * @param csvText CSV 正文。
+   * @param fileName 展示用文件名。
+   */
+  async function applyDatasetFromCsv(csvText: string, fileName: string) {
+    setDataUploadState("uploading");
+    setDataUploadError("");
+    setRunResult(null);
+    setProgress(null);
+    setRunHistory([]);
+    setRunError("");
+    try {
+      const response = await fetch("/api/ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: csvText, format: "csv", fileName }),
+      });
+      const result = (await response.json()) as Partial<IngestResponse> & { error?: string };
+      if (!response.ok || !result.rawRows?.length || !result.ingestMeta) {
+        throw new Error(result.error ?? "AutoFind 数据加载失败。");
+      }
+      setDataset({
+        fileName: result.fileName ?? fileName,
+        format: "csv",
+        rawRows: result.rawRows,
+        previewTop20: result.previewTop20 ?? [],
+        ingestMeta: result.ingestMeta,
+        structuredTaskMetrics: result.structuredTaskMetrics,
+        warnings: result.warnings ?? [],
+        uploadedAt: new Date().toISOString(),
+      });
+      setDataUploadState("ready");
+    } catch (error) {
+      setDataset(null);
+      setDataUploadState("error");
+      setDataUploadError(error instanceof Error ? error.message : "AutoFind 数据加载失败");
+      throw error;
+    }
+  }
+
+  /**
+   * 组装 AutoFind 所需的 rubric 参考上下文。
+   *
+   * @returns 需求、评分标准生成对话与 rubric 摘要。
+   */
+  const buildAutoFindRubricContext = useCallback((): AutoFindRubricContext => {
+    const rubricDialogue = copilotTurns
+      .filter((turn): turn is Extract<ChatTurn, { kind: "user" | "ai" }> => turn.kind === "user" || turn.kind === "ai")
+      .map((turn) => ({
+        role: turn.kind === "user" ? ("user" as const) : ("assistant" as const),
+        text: turn.text.trim(),
+      }))
+      .filter((turn) => turn.text.length > 0)
+      .filter((turn, index) => {
+        if (
+          index === 0 &&
+          turn.role === "assistant" &&
+          turn.text === DEFAULT_COPILOT_TURNS[0]?.text
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+    const metrics = rubric?.modules.flatMap((module) => module.metrics) ?? [];
+    const approvedMetrics = metrics.filter((metric) => metric.approvalStatus === "approved");
+
+    return {
+      requirementText: requirement.trim(),
+      rubricDialogue,
+      rubricTitle: rubric?.title,
+      rubricDescription: rubric?.description,
+      rubricMetrics: (approvedMetrics.length > 0 ? approvedMetrics : metrics).map(
+        (metric) => metric.displayName,
+      ),
+    };
+  }, [copilotTurns, requirement, rubric]);
+
+  /**
+   * 打开 AutoFind 标签并启动数据工作流。
+   */
+  const handleAutoFindStart = useCallback(async () => {
+    setRightOpen(true);
+    setActiveCopilotTab("autofind");
+    setAutofindRunning(true);
+    const rubricContext = buildAutoFindRubricContext();
+    try {
+      const response = await fetch("/api/benchmarks/autofind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "start",
+          requirementText: requirement,
+          rubricContext,
+          state: autofindState,
+        }),
+      });
+      const data = (await response.json()) as BenchmarkAutoFindResponse;
+      if (!response.ok || data.error) {
+        throw new Error(data.error ?? "AutoFind 启动失败");
+      }
+      if (data.state) setAutofindState(data.state);
+      if (data.reply) {
+        setAutofindTurns((prev) => [...prev, { kind: "ai", text: data.reply! }]);
+      }
+    } catch (error) {
+      setAutofindTurns((prev) => [
+        ...prev,
+        { kind: "error", text: error instanceof Error ? error.message : "AutoFind 启动失败" },
+      ]);
+    } finally {
+      setAutofindRunning(false);
+    }
+  }, [autofindState, buildAutoFindRubricContext, requirement]);
+
+  /**
+   * 向 AutoFind 工作流发送用户消息或快捷动作。
+   *
+   * @param message 用户输入；为空时使用输入框内容。
+   */
+  const sendAutoFind = useCallback(
+    async (message?: string) => {
+      const text = (message ?? autofindInput).trim();
+      if (!text || autofindRunning) return;
+
+      setAutofindTurns((prev) => [...prev, { kind: "user", text }]);
+      setAutofindInput("");
+      setAutofindRunning(true);
+
+      try {
+        const action =
+          /开始|搜索|检索|find|search/i.test(text) ? "search"
+          : /保存|save/i.test(text) ? "save"
+          : "chat";
+
+        const response = await fetch("/api/benchmarks/autofind", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            message: text,
+            requirementText: requirement,
+            rubricContext: buildAutoFindRubricContext(),
+            state: autofindState,
+          }),
+        });
+        const data = (await response.json()) as BenchmarkAutoFindResponse;
+        if (!response.ok || data.error) {
+          throw new Error(data.error ?? "AutoFind 调用失败");
+        }
+        if (data.state) setAutofindState(data.state);
+
+        if (/应用|加载|导入|apply/i.test(text) && data.state?.csvText) {
+          const fileName = data.state.fileName ?? "companion-autofind-20sessions.csv";
+          if (data.state.phase !== "saved") {
+            await fetch("/api/benchmarks/autofind", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "save", state: data.state }),
+            });
+          }
+          await applyDatasetFromCsv(data.state.csvText, fileName);
+          setAutofindTurns((prev) => [
+            ...prev,
+            {
+              kind: "ai",
+              text: `${data.reply ?? "已应用数据集。"}\n\n已加载到评测数据区，可直接开始评测。`,
+            },
+          ]);
+          return;
+        }
+
+        setAutofindTurns((prev) => [...prev, { kind: "ai", text: data.reply ?? "已处理。" }]);
+      } catch (error) {
+        setAutofindTurns((prev) => [
+          ...prev,
+          { kind: "error", text: error instanceof Error ? error.message : "AutoFind 请求失败" },
+        ]);
+      } finally {
+        setAutofindRunning(false);
+      }
+    },
+    [autofindInput, autofindRunning, autofindState, buildAutoFindRubricContext, requirement],
+  );
+
   async function handleRunBenchmark(resumeRunId?: string) {
+    const safeResumeRunId = typeof resumeRunId === "string" ? resumeRunId : undefined;
     if (!rubric) {
       setRunError("请先生成评分标准。");
       setViewMode("progress");
@@ -898,7 +1112,7 @@ export function NotebookLayout() {
           requirementText: requirement,
           rubric,
           dataset,
-          resumeRunId,
+          resumeRunId: safeResumeRunId,
         }),
       });
       const data = (await response.json()) as StartBenchmarkRunResponse;
@@ -1213,6 +1427,7 @@ export function NotebookLayout() {
                 dataUploadState={dataUploadState}
                 dataUploadError={dataUploadError || runError}
                 onDatasetFile={handleBenchmarkDataFile}
+                onAutoFind={handleAutoFindStart}
               />
             )}
             {viewMode === "progress" && (
@@ -1261,64 +1476,150 @@ export function NotebookLayout() {
         >
           <div className={styles.panelHeader}>
             <h3>助手</h3>
+            <div className={styles.copilotTabs}>
+              <button
+                type="button"
+                className={activeCopilotTab === "rubric" ? styles.copilotTabActive : styles.copilotTab}
+                onClick={() => setActiveCopilotTab("rubric")}
+              >
+                Rubric
+              </button>
+              <button
+                type="button"
+                className={activeCopilotTab === "autofind" ? styles.copilotTabActive : styles.copilotTab}
+                onClick={() => setActiveCopilotTab("autofind")}
+              >
+                AutoFind
+              </button>
+            </div>
           </div>
 
           <div className={styles.chatMessages} ref={copilotScrollRef}>
-            {requirement.trim() ? (
-              <div className={styles.requirementCard}>
-                <span>最初需求</span>
-                <p>{requirement.trim()}</p>
-              </div>
-            ) : null}
-            {copilotTurns.map((turn, i) => (
-              <div
-                key={i}
-                className={`${styles.chatBubble} ${
-                  turn.kind === "user"
-                    ? styles.chatBubbleUser
-                    : turn.kind === "error"
-                      ? styles.chatBubbleError
-                      : styles.chatBubbleAi
-                }`}
-              >
-                {turn.kind === "user" ? (
-                  turn.text
-                ) : (
-                  <MarkdownMessage text={turn.text} />
+            {activeCopilotTab === "rubric" ? (
+              <>
+                {requirement.trim() ? (
+                  <div className={styles.requirementCard}>
+                    <span>最初需求</span>
+                    <p>{requirement.trim()}</p>
+                  </div>
+                ) : null}
+                {copilotTurns.map((turn, i) => (
+                  <div
+                    key={`rubric-${i}`}
+                    className={`${styles.chatBubble} ${
+                      turn.kind === "user"
+                        ? styles.chatBubbleUser
+                        : turn.kind === "error"
+                          ? styles.chatBubbleError
+                          : styles.chatBubbleAi
+                    }`}
+                  >
+                    {turn.kind === "user" ? turn.text : <MarkdownMessage text={turn.text} />}
+                  </div>
+                ))}
+                {copilotRunning && (
+                  <div className={styles.chatBubbleAi}>
+                    <div className={styles.typingIndicator}>
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  </div>
                 )}
-              </div>
-            ))}
-            {copilotRunning && (
-              <div className={styles.chatBubbleAi}>
-                <div className={styles.typingIndicator}>
-                  <span />
-                  <span />
-                  <span />
+              </>
+            ) : (
+              <>
+                <div className={styles.requirementCard}>
+                  <span>AutoFind 工作流</span>
+                  <p>10 正样本 + 10 负样本 · 保存至 public/sample-data</p>
                 </div>
-              </div>
+                {autofindTurns.map((turn, i) => (
+                  <div
+                    key={`autofind-${i}`}
+                    className={`${styles.chatBubble} ${
+                      turn.kind === "user"
+                        ? styles.chatBubbleUser
+                        : turn.kind === "error"
+                          ? styles.chatBubbleError
+                          : styles.chatBubbleAi
+                    }`}
+                  >
+                    {turn.kind === "user" ? turn.text : <MarkdownMessage text={turn.text} />}
+                  </div>
+                ))}
+                {autofindRunning && (
+                  <div className={styles.chatBubbleAi}>
+                    <div className={styles.typingIndicator}>
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           <div className={styles.chatInputArea}>
-            <textarea
-              ref={copilotInputRef}
-              value={copilotInput}
-              onChange={(e) => setCopilotInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  sendCopilot();
-                }
-              }}
-              rows={1}
-            />
-            <button
-              onClick={sendCopilot}
-              disabled={!copilotInput.trim() || copilotRunning}
-              className={styles.chatSendButton}
-            >
-              ➤
-            </button>
+            {activeCopilotTab === "autofind" ? (
+              <>
+                <div className={styles.autofindQuickActions}>
+                  {["开始搜索", "保存", "应用"].map((action) => (
+                    <button
+                      key={action}
+                      type="button"
+                      className={styles.autofindQuickAction}
+                      disabled={autofindRunning}
+                      onClick={() => void sendAutoFind(action)}
+                    >
+                      {action}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  ref={autofindInputRef}
+                  value={autofindInput}
+                  onChange={(e) => setAutofindInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      void sendAutoFind();
+                    }
+                  }}
+                  rows={1}
+                  placeholder="输入指令或补充检索条件…"
+                />
+                <button
+                  onClick={() => void sendAutoFind()}
+                  disabled={!autofindInput.trim() || autofindRunning}
+                  className={styles.chatSendButton}
+                >
+                  ➤
+                </button>
+              </>
+            ) : (
+              <>
+                <textarea
+                  ref={copilotInputRef}
+                  value={copilotInput}
+                  onChange={(e) => setCopilotInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      sendCopilot();
+                    }
+                  }}
+                  rows={1}
+                />
+                <button
+                  onClick={sendCopilot}
+                  disabled={!copilotInput.trim() || copilotRunning}
+                  className={styles.chatSendButton}
+                >
+                  ➤
+                </button>
+              </>
+            )}
           </div>
         </aside>
       </div>
@@ -1478,6 +1779,7 @@ function RubricWorkspace(props: {
   dataUploadState: BenchmarkDataUploadState;
   dataUploadError: string;
   onDatasetFile: (file: File) => void | Promise<void>;
+  onAutoFind: () => void | Promise<void>;
 }) {
   const [drafting, setDrafting] = useState(false);
   const [highlightedMetricKey, setHighlightedMetricKey] = useState<string | null>(null);
@@ -1656,10 +1958,15 @@ function RubricWorkspace(props: {
             error={props.dataUploadError}
             approvedMetricCount={approvedMetrics.length}
             onDatasetFile={props.onDatasetFile}
+            onAutoFind={props.onAutoFind}
           />
 
           <div className={styles.rubricActions}>
-            <button className={styles.workspaceButton} onClick={props.onRun} disabled={approvedMetrics.length === 0 || !props.dataset?.rawRows.length}>
+            <button
+              className={styles.workspaceButton}
+              onClick={() => void props.onRun()}
+              disabled={approvedMetrics.length === 0 || !props.dataset?.rawRows.length}
+            >
               开始评测
             </button>
           </div>
@@ -1675,6 +1982,7 @@ function BenchmarkDatasetPanel(props: {
   error: string;
   approvedMetricCount: number;
   onDatasetFile: (file: File) => void | Promise<void>;
+  onAutoFind: () => void | Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const redaction = props.dataset?.ingestMeta.piiRedaction;
@@ -1695,20 +2003,31 @@ function BenchmarkDatasetPanel(props: {
   return (
     <div className={styles.datasetPanel}>
       <div className={styles.datasetHeader}>
-        <div>
+        <div className={styles.datasetHeaderIntro}>
           <strong>评测数据</strong>
           <span>确认指标框架后上传数据，系统会复用字段对齐、清洗、脱敏和样本切分流程。</span>
         </div>
-        <label className={styles.datasetUploadButton}>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".csv,.json,.jsonl,.txt,.md"
-            onChange={handleInputChange}
+        <div className={styles.datasetHeaderActions}>
+          <button
+            type="button"
+            className={styles.datasetUploadButton}
+            onClick={() => void props.onAutoFind()}
             disabled={props.uploadState === "uploading"}
-          />
-          {props.uploadState === "uploading" ? "清洗中..." : props.dataset ? "重新上传" : "上传数据"}
-        </label>
+            title="在右侧 AutoFind 标签中自动检索 10 正 + 10 负样本"
+          >
+            AutoFind
+          </button>
+          <label className={styles.datasetUploadButton}>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".csv,.json,.jsonl,.txt,.md"
+              onChange={handleInputChange}
+              disabled={props.uploadState === "uploading"}
+            />
+            {props.uploadState === "uploading" ? "清洗中..." : props.dataset ? "重新上传" : "上传数据"}
+          </label>
+        </div>
       </div>
 
       {props.dataset ? (

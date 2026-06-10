@@ -3,6 +3,8 @@
 **Zeval** is an AI conversation quality evaluation workbench.  
 Upload chatlog files, run objective + LLM-judge subjective metrics, harvest bad cases into a dataset pool, and generate remediation skill bundles — all from a browser UI **or a terminal CLI**.
 
+> 中文文档：[README-zh.md](README-zh.md)
+
 ```
 chatlog file
     │
