@@ -1,0 +1,50 @@
+[
+  {
+    "issue_area": "Orders",
+    "conversation": "Agent: Thank you for contacting support. How can I help?\n\nCustomer: My Shopify order has not shipped yet.\n\nAgent: I can check fulfillment status for you.\n\nCustomer: It has been five days.\n\nAgent: I see a warehouse delay and will expedite shipping."
+  },
+  {
+    "issue_area": "Returns",
+    "conversation": "Agent: Hello, this is customer service.\n\nCustomer: I want to return a damaged product.\n\nAgent: I'm sorry about the damage.\n\nCustomer: Can I get a refund instead of exchange?\n\nAgent: Yes, I can process a full refund once photos are uploaded."
+  },
+  {
+    "issue_area": "Billing",
+    "conversation": "Agent: Thanks for reaching out about billing.\n\nCustomer: I was charged twice for the same subscription.\n\nAgent: I can review duplicate charges on your account.\n\nCustomer: Please refund the extra payment today.\n\nAgent: The duplicate charge refund has been initiated."
+  },
+  {
+    "issue_area": "Shipping",
+    "conversation": "Agent: How may I assist with shipping?\n\nCustomer: My international parcel is stuck in customs.\n\nAgent: Customs inspections can take several days.\n\nCustomer: Can you provide an updated ETA?\n\nAgent: The carrier estimates delivery within two business days."
+  },
+  {
+    "issue_area": "Account",
+    "conversation": "Agent: I can help with account access.\n\nCustomer: I cannot log in to track my order.\n\nAgent: Let's verify your email and reset the password.\n\nCustomer: I never received the verification code.\n\nAgent: I resent the code to your registered email."
+  },
+  {
+    "issue_area": "Product",
+    "conversation": "Agent: Product support here.\n\nCustomer: The item description does not match what I received.\n\nAgent: I apologize for the mismatch.\n\nCustomer: I need the correct variant shipped.\n\nAgent: I'll arrange a replacement with the correct SKU."
+  },
+  {
+    "issue_area": "Warranty",
+    "conversation": "Agent: Warranty team speaking.\n\nCustomer: My device stopped working after one month.\n\nAgent: It is still under warranty coverage.\n\nCustomer: How do I start a claim?\n\nAgent: Submit serial number and purchase invoice online."
+  },
+  {
+    "issue_area": "Promotions",
+    "conversation": "Agent: I can help with promotions.\n\nCustomer: My discount code failed at checkout.\n\nAgent: The code expired yesterday.\n\nCustomer: Can you issue a new one?\n\nAgent: I created a one-time replacement coupon for you."
+  },
+  {
+    "issue_area": "Cancellation",
+    "conversation": "Agent: Order cancellation support.\n\nCustomer: Please cancel order #991 before shipment.\n\nAgent: The order is still processing.\n\nCustomer: I ordered the wrong size.\n\nAgent: Cancellation completed successfully."
+  },
+  {
+    "issue_area": "Escalation",
+    "conversation": "Agent: I'm here to help.\n\nCustomer: I need a human agent for a complex refund case.\n\nAgent: I understand and will escalate this ticket.\n\nCustomer: The automated replies were not helpful.\n\nAgent: A senior specialist will continue this chat."
+  },
+  {
+    "issue_area": "Inventory",
+    "conversation": "Agent: Inventory support.\n\nCustomer: When will this product be back in stock?\n\nAgent: Restock is scheduled next week.\n\nCustomer: Can you notify me by email?\n\nAgent: Back-in-stock alerts are now enabled."
+  },
+  {
+    "issue_area": "Tracking",
+    "conversation": "Agent: Tracking assistance.\n\nCustomer: Tracking says delivered but I got nothing.\n\nAgent: I'll open a carrier investigation.\n\nCustomer: Please reship if the package is lost.\n\nAgent: A reshipment will be arranged after investigation."
+  }
+]

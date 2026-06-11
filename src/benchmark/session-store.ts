@@ -4,6 +4,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { AutoFindWorkflowState } from "@/benchmark/agent/skills/autofind-data-skill";
 import type { BenchmarkRubricSet } from "@/benchmark/types";
 import type { BenchmarkProgressSnapshot } from "@/benchmark/progress";
 import type { BenchmarkRunResult } from "@/benchmark/types";
@@ -71,6 +72,8 @@ export type BenchmarkWorkspaceSession = {
   id: string;
   projectId: string;
   title: string;
+  /** When true, UI keeps the user-provided title instead of auto-syncing from rubric/requirement. */
+  titleManuallySet?: boolean;
   description: string;
   createdAt: string;
   updatedAt: string;
@@ -85,6 +88,8 @@ export type BenchmarkWorkspaceSession = {
   progress?: BenchmarkProgressSnapshot | null;
   runHistory?: BenchmarkRunHistoryItem[];
   humanReviewRecords?: BenchmarkHumanReviewRecord[];
+  autofindState?: AutoFindWorkflowState | null;
+  autofindTurns?: BenchmarkChatTurn[];
 };
 
 export type BenchmarkWorkspaceSessionIndex = {

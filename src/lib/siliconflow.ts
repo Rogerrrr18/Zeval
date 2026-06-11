@@ -46,6 +46,10 @@ type SiliconFlowLogContext = {
   seed?: number;
   /** Provider-specific request extensions, for example search/deep-research flags. */
   providerOptions?: Record<string, unknown>;
+  /** Override default max output tokens for long JSON stages such as rubric draft. */
+  maxTokens?: number;
+  /** Override default request timeout in milliseconds. */
+  timeoutMs?: number;
 };
 
 /**
@@ -83,7 +87,8 @@ export async function requestSiliconFlowChatCompletion(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), DEFAULT_LLM_TIMEOUT_MS);
+    const timeoutMs = context.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS;
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
     const providerVariant =
       providerRequestVariants[(attempt - 1) % providerRequestVariants.length] ?? {
         model: modelVariants[0] ?? config.model,
@@ -112,7 +117,7 @@ export async function requestSiliconFlowChatCompletion(
         stream: true,
         temperature: context.temperature ?? ZEVAL_JUDGE_TEMPERATURE,
         top_p: ZEVAL_JUDGE_TOP_P,
-        max_tokens: ZEVAL_JUDGE_MAX_TOKENS,
+        max_tokens: context.maxTokens ?? ZEVAL_JUDGE_MAX_TOKENS,
         ...(jsonModeEnabled ? { response_format: { type: "json_object" } } : {}),
         ...(context.providerOptions ?? {}),
       };
@@ -205,7 +210,7 @@ export async function requestSiliconFlowChatCompletion(
  * @returns Parsed JSON object.
  */
 export function parseJsonObjectFromLlmOutput(value: string): unknown {
-  const normalized = value.trim();
+  const normalized = stripMarkdownCodeFence(value.trim());
   try {
     return JSON.parse(normalized);
   } catch {
@@ -222,6 +227,17 @@ export function parseJsonObjectFromLlmOutput(value: string): unknown {
  * @param value Raw model output that may include extra text after JSON.
  * @returns First complete JSON object string, or null when absent.
  */
+/**
+ * Remove optional Markdown code fences around model JSON output.
+ *
+ * @param value Raw model output.
+ * @returns Fence-stripped text.
+ */
+function stripMarkdownCodeFence(value: string): string {
+  const fenced = value.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fenced?.[1]?.trim() ?? value;
+}
+
 function extractFirstBalancedJsonObject(value: string): string | null {
   const start = value.indexOf("{");
   if (start < 0) {

@@ -1,0 +1,24 @@
+{"category":"refund","input":"Can I return this Shopify order?","output":"Yes, returns are accepted within 30 days with invoice attached."}
+{"category":"refund","input":"The package arrived damaged.","output":"I'm sorry about that. I can arrange a replacement or full refund immediately."}
+{"category":"shipping","input":"Why is my international order delayed?","output":"Cross-border customs checks can add 3-5 business days to delivery."}
+{"category":"shipping","input":"Can you upgrade shipping to express?","output":"I can upgrade shipping if the order has not left the warehouse yet."}
+{"category":"billing","input":"I was charged twice for the same item.","output":"I see duplicate charges and will refund the extra payment today."}
+{"category":"billing","input":"Please send me the invoice by email.","output":"I've emailed the invoice PDF to your registered address."}
+{"category":"product","input":"This SKU does not match the product page description.","output":"Thanks for flagging that. I'll verify listing details and correct the mismatch."}
+{"category":"product","input":"Do you have this item in size M?","output":"Size M is in stock and can ship within 24 hours."}
+{"category":"agent","input":"I want to speak to a human about my refund.","output":"I'll transfer you to a senior agent who can review the refund case."}
+{"category":"agent","input":"Your bot keeps repeating the same answer.","output":"I understand the frustration. A live specialist will continue this conversation."}
+{"category":"warranty","input":"Is warranty included for electronics?","output":"Yes, electronics include a 12-month manufacturer warranty."}
+{"category":"warranty","input":"How do I file a warranty claim?","output":"Submit the serial number, invoice, and issue photos through the support form."}
+{"category":"account","input":"I cannot log into my customer account.","output":"Let's reset your password and verify your email address."}
+{"category":"account","input":"The verification code never arrived.","output":"I resent the code and confirmed your email spelling is correct."}
+{"category":"promo","input":"My coupon code is not applying at checkout.","output":"The coupon expired yesterday, but I can issue a one-time replacement code."}
+{"category":"promo","input":"Can I combine two discount codes?","output":"Only one promotion can be applied per order on Shopify checkout."}
+{"category":"cancel","input":"Please cancel order #5521 before it ships.","output":"Order #5521 is still processing and I cancelled it successfully."}
+{"category":"cancel","input":"I ordered the wrong color by mistake.","output":"No problem. I cancelled the order so you can place a corrected one."}
+{"category":"stock","input":"When will this item be back in stock?","output":"Restock is expected next Tuesday based on supplier updates."}
+{"category":"stock","input":"Can you notify me when it is available?","output":"I've enabled back-in-stock alerts for your account email."}
+{"category":"support","input":"How do I track my replacement shipment?","output":"Here is the tracking link for your replacement package."}
+{"category":"support","input":"The tracking page shows delivered but I received nothing.","output":"I'll open a carrier investigation and arrange a reshipment if needed."}
+{"category":"policy","input":"What is your return policy for opened items?","output":"Opened items can be returned if unused and include all accessories."}
+{"category":"policy","input":"Do you offer price matching?","output":"We match authorized retailer prices within 7 days of purchase."}

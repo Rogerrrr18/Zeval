@@ -132,8 +132,10 @@ const METRIC_W = 138;
 const METRIC_H = 50;
 const MODULE_W = 154;
 const MODULE_H = 40;
-const ROOT_W = 192;
+const ROOT_MIN_W = 192;
+const ROOT_MAX_W = 520;
 const ROOT_H = 46;
+const ROOT_PAD_X = 28;
 const EVAL_R = 5; // evaluator dot radius
 const MIN_ZOOM = 0.75;
 const MAX_ZOOM = 2;
@@ -141,6 +143,52 @@ const ZOOM_STEP = 0.125;
 
 function clampZoom(value: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
+}
+
+/**
+ * Build a stable module node id. Capability alone is not unique because LLM
+ * drafts may emit multiple modules under the same capability dimension.
+ */
+function moduleNodeId(moduleIndex: number): string {
+  return `mod-${moduleIndex}`;
+}
+
+/**
+ * Build a stable metric position key scoped to its parent module index.
+ */
+function metricPositionKey(moduleIndex: number, metricKey: string): string {
+  return `${moduleIndex}:${metricKey}`;
+}
+
+/**
+ * Estimate rendered text width for SVG labels (no DOM measurement).
+ *
+ * @param text Label text.
+ * @param fontSize Font size in px.
+ * @returns Approximate width in px.
+ */
+function estimateTextWidth(text: string, fontSize: number): number {
+  let width = 0;
+  for (const char of text) {
+    width += /[\u3400-\u9fff]/.test(char) ? fontSize : fontSize * 0.58;
+  }
+  return width;
+}
+
+/**
+ * Compute adaptive root node size from title and subtitle.
+ *
+ * @param label Root title.
+ * @param sublabel Root subtitle.
+ * @returns Width/height for the root rectangle.
+ */
+function measureRootNodeSize(label: string, sublabel: string): { width: number; height: number } {
+  const labelWidth = estimateTextWidth(label, 12);
+  const sublabelWidth = sublabel ? estimateTextWidth(sublabel, 9) : 0;
+  const contentWidth = Math.max(labelWidth, sublabelWidth);
+  const width = Math.min(ROOT_MAX_W, Math.max(ROOT_MIN_W, Math.ceil(contentWidth + ROOT_PAD_X)));
+
+  return { width, height: ROOT_H };
 }
 
 /* ── Layout engine ──────────────────────────────────────────────────── */
@@ -155,8 +203,9 @@ function computeLayout(
   const edges: GraphEdge[] = [];
 
   // --- Layer 3 (bottom): Metrics ---
-  // Collect all metrics into groups by module
-  const moduleGroups = rubric.modules.map((mod) => ({
+  // Collect all metrics into groups by module (index-scoped; capability may repeat)
+  const moduleGroups = rubric.modules.map((mod, moduleIndex) => ({
+    moduleIndex,
     module: mod,
     metrics: mod.metrics,
     groupWidth: mod.metrics.length * METRIC_W + Math.max(0, mod.metrics.length - 1) * M,
@@ -166,33 +215,36 @@ function computeLayout(
   let cursorX = 0;
   const metricPositions: Record<string, { x: number; y: number }> = {};
 
-  moduleGroups.forEach((g) => {
-    g.metrics.forEach((metric, i) => {
-      const x = cursorX + i * (METRIC_W + M);
+  moduleGroups.forEach((group) => {
+    group.metrics.forEach((metric, metricIndex) => {
+      const x = cursorX + metricIndex * (METRIC_W + M);
       const y = 0; // bottom layer baseline (will shift later)
-      metricPositions[metric.metricKey] = { x, y };
+      metricPositions[metricPositionKey(group.moduleIndex, metric.metricKey)] = { x, y };
     });
-    cursorX += g.groupWidth + M * 2; // gap between module groups
+    cursorX += group.groupWidth + M * 2; // gap between module groups
   });
 
   const totalMetricsWidth = cursorX - M * 2; // remove trailing gap
 
   // --- Layer 2: Modules ---
   // Center each module above its metrics group
-  const modulePositions: Record<string, { x: number; y: number }> = {};
+  const modulePositions: Record<number, { x: number; y: number }> = {};
   let groupCursor = 0;
 
-  moduleGroups.forEach((g) => {
-    const groupW = g.groupWidth;
+  moduleGroups.forEach((group) => {
+    const groupW = group.groupWidth;
     const modX = groupCursor + groupW / 2 - MODULE_W / 2;
     const modY = -(LAYER_GAP + MODULE_H);
-    modulePositions[g.module.capability] = { x: modX, y: modY };
+    modulePositions[group.moduleIndex] = { x: modX, y: modY };
     groupCursor += groupW + M * 2;
   });
 
   // --- Layer 1: Root ---
-  const rootX = totalMetricsWidth / 2 - ROOT_W / 2;
-  const rootY = -(LAYER_GAP + MODULE_H) - (LAYER_GAP + ROOT_H);
+  const rootLabel = hasChineseText(rubric.title) ? rubric.title : "评测任务评分标准";
+  const rootSublabel = `${rubric.modules.length} 个能力维度 · ${rubric.modules.reduce((s, m) => s + m.metrics.length, 0)} 项指标`;
+  const rootSize = measureRootNodeSize(rootLabel, rootSublabel);
+  const rootX = totalMetricsWidth / 2 - rootSize.width / 2;
+  const rootY = -(LAYER_GAP + MODULE_H) - (LAYER_GAP + rootSize.height);
 
   // --- Build nodes (top to bottom order for proper z-index feel) ---
 
@@ -200,19 +252,20 @@ function computeLayout(
   nodes.push({
     id: "root",
     type: "root",
-    label: hasChineseText(rubric.title) ? rubric.title : "评测任务评分标准",
-    sublabel: `${rubric.modules.length} 个能力维度 · ${rubric.modules.reduce((s, m) => s + m.metrics.length, 0)} 项指标`,
+    label: rootLabel,
+    sublabel: rootSublabel,
     x: rootX,
     y: rootY,
-    width: ROOT_W,
-    height: ROOT_H,
+    width: rootSize.width,
+    height: rootSize.height,
   });
 
   // Modules
-  rubric.modules.forEach((mod) => {
-    const pos = modulePositions[mod.capability];
+  rubric.modules.forEach((mod, moduleIndex) => {
+    const pos = modulePositions[moduleIndex];
+    const modId = moduleNodeId(moduleIndex);
     nodes.push({
-      id: `mod-${mod.capability}`,
+      id: modId,
       type: "module",
       label: capabilityDisplayName(mod),
       sublabel: `权重 ${mod.weight}`,
@@ -222,13 +275,14 @@ function computeLayout(
       height: MODULE_H,
       module: mod,
     });
-    edges.push({ from: "root", to: `mod-${mod.capability}` });
+    edges.push({ from: "root", to: modId });
   });
 
   // Metrics + Evaluators
-  rubric.modules.forEach((mod) => {
+  rubric.modules.forEach((mod, moduleIndex) => {
+    const modId = moduleNodeId(moduleIndex);
     mod.metrics.forEach((metric) => {
-      const pos = metricPositions[metric.metricKey];
+      const pos = metricPositions[metricPositionKey(moduleIndex, metric.metricKey)];
 
       let status: GraphNode["status"] = "unreviewed";
       if (highlightedKey === metric.metricKey) status = "highlighted";
@@ -247,7 +301,7 @@ function computeLayout(
         metric,
         status,
       });
-      edges.push({ from: `mod-${mod.capability}`, to: `metric-${metric.metricKey}` });
+      edges.push({ from: modId, to: `metric-${metric.metricKey}` });
 
       // Evaluator dot below metric
       nodes.push({

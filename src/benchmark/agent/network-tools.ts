@@ -8,6 +8,7 @@
  */
 
 import type { AgentToolHandler, AgentToolRegistry, AgentToolResult, AgentToolSchema } from "./types";
+import { unwrapRedirectUrl } from "./url-utils";
 
 // ───────────────────────────────────────────────
 // Schema 定义
@@ -106,9 +107,9 @@ const webSearchHandler: AgentToolHandler = async (args) => {
     let match: RegExpExecArray | null;
     const titles: Array<{ url: string; title: string }> = [];
     while ((match = resultPattern.exec(html)) !== null && titles.length < limit) {
-      const url = match[1].replace(/^\/l\?\?.*?uddg=/, "").replace(/&rut=.*$/, "");
+      const url = unwrapRedirectUrl(match[1]);
       const title = stripHtml(match[2]);
-      titles.push({ url: decodeURIComponent(url), title });
+      titles.push({ url, title });
     }
 
     const snippets: string[] = [];

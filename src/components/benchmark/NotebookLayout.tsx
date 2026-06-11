@@ -132,7 +132,7 @@ const DEFAULT_COPILOT_TURNS: ChatTurn[] = [
 const DEFAULT_AUTOFIND_TURNS: ChatTurn[] = [
   {
     kind: "ai",
-    text: "我是 AutoFind 数据助手。点击「AutoFind」或告诉我「开始搜索」，我会从公开数据集整理 10 正 + 10 负多轮对话，并保存到 public/sample-data。",
+    text: "我是 AutoFind 数据助手。我会调用模型根据你的评测需求生成检索词、选择公开数据集，并整理 10 正 + 10 负多轮对话。回复「开始搜索」或点击下方快捷操作即可。",
   },
 ];
 
@@ -377,6 +377,7 @@ function createBenchmarkSession(projectId: string): BenchmarkSession {
     id: `bm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     projectId,
     title: "新评测任务",
+    titleManuallySet: false,
     description: "尚未生成评分标准",
     createdAt: now,
     updatedAt: now,
@@ -391,6 +392,8 @@ function createBenchmarkSession(projectId: string): BenchmarkSession {
     progress: null,
     runHistory: [],
     humanReviewRecords: [],
+    autofindState: null,
+    autofindTurns: [...DEFAULT_AUTOFIND_TURNS],
   };
 }
 
@@ -408,6 +411,7 @@ function readBenchmarkSessions(projectId: string): BenchmarkSession[] {
         ...session,
         projectId,
         title: session.title === "新评测会话" ? "新评测任务" : session.title,
+        titleManuallySet: session.titleManuallySet ?? false,
         rubric: session.rubric ? localizeRubricForDisplay(session.rubric) : null,
         dataset: session.dataset ?? null,
         runResult: session.runResult ?? session.runHistory?.[0]?.result ?? null,
@@ -418,6 +422,11 @@ function readBenchmarkSessions(projectId: string): BenchmarkSession[] {
           ? session.copilotTurns
           : [...DEFAULT_COPILOT_TURNS],
         viewMode: session.viewMode ?? "rubric",
+        autofindState: session.autofindState ?? null,
+        autofindTurns:
+          Array.isArray(session.autofindTurns) && session.autofindTurns.length > 0
+            ? session.autofindTurns
+            : [...DEFAULT_AUTOFIND_TURNS],
       }));
   } catch {
     return [];
@@ -449,6 +458,7 @@ async function fetchRemoteBenchmarkSessions(projectId: string): Promise<{
         ? payload.sessions.map((session) => ({
             ...session,
             title: session.title === "新评测会话" ? "新评测任务" : session.title,
+            titleManuallySet: session.titleManuallySet ?? false,
             rubric: session.rubric ? localizeRubricForDisplay(session.rubric) : null,
             dataset: session.dataset ?? null,
             runResult: session.runResult ?? session.runHistory?.[0]?.result ?? null,
@@ -456,6 +466,11 @@ async function fetchRemoteBenchmarkSessions(projectId: string): Promise<{
             runHistory: session.runHistory ?? [],
             humanReviewRecords: session.humanReviewRecords ?? [],
             viewMode: session.viewMode ?? "rubric",
+            autofindState: session.autofindState ?? null,
+            autofindTurns:
+              Array.isArray(session.autofindTurns) && session.autofindTurns.length > 0
+                ? session.autofindTurns
+                : [...DEFAULT_AUTOFIND_TURNS],
           }))
         : [],
       activeSessionId: payload.activeSessionId ?? null,
@@ -512,6 +527,69 @@ function buildSessionDescription(requirement: string, rubric: BenchmarkRubricSet
     return `${rubric.modules.length} 个能力维度 · ${metricCount} 项指标`;
   }
   return requirement.trim() ? "已填写需求，等待生成评分标准" : "尚未生成评分标准";
+}
+
+/**
+ * Inline title editor for benchmark session names.
+ */
+function SessionTitleField(props: {
+  title: string;
+  onRename: (title: string) => void;
+  buttonClassName?: string;
+  inputClassName?: string;
+  placeholder?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(props.title);
+
+  useEffect(() => {
+    if (!editing) setDraft(props.title);
+  }, [editing, props.title]);
+
+  function commitRename() {
+    const trimmed = draft.trim();
+    if (trimmed) props.onRename(trimmed);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <input
+        className={props.inputClassName ?? styles.titleRenameInput}
+        value={draft}
+        placeholder={props.placeholder ?? "输入评测任务名称"}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commitRename}
+        onClick={(event) => event.stopPropagation()}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commitRename();
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setDraft(props.title);
+            setEditing(false);
+          }
+        }}
+        autoFocus
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={props.buttonClassName ?? styles.titleRenameButton}
+      title="点击重命名评测任务"
+      onClick={(event) => {
+        event.stopPropagation();
+        setEditing(true);
+      }}
+    >
+      {props.title}
+    </button>
+  );
 }
 
 function formatSessionTime(value: string): string {
@@ -594,6 +672,14 @@ export function NotebookLayout() {
     setRunResult(session.runResult ?? session.runHistory?.[0]?.result ?? null);
     setRunHistory(session.runHistory ?? []);
     setHumanReviewRecords(session.humanReviewRecords ?? []);
+    setAutofindState(session.autofindState ?? null);
+    setAutofindTurns(
+      Array.isArray(session.autofindTurns) && session.autofindTurns.length > 0
+        ? session.autofindTurns
+        : [...DEFAULT_AUTOFIND_TURNS],
+    );
+    setAutofindInput("");
+    setAutofindRunning(false);
     setRunError("");
   }, []);
 
@@ -642,7 +728,7 @@ export function NotebookLayout() {
         session.id === activeSessionId
           ? {
               ...session,
-              title: buildSessionTitle(requirement, rubric),
+              title: session.titleManuallySet ? session.title : buildSessionTitle(requirement, rubric),
               description: buildSessionDescription(requirement, rubric),
               updatedAt: now,
               requirement,
@@ -656,6 +742,8 @@ export function NotebookLayout() {
               progress,
               runHistory,
               humanReviewRecords,
+              autofindState,
+              autofindTurns,
             }
           : session,
       );
@@ -667,6 +755,8 @@ export function NotebookLayout() {
   }, [
     activeProjectId,
     activeSessionId,
+    autofindState,
+    autofindTurns,
     copilotTurns,
     dataset,
     humanReviewRecords,
@@ -800,6 +890,22 @@ export function NotebookLayout() {
     writeActiveBenchmarkSessionId(activeProjectId, session.id);
     applySession(session);
     setSessionHydrated(true);
+  }
+
+  function renameSession(sessionId: string, nextTitle: string) {
+    const trimmed = nextTitle.trim();
+    if (!trimmed) return;
+    const now = new Date().toISOString();
+    setSessions((prev) => {
+      const next = prev.map((session) =>
+        session.id === sessionId
+          ? { ...session, title: trimmed, titleManuallySet: true, updatedAt: now }
+          : session,
+      );
+      writeBenchmarkSessions(activeProjectId, next);
+      void persistRemoteBenchmarkSessions(activeProjectId, next, activeSessionId);
+      return next;
+    });
   }
 
   function handleDeleteSession(sessionId: string) {
@@ -976,6 +1082,8 @@ export function NotebookLayout() {
     setRightOpen(true);
     setActiveCopilotTab("autofind");
     setAutofindRunning(true);
+    setAutofindTurns([...DEFAULT_AUTOFIND_TURNS]);
+    setAutofindState(null);
     const rubricContext = buildAutoFindRubricContext();
     try {
       const response = await fetch("/api/benchmarks/autofind", {
@@ -985,7 +1093,7 @@ export function NotebookLayout() {
           action: "start",
           requirementText: requirement,
           rubricContext,
-          state: autofindState,
+          state: null,
         }),
       });
       const data = (await response.json()) as BenchmarkAutoFindResponse;
@@ -1004,7 +1112,7 @@ export function NotebookLayout() {
     } finally {
       setAutofindRunning(false);
     }
-  }, [autofindState, buildAutoFindRubricContext, requirement]);
+  }, [buildAutoFindRubricContext, requirement]);
 
   /**
    * 向 AutoFind 工作流发送用户消息或快捷动作。
@@ -1259,7 +1367,16 @@ export function NotebookLayout() {
             主页
           </Link>
           <div className={styles.headerDivider} />
-          <span className={styles.headerTitle}>{title}</span>
+          {activeSessionId ? (
+            <SessionTitleField
+              title={title}
+              buttonClassName={`${styles.titleRenameButton} ${styles.headerTitle}`}
+              inputClassName={`${styles.titleRenameInput} ${styles.headerTitleInput}`}
+              onRename={(nextTitle) => renameSession(activeSessionId, nextTitle)}
+            />
+          ) : (
+            <span className={styles.headerTitle}>{title}</span>
+          )}
           <span className={styles.headerSubtitle}>{description}</span>
         </div>
         <div className={styles.headerRight}>
@@ -1316,7 +1433,12 @@ export function NotebookLayout() {
                 onClick={() => handleOpenSession(session.id)}
               >
                 <div className={styles.sessionInfo}>
-                  <div className={styles.sessionName}>{session.title}</div>
+                  <SessionTitleField
+                    title={session.title}
+                    buttonClassName={`${styles.titleRenameButton} ${styles.sessionName}`}
+                    inputClassName={styles.sessionRenameInput}
+                    onRename={(nextTitle) => renameSession(session.id, nextTitle)}
+                  />
                   <div className={styles.sessionMeta}>
                     {session.description} · {formatSessionTime(session.updatedAt)}
                   </div>
@@ -1422,6 +1544,7 @@ export function NotebookLayout() {
                 rubric={rubric}
                 onRubricChange={setRubric}
                 onRun={handleRunBenchmark}
+                taskTitle={title}
                 requirement={requirement}
                 onRequirementChange={setRequirement}
                 dataset={dataset}
@@ -1774,6 +1897,7 @@ function RubricWorkspace(props: {
   rubric: BenchmarkRubricSet | null;
   onRubricChange: (r: BenchmarkRubricSet | null) => void;
   onRun: () => void;
+  taskTitle: string;
   requirement: string;
   onRequirementChange: (value: string) => void;
   dataset: BenchmarkDatasetSnapshot | null;
@@ -1783,29 +1907,54 @@ function RubricWorkspace(props: {
   onAutoFind: () => void | Promise<void>;
 }) {
   const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState("");
   const [highlightedMetricKey, setHighlightedMetricKey] = useState<string | null>(null);
 
   async function draftRubric() {
     setDrafting(true);
+    setDraftError("");
     try {
       const res = await fetch("/api/benchmarks/rubric", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: "自定义评测任务",
+          title: props.taskTitle.trim() || "自定义评测任务",
           description: "根据当前业务需求生成可审核的通用评分标准",
           domain: "custom",
           requirementText: props.requirement,
           useLlm: true,
         }),
       });
-      const data = (await res.json()) as { rubric?: BenchmarkRubricSet; error?: string };
+      const data = (await res.json()) as {
+        rubric?: BenchmarkRubricSet;
+        error?: string;
+        warnings?: string[];
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? `生成评分标准失败（${res.status}）`);
+      }
       if (data.rubric) {
         props.onRubricChange(localizeRubricForDisplay(cloneRubric(data.rubric)));
       }
+      if (data.warnings?.length) {
+        console.warn("[benchmark rubric]", data.warnings.join("；"));
+        setDraftError(data.warnings.join("；"));
+      }
+    } catch (error) {
+      setDraftError(error instanceof Error ? error.message : "生成评分标准失败");
     } finally {
       setDrafting(false);
     }
+  }
+
+  async function redraftRubric() {
+    if (
+      props.rubric &&
+      !confirm("重新生成将覆盖当前评分标准（含已确认指标）。是否继续？")
+    ) {
+      return;
+    }
+    await draftRubric();
   }
 
   const metrics = props.rubric?.modules.flatMap((m) => m.metrics) ?? [];
@@ -1856,6 +2005,7 @@ function RubricWorkspace(props: {
             <button className={styles.workspaceButton} onClick={draftRubric} disabled={drafting}>
               {drafting ? "生成中..." : "生成评分标准"}
             </button>
+            {draftError && <p className={styles.datasetError}>{draftError}</p>}
           </div>
         </div>
       ) : (
@@ -1875,16 +2025,42 @@ function RubricWorkspace(props: {
             </div>
           </div>
 
+          <div className={styles.requirementPanel}>
+            <div className={styles.requirementPanelHeader}>
+              <strong>评测需求</strong>
+              <span>修改后点击「重新生成评分标准」生效</span>
+            </div>
+            <textarea
+              className={styles.requirementPanelInput}
+              value={props.requirement}
+              onChange={(event) => props.onRequirementChange(event.target.value)}
+              placeholder="描述评测任务需求、业务约束与关注指标..."
+              rows={3}
+            />
+          </div>
+
           <div className={styles.rubricGraphPanel}>
             <div className={styles.rubricGraphHeader}>
               <div>
                 <strong>评分标准图谱</strong>
                 <span>点击节点选择指标；按住 Ctrl / ⌘ 并滚动鼠标可缩放图谱</span>
               </div>
-              <button className={styles.rubricHeaderAction} type="button" onClick={confirmAllMetrics}>
-                确认全部
-              </button>
+              <div className={styles.rubricGraphHeaderActions}>
+                <button
+                  className={styles.rubricHeaderActionSecondary}
+                  type="button"
+                  onClick={() => void redraftRubric()}
+                  disabled={drafting || !props.requirement.trim()}
+                  title={props.requirement.trim() ? "根据当前需求重新生成评分标准图谱" : "请先填写评测需求"}
+                >
+                  {drafting ? "生成中..." : "重新生成评分标准"}
+                </button>
+                <button className={styles.rubricHeaderAction} type="button" onClick={confirmAllMetrics}>
+                  确认全部
+                </button>
+              </div>
             </div>
+            {draftError && <p className={styles.datasetError}>{draftError}</p>}
             <RubricGraphView
               rubric={props.rubric}
               reviewedMetricKeys={reviewedMetricKeys}
@@ -1903,8 +2079,8 @@ function RubricWorkspace(props: {
                 <span>{metrics.length} 项</span>
               </div>
               <div className={styles.rubricModules}>
-                {props.rubric.modules.map((module) => (
-                  <div key={module.capability} className={styles.rubricModule}>
+                {props.rubric.modules.map((module, moduleIndex) => (
+                  <div key={`${module.capability}-${moduleIndex}`} className={styles.rubricModule}>
                     <div className={styles.rubricModuleHeader}>
                       <div>
                         <strong>{capabilityDisplayName(module.capability, module.displayName)}</strong>

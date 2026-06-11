@@ -1,0 +1,38 @@
+[
+  {
+    "session_id": "shopify_order_1",
+    "messages": [
+      { "role": "user", "content": "Where is my Shopify order #8821? I need shipping update." },
+      { "role": "assistant", "content": "I can help check your order status and delivery timeline." },
+      { "role": "user", "content": "It has been 10 days without update." },
+      { "role": "assistant", "content": "Sorry for the delay. I will check logistics and offer a solution." }
+    ]
+  },
+  {
+    "session_id": "shopify_refund_1",
+    "messages": [
+      { "role": "user", "content": "I want a refund for damaged goods from your store." },
+      { "role": "assistant", "content": "I understand. Please share your order ID and photos." },
+      { "role": "user", "content": "Order 5521, package arrived broken." },
+      { "role": "assistant", "content": "Thanks. I will start the refund process and follow up by email." }
+    ]
+  },
+  {
+    "session_id": "shopify_handover_1",
+    "messages": [
+      { "role": "user", "content": "Your bot keeps giving wrong answers about customs tax." },
+      { "role": "assistant", "content": "Sorry this was not helpful." },
+      { "role": "user", "content": "I need a human agent now." },
+      { "role": "assistant", "content": "Please wait, transferring you to support." }
+    ]
+  },
+  {
+    "session_id": "shopify_handover_2",
+    "messages": [
+      { "role": "user", "content": "The automatic reply ignored my product defect issue." },
+      { "role": "assistant", "content": "Can you repeat your issue?" },
+      { "role": "user", "content": "I already explained twice." },
+      { "role": "assistant", "content": "I cannot solve this, please contact support manually." }
+    ]
+  }
+]

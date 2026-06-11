@@ -11,6 +11,7 @@ import {
 import { getBenchmarkCapabilityDefinition } from "@/benchmark/capabilities";
 import { benchmarkReferencesForCapability, cloneMetricReferences } from "@/benchmark/reference-catalog";
 import { inferBenchmarkTaskType, renderEvalAnythingPhilosophyPrompt } from "@/benchmark/eval-anything-philosophy";
+import { consolidateSparseLlmModules } from "@/benchmark/rubric-structure";
 import type {
   BenchmarkCapabilityDimension,
   BenchmarkDomain,
@@ -187,7 +188,9 @@ export async function draftBenchmarkRubric(
               "主观指标要为 Judge Panel 设计：评分档必须可被多个 judge 独立判断，并能暴露 panel_disagree 的边界。",
               "所有面向用户展示的 title、description、displayName、criteria 必须使用中文。",
               "metricKey 和枚举字段可以使用英文机器标识，但不能作为展示名称。",
-              "每个能力维度生成 1-3 个强相关指标，总指标数控制在 4-10 个；首轮建议至少生成 6 个可区分指标，最低可运行门槛为 3 个。",
+              "结构要求：生成 3-5 个一级能力维度（modules），每个维度下必须有 2-3 个二级指标（metrics）；禁止把每个指标单独做成一个 module。",
+              "每个能力维度生成 2-3 个强相关指标，总指标数控制在 6-12 个；首轮建议至少生成 6 个可区分指标，最低可运行门槛为 3 个。",
+              "一级维度应按业务逻辑归并（如「问题承接与解决」「情绪服务」「事实与合规」），其下挂多个可独立评分的二级指标。",
               "每个 metric 的 rubricForm 必须包含至少 3 个离散档位（建议 1/3/5），并为每个档位提供可复核 description；可为档位补充 fewshot 示例片段。",
               "指标必须贴合该领域的真实验收标准，例如金融风控、采购比价、代码修复、医疗问诊、研究综述等领域应生成完全不同的指标。",
               "必须基于 DeepSearch research brief 中的论文、公开 benchmark、标准或框架设计指标；不要编造不存在的论文、URL 或 benchmark。",
@@ -199,7 +202,7 @@ export async function draftBenchmarkRubric(
               "Use llm_judge for most metrics; use human_label only when the metric clearly requires domain expert review.",
               "Allowed domain: hr, finance, procurement, software, healthcare, research, custom.",
               'Allowed sourceType: paper, public_benchmark, standard, dataset, framework, documentation, research_report.',
-              'Output schema: {"domain":"custom","title":"中文标题","description":"中文描述","researchSummary":"中文依据摘要","preferredCapabilities":["task_completion"],"modules":[{"capability":"task_completion","displayName":"中文能力维度","description":"中文说明","weight":3,"metrics":[{"metricKey":"machine_key","displayName":"中文指标名","description":"中文指标说明","evaluatorType":"llm_judge","weight":3,"passThreshold":3,"evidenceRequired":true,"humanApprovalRequired":true,"failureTags":["domain_issue"],"criteria":"中文评分准则，包含 [R1] 引用","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明，包含 [R1] 引用"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"论文或公开 benchmark 标题","sourceType":"paper","url":"https://...","authors":["作者"],"publisher":"机构","year":2023,"benchmarkName":"benchmark 名称","relevance":"中文说明该来源如何支撑此指标","confidence":0.9}]}]}]}',
+              'Output schema: {"domain":"custom","title":"中文标题","description":"中文描述","researchSummary":"中文依据摘要","preferredCapabilities":["task_completion","business_judgment"],"modules":[{"capability":"task_completion","displayName":"问题承接与解决","description":"中文说明","weight":3,"metrics":[{"metricKey":"intent_match","displayName":"意图识别准确率","description":"中文指标说明","evaluatorType":"llm_judge","weight":3,"passThreshold":3,"evidenceRequired":true,"humanApprovalRequired":true,"failureTags":["domain_issue"],"criteria":"中文评分准则，包含 [R1] 引用","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明，包含 [R1] 引用"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"论文或公开 benchmark 标题","sourceType":"paper","url":"https://...","authors":["作者"],"publisher":"机构","year":2023,"benchmarkName":"benchmark 名称","relevance":"中文说明该来源如何支撑此指标","confidence":0.9}]},{"metricKey":"solution_quality","displayName":"解决方案可执行性","description":"中文指标说明","evaluatorType":"llm_judge","weight":3,"passThreshold":3,"evidenceRequired":true,"humanApprovalRequired":true,"failureTags":["domain_issue"],"criteria":"中文评分准则","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"来源标题","sourceType":"paper","url":"https://...","relevance":"中文说明","confidence":0.9}]}]}]}',
             ].join("\n"),
           },
           {
@@ -220,7 +223,13 @@ export async function draftBenchmarkRubric(
             ].join("\n\n"),
           },
         ],
-        { stage: "benchmark_rubric_draft", temperature: 0.2, seed: 42 },
+        {
+          stage: "benchmark_rubric_draft",
+          temperature: 0.2,
+          seed: 42,
+          maxTokens: 8192,
+          timeoutMs: 120000,
+        },
       );
       const parsed = parseJsonObjectFromLlmOutput(llm) as LlmRubricPayload;
       const capabilities = (parsed.preferredCapabilities ?? [])
@@ -238,7 +247,7 @@ export async function draftBenchmarkRubric(
       if (typeof parsed.description === "string" && parsed.description.trim()) {
         description = parsed.description.trim();
       }
-      llmRubric = buildRubricFromLlmPayload({
+      const llmBuild = buildRubricFromLlmPayload({
         parsed,
         fallbackTitle: title,
         fallbackDescription: description,
@@ -246,6 +255,8 @@ export async function draftBenchmarkRubric(
         researchSummary: researchBrief.summary,
         researchReferences: researchBrief.references,
       });
+      llmRubric = llmBuild.rubric;
+      warnings.push(...llmBuild.warnings);
       if (llmRubric) {
         source = "llm";
       } else if (source === "llm") {
@@ -257,19 +268,20 @@ export async function draftBenchmarkRubric(
     }
   }
 
-  if (input.useLlm) {
-    if (llmRubric) {
-      return {
-        rubric: llmRubric,
-        reviewMarkdown: renderRubricReviewMarkdown(llmRubric),
-        source,
-        warnings,
-      };
-    }
-    throw new Error(
-      warnings.join("；")
-      || "LLM 评分标准生成失败，未返回可用指标。请重试或补充任务描述，系统不会自动套用稀疏模板。",
+  if (input.useLlm && llmRubric) {
+    return {
+      rubric: llmRubric,
+      reviewMarkdown: renderRubricReviewMarkdown(llmRubric),
+      source,
+      warnings,
+    };
+  }
+
+  if (input.useLlm && !llmRubric) {
+    warnings.push(
+      "LLM 评分标准生成失败，已回退到内置能力模板。请检查 API 配置后重试，或继续在助手中增补指标。",
     );
+    source = "template";
   }
 
   const rubric = buildRubricDraftFromRequirement({
@@ -298,24 +310,40 @@ function buildRubricFromLlmPayload(input: {
   fallbackDomain: BenchmarkDomain;
   researchSummary: string;
   researchReferences: BenchmarkMetricReference[];
-}): BenchmarkRubricSet | null {
-  const modules = sanitizeLlmModules(input.parsed.modules, input.researchReferences);
-  if (modules.length === 0) return null;
+}): { rubric: BenchmarkRubricSet | null; warnings: string[] } {
+  const structureWarnings: string[] = [];
+  const sanitized = sanitizeLlmModules(input.parsed.modules, input.researchReferences);
+  if (sanitized.length === 0) {
+    return { rubric: null, warnings: structureWarnings };
+  }
+
+  const { modules, consolidated } = consolidateSparseLlmModules(sanitized);
+  if (consolidated) {
+    structureWarnings.push(
+      "模型将每个指标拆成了独立能力维度，已自动归并为「一级维度 → 多个二级指标」结构；可在助手中继续微调。",
+    );
+  }
+  if (modules.length === 0) {
+    return { rubric: null, warnings: structureWarnings };
+  }
 
   const now = new Date().toISOString();
   const domain = isBenchmarkDomain(input.parsed.domain) ? input.parsed.domain : input.fallbackDomain;
   return {
-    rubricId: `rubric_${domain}_${randomBytes(3).toString("hex")}`,
-    version: "0.1.0",
-    title: ensureChineseText(input.parsed.title, input.fallbackTitle),
-    description: ensureChineseText(input.parsed.description, input.fallbackDescription),
-    domain,
-    modules,
-    generatedBy: "copilot",
-    approvalStatus: "candidate",
-    researchSummary: ensureChineseText(input.parsed.researchSummary, input.researchSummary),
-    createdAt: now,
-    updatedAt: now,
+    rubric: {
+      rubricId: `rubric_${domain}_${randomBytes(3).toString("hex")}`,
+      version: "0.1.0",
+      title: ensureChineseText(input.parsed.title, input.fallbackTitle),
+      description: ensureChineseText(input.parsed.description, input.fallbackDescription),
+      domain,
+      modules,
+      generatedBy: "copilot",
+      approvalStatus: "candidate",
+      researchSummary: ensureChineseText(input.parsed.researchSummary, input.researchSummary),
+      createdAt: now,
+      updatedAt: now,
+    },
+    warnings: structureWarnings,
   };
 }
 
@@ -441,6 +469,8 @@ export async function researchBenchmarkReferences(input: DraftBenchmarkRubricInp
       temperature: 0.1,
       seed: 41,
       providerOptions,
+      maxTokens: 4096,
+      timeoutMs: 90000,
     },
   );
 

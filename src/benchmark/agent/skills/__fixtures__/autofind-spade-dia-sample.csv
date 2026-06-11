@@ -1,0 +1,17 @@
+,dia_no,dia
+0,0,"user: I need help with my Shopify order #1001
+system: I can help you track order #1001. What issue are you seeing?
+user: It still shows processing after 5 days.
+system: Let me check fulfillment status and shipping carrier updates for you."
+1,1,"user: Can I return an item from my ecommerce order?
+system: Yes, returns are accepted within 30 days with original packaging.
+user: The product arrived damaged.
+system: I'm sorry to hear that. I can start a replacement or refund right away."
+2,2,"user: My payment failed on checkout for international shipping.
+system: I can review the payment gateway error and suggest an alternative method.
+user: I was using a foreign credit card.
+system: Some cards need 3-D Secure verification for cross-border Shopify payments."
+3,3,"user: Where is my customer support ticket?
+system: Your ticket #889 is assigned to our billing team.
+user: I was charged twice for the same subscription.
+system: I see duplicate charges and can initiate a refund for the extra payment."
