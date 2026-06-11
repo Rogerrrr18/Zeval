@@ -10,6 +10,7 @@ import {
 } from "@/benchmark/rubric";
 import { getBenchmarkCapabilityDefinition } from "@/benchmark/capabilities";
 import { benchmarkReferencesForCapability, cloneMetricReferences } from "@/benchmark/reference-catalog";
+import { inferBenchmarkTaskType, renderEvalAnythingPhilosophyPrompt } from "@/benchmark/eval-anything-philosophy";
 import type {
   BenchmarkCapabilityDimension,
   BenchmarkDomain,
@@ -178,7 +179,12 @@ export async function draftBenchmarkRubric(
             role: "system",
             content: [
               "你是 Zeval 评测标准生成专家。",
+              renderEvalAnythingPhilosophyPrompt(),
               "请根据用户真实业务任务和 DeepSearch research brief 生成领域化 benchmark rubric，不要套用 HR、客服或通用模板。",
+              "必须先判断任务类型，并把指标设计成 task world / target / harness / judge 可以执行和复核的结构。",
+              "不要把完整应用、RAG、workspace agent 或工具调用任务误当成裸 LLM 问答；必要时在 criteria 里明确环境状态、工具调用、引用证据或可执行验收逻辑。",
+              "保留 raw baseline 的思想：指标应能解释复杂 agent/harness 相比基线的真实增益，而不是只奖励冗长推理。",
+              "主观指标要为 Judge Panel 设计：评分档必须可被多个 judge 独立判断，并能暴露 panel_disagree 的边界。",
               "所有面向用户展示的 title、description、displayName、criteria 必须使用中文。",
               "metricKey 和枚举字段可以使用英文机器标识，但不能作为展示名称。",
               "每个能力维度生成 1-3 个强相关指标，总指标数控制在 4-10 个；首轮建议至少生成 6 个可区分指标，最低可运行门槛为 3 个。",
@@ -202,6 +208,7 @@ export async function draftBenchmarkRubric(
               `Title: ${input.title}`,
               `Domain: ${input.domain}`,
               `Description: ${input.description}`,
+              `Inferred task type: ${inferBenchmarkTaskType({ requirementText: input.requirementText })}`,
               "Requirement:",
               input.requirementText,
               "",
@@ -400,7 +407,9 @@ export async function researchBenchmarkReferences(input: DraftBenchmarkRubricInp
         role: "system",
         content: [
           "你是 Zeval DeepSearch 研究员，请为 benchmark rubric 生成前置研究依据。",
+          renderEvalAnythingPhilosophyPrompt(),
           "如果当前模型或网关支持 DeepSearch / web research / online search，请必须使用该能力检索公开论文、公开 benchmark、行业标准或权威框架。",
+          "检索目标要覆盖 task world / environment、target 系统、harness/agent 架构、judge panel 或人类偏好评价方法。",
           "只返回 JSON，不要输出 Markdown。",
           "不要编造来源。无法确认 URL 时可以省略 url，但必须降低 confidence。",
           "至少返回 6 个来源，其中至少 3 个 sourceType 为 paper 或 public_benchmark；来源要和用户任务领域相关。",
@@ -414,6 +423,7 @@ export async function researchBenchmarkReferences(input: DraftBenchmarkRubricInp
         content: [
           `Title: ${input.title}`,
           `Domain: ${input.domain}`,
+          `Inferred task type: ${inferBenchmarkTaskType({ requirementText: input.requirementText })}`,
           `Description: ${input.description}`,
           "Preferred capabilities:",
           (input.preferredCapabilities ?? []).join(", ") || "auto",

@@ -10,6 +10,7 @@ import {
   readBenchmarkRunArtifact,
   type BenchmarkGenericRunArtifact,
 } from "@/benchmark/progress-artifacts";
+import { buildEvalAnythingDesign, renderEvalAnythingDesignSummary } from "@/benchmark/eval-anything-philosophy";
 import { snapScoreToRubricLevels } from "@/benchmark/rubric-judge";
 import {
   buildBenchmarkTaskPackage,
@@ -17,14 +18,19 @@ import {
   buildTranscriptSubmission,
   getMaxDatasetCases,
 } from "@/benchmark/transcript-benchmark";
-import { parseJsonObjectFromLlmOutput, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
+import { parseJsonObjectFromLlmOutput, readZevalEnvValue, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
 import type {
   BenchmarkAgentSubmission,
   BenchmarkCase,
+  BenchmarkJudgeAggregationMode,
   BenchmarkLlmJudge,
+  BenchmarkLlmJudgeMemberResult,
   BenchmarkMetricEvaluationResult,
   BenchmarkMatrixCell,
+  BenchmarkModelId,
+  BenchmarkRubricScoreLevel,
   BenchmarkRubricSet,
+  BenchmarkScoringScale,
   BenchmarkTaskPackage,
 } from "@/benchmark/types";
 import type { BenchmarkDatasetSnapshot } from "@/benchmark/session-store";
@@ -58,9 +64,9 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
   }
 
   const rubric = approveRubricMetrics(input.rubric, approvedMetricKeys);
-  const task = buildBenchmarkTaskPackage(input.requirementText, rubric);
-  const cases = buildCasesFromDataset(task, input.dataset);
   const matrix = DEFAULT_MATRIX;
+  const task = buildTaskPackage(input.requirementText, rubric, matrix);
+  const cases = buildCasesFromDataset(task, input.dataset);
   const totalMetrics = cases.length * matrix.length * approvedMetricKeys.length;
   const resumeArtifact = input.resumeRunId
     ? (await readBenchmarkRunArtifact(input.resumeRunId))?.genericRun
@@ -71,10 +77,18 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
   const metricResultsForArtifact = dedupeMetricResults(reusableArtifact?.metricResults ?? []);
 
   benchmarkProgress.init(input.runId, matrix, cases.length);
+  if (task.evalDesign) {
+    benchmarkProgress.addEvent(input.runId, {
+      phase: "preparing",
+      status: "completed",
+      title: "Eval-Anything 对齐设计",
+      detail: renderEvalAnythingDesignSummary(task.evalDesign),
+    });
+  }
   benchmarkProgress.update(input.runId, {
     phase: "building_cases",
     totalMetrics,
-    activeAnalysis: "正在按 session 切分评测案例，并将每个会话转成包含输入、期望验收标准和上下文证据的 benchmark case。",
+    activeAnalysis: "正在按 Eval-Anything 的 Environment 思想构建评测案例：每个 session 都会携带输入、期望验收标准、上下文证据、参考来源和人工复核触发条件。",
     datasetSummary: {
       fileName: input.dataset.fileName,
       rows: input.dataset.ingestMeta.rows,
@@ -177,8 +191,49 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
   return { task, result };
 }
 
+function buildTaskPackage(
+  requirementText: string,
+  rubric: BenchmarkRubricSet,
+  matrix: BenchmarkMatrixCell[],
+): BenchmarkTaskPackage {
+  const evalDesign = buildEvalAnythingDesign({
+    requirementText,
+    rubric,
+    matrix,
+    judgeMode: readJudgePanelMode(),
+  });
+  const task = buildBenchmarkTaskPackage(requirementText, rubric);
+  return {
+    ...task,
+    evalDesign,
+    metadata: {
+      ...(task.metadata ?? {}),
+      evalAnythingAlignment: evalDesign,
+    },
+  };
+}
+
+/**
+ * Build benchmark cases from normalized uploaded rows and attach the evaluator design.
+ *
+ * @param task Runnable benchmark task package.
+ * @param dataset Ingested and normalized dataset snapshot from the workspace.
+ * @returns Session-level benchmark cases capped for runtime.
+ */
 function buildCasesFromDataset(task: BenchmarkTaskPackage, dataset: BenchmarkDatasetSnapshot): BenchmarkCase[] {
-  return buildCasesFromRawRows(task, dataset.rawRows, dataset.fileName);
+  return buildCasesFromRawRows(task, dataset.rawRows, dataset.fileName).map((taskCase) => ({
+    ...taskCase,
+    expected: {
+      ...taskCase.expected,
+      evaluationDesign: task.evalDesign,
+    },
+    metadata: {
+      ...(taskCase.metadata ?? {}),
+      sourceFormat: dataset.format,
+      evalDesign: task.evalDesign,
+      evalDesignSummary: task.evalDesign ? renderEvalAnythingDesignSummary(task.evalDesign) : undefined,
+    },
+  }));
 }
 
 async function buildSubmissions(input: {
@@ -472,61 +527,320 @@ function isTranscriptEvalMode(): boolean {
 }
 
 function createLlmJudge(): BenchmarkLlmJudge {
+  const panelMode = readJudgePanelMode();
+  const panelMembers = readJudgePanelMembers(panelMode);
+  const aggregation = readJudgeAggregationMode();
+  const disagreementThreshold = readJudgeDisagreementThreshold();
+
   return async ({ metric, taskCase, submission }) => {
     const allowedScores = (metric.config?.rubricForm ?? [])
       .map((level) => level.score)
       .filter((score, index, scores) => scores.indexOf(score) === index)
       .sort((left, right) => left - right);
-    const raw = await requestSiliconFlowChatCompletion(
-      [
+    const members: BenchmarkLlmJudgeMemberResult[] = [];
+    for (const [index, member] of panelMembers.entries()) {
+      const raw = await requestSiliconFlowChatCompletion(
+        [
+          {
+            role: "system",
+            content: [
+              "你是 Zeval benchmark 评测器，也是 Eval-Anything 风格 Judge Panel 的一个独立成员。",
+              "请严格根据指标准则、参考依据、案例输入、期望标准和被测输出评分。",
+              "不要迁就被测模型；如果证据不足，要降低分数和 confidence。",
+              "如果该案例暴露 rubric 歧义、边界样本或需要人工复核，请在 labels 中加入对应标签。",
+              allowedScores.length > 0
+                ? `score 必须且只能是以下离散档位之一：${allowedScores.join("、")}。`
+                : "score 必须落在 rubricForm 定义的离散档位上，禁止给出中间分。",
+              "若给最高分，evidence 必须引用 transcript 中的具体片段。",
+              "只返回 JSON，不要输出 Markdown。",
+              '输出格式：{"score":离散档位,"passed":true,"labels":["missing_evidence"],"comment":"中文理由","evidence":["证据1"],"dimensions":{"criteria_fit":0-5,"evidence_grounding":0-5},"confidence":0-1}',
+            ].join("\n"),
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              judgeMember: member,
+              evalDesign: taskCase.metadata?.evalDesign,
+              metric: {
+                key: metric.metricKey,
+                name: metric.displayName,
+                capability: metric.capability,
+                description: metric.description,
+                criteria: metric.config?.criteria,
+                rubricForm: metric.config?.rubricForm,
+                fewshotExamples: (metric.config?.rubricForm ?? []).flatMap((level) =>
+                  (level.fewshot ?? []).map((excerpt) => ({
+                    score: level.score,
+                    label: level.label,
+                    excerpt,
+                  })),
+                ),
+                references: metric.config?.references ?? [],
+                scale: metric.scale,
+              },
+              caseInput: taskCase.input,
+              expected: taskCase.expected,
+              submission: submission.parsedOutput ?? submission.rawOutput,
+            }, null, 2),
+          },
+        ],
         {
-          role: "system",
-          content: [
-            "你是 Zeval benchmark 评测器。",
-            "请严格根据指标准则、案例输入、期望标准和被测输出评分。",
-            allowedScores.length > 0
-              ? `score 必须且只能是以下离散档位之一：${allowedScores.join("、")}。`
-              : "score 必须落在 rubricForm 定义的离散档位上，禁止给出中间分。",
-            "若给最高分，evidence 必须引用 transcript 中的具体片段。",
-            "只返回 JSON，不要输出 Markdown。",
-            '输出格式：{"score":离散档位,"reason":"中文理由","evidence":["证据1"],"confidence":0-1}',
-          ].join("\n"),
+          stage: panelMode === "panel" ? "benchmark_generic_llm_judge_panel" : "benchmark_generic_llm_judge",
+          model: member.model,
+          temperature: 0.1,
+          seed: 42 + index,
         },
-        {
-          role: "user",
-          content: JSON.stringify({
-            metric: {
-              name: metric.displayName,
-              description: metric.description,
-              criteria: metric.config?.criteria,
-              rubricForm: metric.config?.rubricForm,
-              fewshotExamples: (metric.config?.rubricForm ?? []).flatMap((level) =>
-                (level.fewshot ?? []).map((excerpt) => ({
-                  score: level.score,
-                  label: level.label,
-                  excerpt,
-                })),
-              ),
-              references: metric.config?.references ?? [],
-              scale: metric.scale,
-            },
-            caseInput: taskCase.input,
-            expected: taskCase.expected,
-            submission: submission.parsedOutput ?? submission.rawOutput,
-          }, null, 2),
-        },
-      ],
-      { stage: "benchmark_generic_llm_judge", temperature: 0.1, seed: 42 },
-    );
-    const parsed = parseRecord(raw);
-    const rawScore = readNumber(parsed.score, metric.scale.min);
+      );
+      members.push(parseJudgeMemberResult(
+        raw,
+        member,
+        metric.scale.passThreshold,
+        metric.config?.rubricForm,
+        metric.scale,
+      ));
+    }
+
+    const aggregated = aggregateJudgeMembers({
+      members,
+      aggregation,
+      disagreementThreshold,
+      passThreshold: metric.scale.passThreshold,
+      mode: panelMode,
+    });
     return {
-      score: snapScoreToRubricLevels(rawScore, metric.config?.rubricForm, metric.scale),
-      reason: typeof parsed.reason === "string" ? parsed.reason : "模型评审未返回理由。",
-      evidence: Array.isArray(parsed.evidence) ? parsed.evidence.map(String).slice(0, 5) : [],
-      confidence: readNumber(parsed.confidence, 0.6),
+      score: aggregated.score,
+      passed: aggregated.passed,
+      reason: aggregated.reason,
+      evidence: aggregated.evidence,
+      confidence: aggregated.confidence,
+      labels: aggregated.labels,
+      dimensions: aggregated.dimensions,
+      judge: {
+        mode: panelMode,
+        aggregation,
+        memberCount: members.length,
+        disagreement: aggregated.disagreement,
+        disagreementThreshold,
+        panelDisagree: aggregated.panelDisagree,
+        members,
+      },
     };
   };
+}
+
+type JudgePanelMemberConfig = {
+  judgeId: string;
+  model?: BenchmarkModelId;
+  family?: string;
+};
+
+type AggregatedJudgeMembers = {
+  score: number;
+  passed: boolean;
+  reason: string;
+  evidence: string[];
+  confidence: number;
+  labels: string[];
+  dimensions: Record<string, number>;
+  disagreement: number;
+  panelDisagree: boolean;
+};
+
+function readJudgePanelMode(): "single" | "panel" {
+  const value = readZevalEnvValue(["ZEVAL_JUDGE_PANEL_MODE", "ZEVAL_LLM_JUDGE_PANEL_MODE"])?.toLowerCase();
+  return value === "panel" || value === "poll" ? "panel" : "single";
+}
+
+function readJudgeAggregationMode(): BenchmarkJudgeAggregationMode {
+  const value = readZevalEnvValue(["ZEVAL_JUDGE_PANEL_AGGREGATION"])?.toLowerCase();
+  if (value === "mean" || value === "median" || value === "majority") return value;
+  return "trimmed_mean";
+}
+
+function readJudgeDisagreementThreshold(): number {
+  const raw = Number.parseFloat(readZevalEnvValue(["ZEVAL_JUDGE_PANEL_DISAGREEMENT_THRESHOLD"]) ?? "");
+  return Number.isFinite(raw) && raw >= 0 ? raw : 1.5;
+}
+
+function readJudgePanelMembers(mode: "single" | "panel"): JudgePanelMemberConfig[] {
+  const raw = readZevalEnvValue(["ZEVAL_JUDGE_PANEL_MEMBERS", "ZEVAL_LLM_JUDGE_PANEL_MEMBERS"]);
+  const parsed = raw
+    ?.split(",")
+    .map((item, index) => parseJudgePanelMember(item, index))
+    .filter((item): item is JudgePanelMemberConfig => Boolean(item)) ?? [];
+
+  if (mode === "panel" && parsed.length > 0) return parsed.slice(0, 5);
+  if (mode === "panel" && parsed.length === 0) {
+    return [
+      { judgeId: "default_judge", family: "default" },
+      { judgeId: "default_judge_recheck", family: "default" },
+      { judgeId: "default_judge_boundary", family: "default" },
+    ];
+  }
+  return [parsed[0] ?? { judgeId: "default_judge", family: "default" }];
+}
+
+function parseJudgePanelMember(value: string, index: number): JudgePanelMemberConfig | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parts = trimmed.split(":").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 1) {
+    return {
+      judgeId: `judge_${index + 1}`,
+      model: parts[0] as BenchmarkModelId,
+      family: inferModelFamily(parts[0]),
+    };
+  }
+  return {
+    judgeId: parts[0] || `judge_${index + 1}`,
+    model: parts[1] as BenchmarkModelId | undefined,
+    family: parts[2] || inferModelFamily(parts[1] ?? parts[0]),
+  };
+}
+
+function inferModelFamily(model: string): string {
+  const normalized = model.toLowerCase();
+  if (/gpt|openai|o[0-9]/.test(normalized)) return "openai";
+  if (/claude|anthropic/.test(normalized)) return "anthropic";
+  if (/qwen|通义/.test(normalized)) return "qwen";
+  if (/deepseek/.test(normalized)) return "deepseek";
+  if (/gemini|google/.test(normalized)) return "google";
+  if (/glm|zhipu|智谱/.test(normalized)) return "zhipu";
+  if (/kimi|moonshot/.test(normalized)) return "moonshot";
+  return "unknown";
+}
+
+function parseJudgeMemberResult(
+  raw: string,
+  member: JudgePanelMemberConfig,
+  passThreshold: number,
+  rubricForm: BenchmarkRubricScoreLevel[] | undefined,
+  scale: BenchmarkScoringScale,
+): BenchmarkLlmJudgeMemberResult {
+  const parsed = parseRecord(raw);
+  const rawScore = readNumber(parsed.score, scale.min);
+  const score = snapScoreToRubricLevels(rawScore, rubricForm, scale);
+  return {
+    judgeId: member.judgeId,
+    model: member.model,
+    family: member.family,
+    score,
+    passed: score >= passThreshold,
+    labels: readStringArray(parsed.labels).slice(0, 8),
+    comment: typeof parsed.comment === "string"
+      ? parsed.comment
+      : typeof parsed.reason === "string"
+        ? parsed.reason
+        : "模型评审未返回理由。",
+    evidence: readStringArray(parsed.evidence).slice(0, 6),
+    dimensions: readNumberRecord(parsed.dimensions),
+    confidence: readNumber(parsed.confidence, 0.6),
+  };
+}
+
+function aggregateJudgeMembers(input: {
+  members: BenchmarkLlmJudgeMemberResult[];
+  aggregation: BenchmarkJudgeAggregationMode;
+  disagreementThreshold: number;
+  passThreshold: number;
+  mode: "single" | "panel";
+}): AggregatedJudgeMembers {
+  const scores = input.members.map((member) => member.score);
+  const score = aggregateNumbers(scores, input.aggregation);
+  const support = input.members.filter((member) => member.passed).length;
+  const passed = input.mode === "panel"
+    ? support > input.members.length / 2
+    : score >= input.passThreshold;
+  const disagreement = scores.length > 1 ? Math.max(...scores) - Math.min(...scores) : 0;
+  const panelDisagree = input.mode === "panel" && disagreement > input.disagreementThreshold;
+  const labels = aggregateLabels(input.members, panelDisagree);
+  const evidence = dedupeStrings(input.members.flatMap((member) => member.evidence)).slice(0, 8);
+  const dimensions = aggregateDimensions(input.members, input.aggregation);
+  const confidence = aggregateNumbers(input.members.map((member) => member.confidence), "mean");
+  const reason = input.members.map((member) => `[${member.judgeId}] ${member.comment}`).join("\n");
+
+  return {
+    score,
+    passed,
+    reason,
+    evidence,
+    confidence,
+    labels,
+    dimensions,
+    disagreement,
+    panelDisagree,
+  };
+}
+
+function aggregateNumbers(values: number[], mode: BenchmarkJudgeAggregationMode): number {
+  const finite = values.filter((value) => Number.isFinite(value)).sort((left, right) => left - right);
+  if (finite.length === 0) return 0;
+  if (mode === "median") {
+    const middle = Math.floor(finite.length / 2);
+    return finite.length % 2 === 0 ? round2((finite[middle - 1] + finite[middle]) / 2) : finite[middle];
+  }
+  if (mode === "trimmed_mean" && finite.length >= 3) {
+    return round2(mean(finite.slice(1, -1)));
+  }
+  return round2(mean(finite));
+}
+
+function mean(values: number[]): number {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function aggregateLabels(members: BenchmarkLlmJudgeMemberResult[], panelDisagree: boolean): string[] {
+  const support = new Map<string, number>();
+  for (const member of members) {
+    for (const label of new Set(member.labels.map((item) => item.trim()).filter(Boolean))) {
+      support.set(label, (support.get(label) ?? 0) + 1);
+    }
+  }
+  const minSupport = Math.ceil(members.length / 2);
+  const labels = [...support.entries()]
+    .filter(([, count]) => count >= minSupport)
+    .map(([label]) => label);
+  if (panelDisagree) labels.push("panel_disagree");
+  return dedupeStrings(labels).slice(0, 10);
+}
+
+function aggregateDimensions(
+  members: BenchmarkLlmJudgeMemberResult[],
+  aggregation: BenchmarkJudgeAggregationMode,
+): Record<string, number> {
+  const values = new Map<string, number[]>();
+  for (const member of members) {
+    for (const [dimension, value] of Object.entries(member.dimensions)) {
+      if (!values.has(dimension)) values.set(dimension, []);
+      values.get(dimension)!.push(value);
+    }
+  }
+  return Object.fromEntries(
+    [...values.entries()].map(([dimension, dimensionValues]) => [
+      dimension,
+      aggregateNumbers(dimensionValues, aggregation),
+    ]),
+  );
+}
+
+function readStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).map((item) => item.trim()).filter(Boolean);
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
+
+function readNumberRecord(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  const result: Record<string, number> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    const numeric = typeof raw === "number" ? raw : Number.parseFloat(String(raw));
+    if (Number.isFinite(numeric)) result[key] = numeric;
+  }
+  return result;
 }
 
 function markSubmissionDone(
@@ -571,6 +885,19 @@ function parseRecord(raw: string): Record<string, unknown> {
 
 function readNumber(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function dedupeStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const normalized = value.trim();
+    const key = normalized.toLowerCase();
+    if (!normalized || seen.has(key)) continue;
+    seen.add(key);
+    result.push(normalized);
+  }
+  return result;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

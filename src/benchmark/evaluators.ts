@@ -264,13 +264,17 @@ async function evaluateLlmJudge(
 
   return buildResult(metric, taskCase, submission, {
     score: snappedScore,
+    passed: judged.passed,
     status: "scored",
     reason: judged.reason,
     evidence: judged.evidence,
     confidence: clamp(judged.confidence, 0, 1),
+    labels: judged.labels,
+    dimensions: judged.dimensions,
+    judge: judged.judge,
     expected: taskCase.expected,
     actual: submission.parsedOutput ?? submission.rawOutput,
-    needsHumanReview: metric.humanApprovalRequired,
+    needsHumanReview: metric.humanApprovalRequired || Boolean(judged.judge?.panelDisagree),
   });
 }
 
@@ -345,10 +349,14 @@ function buildResult(
   submission: BenchmarkAgentSubmission,
   input: {
     score: number;
+    passed?: boolean;
     status: BenchmarkMetricEvaluationResult["status"];
     reason: string;
     evidence: string[];
     confidence: number;
+    labels?: string[];
+    dimensions?: Record<string, number>;
+    judge?: BenchmarkMetricEvaluationResult["judge"];
     expected?: unknown;
     actual?: unknown;
     humanLabel?: BenchmarkMetricEvaluationResult["humanLabel"];
@@ -356,6 +364,7 @@ function buildResult(
   },
 ): BenchmarkMetricEvaluationResult {
   const score = clamp(input.score, metric.scale.min, metric.scale.max);
+  const passed = input.passed ?? score >= metric.scale.passThreshold;
   return {
     runId: submission.runId,
     benchmarkId: submission.benchmarkId,
@@ -370,16 +379,19 @@ function buildResult(
     evaluatorType: metric.evaluatorType,
     score,
     normalizedScore: normalizeScore(score, metric.scale),
-    passed: score >= metric.scale.passThreshold,
+    passed,
     status: input.status,
     reason: input.reason,
     evidence: input.evidence,
     confidence: input.confidence,
+    labels: input.labels,
+    dimensions: input.dimensions,
+    judge: input.judge,
     expected: input.expected,
     actual: input.actual,
     humanLabel: input.humanLabel,
     needsHumanReview: input.needsHumanReview ?? metric.humanApprovalRequired,
-    failureTags: score >= metric.scale.passThreshold ? [] : metric.failureTags,
+    failureTags: passed ? [] : metric.failureTags,
   };
 }
 
