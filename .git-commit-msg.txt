@@ -1,0 +1,35 @@
+feat(autofind): LLM Agent 编排 + 纯动态发现与稳定归一化 pipeline
+
+## 今日修复摘要
+
+### AutoFind Agent（助手能力）
+- 新增 autofind-agent.ts：三阶段 LLM 编排（检索词生成 → 候选数据集选择 → 10正+10负 session 整理）
+- 接入 autofind-data-skill 工作流，状态中记录 agentTrace / llmAssisted
+- LLM 不可用时各阶段独立降级为规则模板，不中断端到端链路
+- 更新 NotebookLayout AutoFind 助手文案与数据来源展示
+
+### 强制纯动态发现
+- 移除 KNOWN_DATASET_FALLBACKS 硬编码（CPsyCoun / Bitext 等）
+- 移除 companion 本地 CSV 缓存回退
+- 发现链路仅依赖 HuggingFace API + GitHub Search + web_search
+
+### URL 发现与下载（autofind-source-resolver）
+- HuggingFace 递归扫描 data/ 子目录，智能排序对话类文件
+- 仅 parquet 时通过 datasets-server rows API 拉取（hf-rows://）
+- GitHub 递归查找 json/jsonl/csv
+- 单数据集多文件重试（最多 8 个），跳过不可归一化文件
+
+### 归一化增强（autofind-normalizers）
+- 支持 JSONL input/output、SPADE dia 列、Agent/Customer 对话文本
+- 支持 conversation 字段（电商客服 parquet 数据集）
+- 多行引号 CSV 记录解析（splitCsvRecords）
+- 校验层拒绝虚构 URL、HTML 页面与非对话 payload
+
+### 其他修复
+- DuckDuckGo 跳转 URL 解包（url-utils + network-tools）
+- Rubric 图谱视图与 copilot 会话存储小幅增强
+- benchmark 测试扩展至 67 项（含 pipeline / resolver / live 集成）
+
+## Test plan
+- npm run test:benchmark（AUTOFIND_LIVE_TEST=0 离线 67/67 通过）
+- UI：Benchmark 侧栏 AutoFind → 开始搜索 → 验证数据文件 URL 与 10+10 CSV

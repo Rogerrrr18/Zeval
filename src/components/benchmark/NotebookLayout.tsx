@@ -371,6 +371,73 @@ function activeBenchmarkSessionKey(projectId: string): string {
   return `${ACTIVE_SESSION_STORAGE_PREFIX}:${projectId}`;
 }
 
+/**
+ * Resolve the effective benchmark run result from session fields.
+ *
+ * @param session Persisted workspace session.
+ * @returns Run result when available on session, history, or completed progress.
+ */
+function resolveSessionRunResult(session: BenchmarkSession): BenchmarkRunResult | null {
+  return session.runResult ?? session.runHistory?.[0]?.result ?? session.progress?.result ?? null;
+}
+
+/**
+ * Prefer the session copy that already contains completed run artifacts.
+ *
+ * @param left Candidate session snapshot.
+ * @param right Candidate session snapshot.
+ * @returns Richer session for hydration merge.
+ */
+function pickRicherBenchmarkSession(left: BenchmarkSession, right: BenchmarkSession): BenchmarkSession {
+  const score = (session: BenchmarkSession): number => {
+    let points = 0;
+    if (resolveSessionRunResult(session)) points += 100;
+    if (session.progress?.phase === "completed") points += 50;
+    if (session.runHistory?.length) points += 10;
+    if (session.progress?.runId) points += 5;
+    return points;
+  };
+  const leftScore = score(left);
+  const rightScore = score(right);
+  if (leftScore !== rightScore) return leftScore > rightScore ? left : right;
+  return left.updatedAt >= right.updatedAt ? left : right;
+}
+
+/**
+ * Merge local and remote session caches without dropping completed run results.
+ *
+ * @param localSessions Browser localStorage sessions.
+ * @param remoteSessions Server-backed sessions.
+ * @returns Merged session list sorted by recent updates.
+ */
+function mergeBenchmarkSessions(
+  localSessions: BenchmarkSession[],
+  remoteSessions: BenchmarkSession[],
+): BenchmarkSession[] {
+  const merged = new Map<string, BenchmarkSession>();
+  for (const session of [...remoteSessions, ...localSessions]) {
+    const existing = merged.get(session.id);
+    merged.set(session.id, existing ? pickRicherBenchmarkSession(existing, session) : session);
+  }
+  return [...merged.values()].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+/**
+ * Check whether a progress snapshot indicates a recoverable completed run.
+ *
+ * @param progress Benchmark progress snapshot.
+ * @returns True when run-status recovery should be attempted.
+ */
+function shouldRecoverBenchmarkRun(
+  progress: BenchmarkProgressSnapshot | null | undefined,
+  runResult: BenchmarkRunResult | null,
+): boolean {
+  if (!progress?.runId || runResult || progress.result) return false;
+  const metricsDone =
+    progress.totalMetrics > 0 && progress.evaluatedMetrics >= progress.totalMetrics;
+  return progress.phase === "completed" || progress.phase === "failed" || metricsDone;
+}
+
 function createBenchmarkSession(projectId: string): BenchmarkSession {
   const now = new Date().toISOString();
   return {
@@ -414,7 +481,7 @@ function readBenchmarkSessions(projectId: string): BenchmarkSession[] {
         titleManuallySet: session.titleManuallySet ?? false,
         rubric: session.rubric ? localizeRubricForDisplay(session.rubric) : null,
         dataset: session.dataset ?? null,
-        runResult: session.runResult ?? session.runHistory?.[0]?.result ?? null,
+        runResult: resolveSessionRunResult(session),
         progress: session.progress ?? session.runHistory?.[0]?.progress ?? null,
         runHistory: session.runHistory ?? [],
         humanReviewRecords: session.humanReviewRecords ?? [],
@@ -461,7 +528,7 @@ async function fetchRemoteBenchmarkSessions(projectId: string): Promise<{
             titleManuallySet: session.titleManuallySet ?? false,
             rubric: session.rubric ? localizeRubricForDisplay(session.rubric) : null,
             dataset: session.dataset ?? null,
-            runResult: session.runResult ?? session.runHistory?.[0]?.result ?? null,
+            runResult: resolveSessionRunResult(session),
             progress: session.progress ?? session.runHistory?.[0]?.progress ?? null,
             runHistory: session.runHistory ?? [],
             humanReviewRecords: session.humanReviewRecords ?? [],
@@ -669,7 +736,7 @@ export function NotebookLayout() {
     setSelectedFileId(session.selectedFileId);
     setRunning(false);
     setProgress(session.progress ?? session.runHistory?.[0]?.progress ?? null);
-    setRunResult(session.runResult ?? session.runHistory?.[0]?.result ?? null);
+    setRunResult(resolveSessionRunResult(session));
     setRunHistory(session.runHistory ?? []);
     setHumanReviewRecords(session.humanReviewRecords ?? []);
     setAutofindState(session.autofindState ?? null);
@@ -699,7 +766,7 @@ export function NotebookLayout() {
       if (cancelled) return;
 
       const localSessions = readBenchmarkSessions(activeProjectId);
-      const storedSessions = remote?.sessions.length ? remote.sessions : localSessions;
+      const storedSessions = mergeBenchmarkSessions(localSessions, remote?.sessions ?? []);
       const nextSessions = storedSessions.length > 0 ? storedSessions : [createBenchmarkSession(activeProjectId)];
       const storedActiveId = remote?.activeSessionId ?? readActiveBenchmarkSessionId(activeProjectId);
       const nextActive = nextSessions.find((session) => session.id === storedActiveId) ?? nextSessions[0];
@@ -717,6 +784,14 @@ export function NotebookLayout() {
       cancelled = true;
     };
   }, [activeProjectId, applySession]);
+
+  // ── Recover completed runs after refresh when session cache is stale ─
+  useEffect(() => {
+    if (!sessionHydrated || running || !shouldRecoverBenchmarkRun(progress, runResult)) return;
+    void recoverBenchmarkRunStatus(progress!.runId);
+  }, [sessionHydrated, running, progress, runResult]);
+
+  const effectiveRunResult = runResult ?? progress?.result ?? null;
 
   // ── Persist active session state ─
   useEffect(() => {
@@ -738,7 +813,7 @@ export function NotebookLayout() {
               viewMode,
               copilotTurns,
               selectedFileId,
-              runResult,
+              runResult: runResult ?? progress?.result ?? null,
               progress,
               runHistory,
               humanReviewRecords,
@@ -1236,6 +1311,7 @@ export function NotebookLayout() {
         setProgress(snapshot);
         if (snapshot.phase === "completed" && snapshot.result) {
           setRunResult(snapshot.result);
+          setProgress(snapshot);
           setRunHistory((prev) => buildNextRunHistory(prev, snapshot.result!, snapshot));
           setRunning(false);
           setViewMode("result");
@@ -1273,6 +1349,7 @@ export function NotebookLayout() {
         setProgress(status.snapshot);
         if (status.snapshot.phase === "completed" && status.snapshot.result) {
           setRunResult(status.snapshot.result);
+          setProgress(status.snapshot);
           setRunHistory((prev) => buildNextRunHistory(prev, status.snapshot!.result!, status.snapshot!));
           setRunning(false);
           setViewMode("result");
@@ -1531,7 +1608,7 @@ export function NotebookLayout() {
             <button
               className={viewMode === "result" ? styles.viewActive : ""}
               onClick={() => setViewMode("result")}
-              disabled={!runResult}
+              disabled={!effectiveRunResult}
             >
               评测结果
             </button>
@@ -1563,10 +1640,10 @@ export function NotebookLayout() {
                 onRestart={() => void handleRunBenchmark()}
               />
             )}
-            {viewMode === "result" && runResult && (
+            {viewMode === "result" && effectiveRunResult && (
               <ResultWorkspace
                 projectId={activeProjectId}
-                result={runResult}
+                result={effectiveRunResult}
                 rubric={rubric}
                 history={runHistory}
                 humanReviewRecords={humanReviewRecords}
