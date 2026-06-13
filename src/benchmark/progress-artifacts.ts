@@ -2,7 +2,7 @@
  * @fileoverview File-backed benchmark run progress artifacts.
  */
 
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { BenchmarkProgressSnapshot } from "@/benchmark/progress";
 import type {
@@ -29,7 +29,13 @@ export type BenchmarkGenericRunArtifact = {
 
 const RUNS_DIR = path.join(process.cwd(), ".zeval-db", "benchmark-runs");
 const writeQueues = new Map<string, Promise<void>>();
+const artifactCache = new Map<string, BenchmarkRunProgressArtifact>();
 
+/**
+ * Persist the latest benchmark progress snapshot to disk.
+ * Failures are logged and swallowed so checkpoint IO never aborts the run.
+ * @param snapshot In-memory progress snapshot.
+ */
 export async function persistBenchmarkRunSnapshot(snapshot: BenchmarkProgressSnapshot): Promise<void> {
   const updatedAt = snapshot.updatedAt ?? new Date().toISOString();
   const existing = await readBenchmarkRunArtifact(snapshot.runId);
@@ -42,6 +48,11 @@ export async function persistBenchmarkRunSnapshot(snapshot: BenchmarkProgressSna
   await writeRunArtifact(snapshot.runId, artifact);
 }
 
+/**
+ * Persist generic benchmark run checkpoint data (submissions + metric results).
+ * @param runId Benchmark run id.
+ * @param genericRun Resumable run payload.
+ */
 export async function persistBenchmarkGenericRunArtifact(
   runId: string,
   genericRun: BenchmarkGenericRunArtifact,
@@ -69,16 +80,28 @@ export async function persistBenchmarkGenericRunArtifact(
   await writeRunArtifact(runId, artifact);
 }
 
+/**
+ * Read a persisted benchmark run artifact from disk.
+ * @param runId Benchmark run id.
+ * @returns Parsed artifact or null when missing/invalid.
+ */
 export async function readBenchmarkRunArtifact(runId: string): Promise<BenchmarkRunProgressArtifact | null> {
+  const cached = artifactCache.get(safeSegment(runId));
+  if (cached) {
+    return cached;
+  }
   try {
     const raw = await readFile(runFilePath(safeSegment(runId)), "utf8");
     const parsed = JSON.parse(raw) as Partial<BenchmarkRunProgressArtifact>;
     if (!parsed.snapshot?.runId) return null;
-    return {
+    const artifact: BenchmarkRunProgressArtifact = {
       runId: parsed.snapshot.runId,
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : parsed.snapshot.updatedAt ?? new Date().toISOString(),
       snapshot: parsed.snapshot,
+      genericRun: parsed.genericRun,
     };
+    artifactCache.set(safeSegment(runId), artifact);
+    return artifact;
   } catch {
     return null;
   }
@@ -96,14 +119,57 @@ async function writeRunArtifact(runIdValue: string, artifact: BenchmarkRunProgre
     .then(async () => {
       await mkdir(RUNS_DIR, { recursive: true });
       const target = runFilePath(runId);
-      const current = await readBenchmarkRunArtifact(runIdValue);
+      const current = artifactCache.get(runId) ?? (await readBenchmarkRunArtifact(runIdValue));
       const merged = mergeRunArtifacts(current, artifact);
-      const temp = `${target}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
-      await writeFile(temp, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
-      await rename(temp, target);
+      await atomicWriteFile(target, `${JSON.stringify(merged, null, 2)}\n`);
+      artifactCache.set(runId, merged);
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[benchmark-checkpoint] failed to persist run ${runIdValue}: ${message}`);
     });
   writeQueues.set(runId, nextWrite);
   await nextWrite;
+}
+
+/**
+ * Write JSON atomically with Windows-safe rename retries and direct-write fallback.
+ * @param target Final artifact path.
+ * @param content Serialized JSON payload.
+ */
+async function atomicWriteFile(target: string, content: string): Promise<void> {
+  const temp = `${target}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
+  await writeFile(temp, content, "utf8");
+  const maxAttempts = 5;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await rename(temp, target);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "EPERM" || code === "EEXIST" || code === "EBUSY") {
+        if (attempt >= maxAttempts) {
+          await writeFile(target, content, "utf8");
+          await unlink(temp).catch(() => undefined);
+          return;
+        }
+        await sleep(120 * attempt);
+        continue;
+      }
+      await unlink(temp).catch(() => undefined);
+      throw error;
+    }
+  }
+}
+
+/**
+ * Sleep for checkpoint retry backoff.
+ * @param ms Delay in milliseconds.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function mergeRunArtifacts(

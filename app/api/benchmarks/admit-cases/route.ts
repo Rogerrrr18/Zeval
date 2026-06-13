@@ -7,7 +7,9 @@ import {
   buildBenchmarkDatasetCaseCandidatesFromReviews,
   persistBenchmarkDatasetCases,
   type BenchmarkHumanReviewDecision,
+  type BenchmarkHumanReviewInput,
 } from "@/benchmark/case-admission";
+import { SESSION_REVIEW_METRIC_KEY } from "@/benchmark/human-review";
 import type { BenchmarkRunResult } from "@/benchmark/types";
 import { createDatasetStore } from "@/eval-datasets/storage";
 import type { DatasetCaseSource } from "@/eval-datasets/storage/types";
@@ -25,7 +27,9 @@ const benchmarkAdmitCasesBodySchema = z.object({
   reviews: z.array(z.object({
     submissionId: z.string().min(1),
     metricKey: z.string().min(1),
-    decision: reviewDecisionSchema,
+    decision: reviewDecisionSchema.optional(),
+    confirmedScore: z.number().finite().optional(),
+    channel: z.string().min(1).optional(),
     reviewer: z.string().max(120).optional(),
     note: z.string().max(4000).optional(),
     reviewedAt: z.string().optional(),
@@ -45,10 +49,10 @@ export async function POST(request: Request) {
 
     const context = getZeroreRequestContext(request);
     const store = createDatasetStore({ workspaceId: context.workspaceId });
-    const reviews = parsedBody.data.reviews.map((review) => ({
-      ...review,
-      decision: review.decision as BenchmarkHumanReviewDecision,
-    }));
+    const reviews = normalizeReviewInputs(parsedBody.data.reviews);
+    if (reviews.length === 0) {
+      return NextResponse.json({ error: "没有可入池的有效标定记录。" }, { status: 400 });
+    }
     const runResult = parsedBody.data.runResult as BenchmarkRunResult;
     let candidates = buildBenchmarkDatasetCaseCandidatesFromReviews(runResult, reviews);
     if (parsedBody.data.usePolicySuggestion !== false) {
@@ -93,4 +97,55 @@ function countBySource(sources: DatasetCaseSource[]): Partial<Record<DatasetCase
     acc[source] = (acc[source] ?? 0) + 1;
     return acc;
   }, {});
+}
+
+/**
+ * Merge session-level channel tags onto metric reviews and drop session marker rows.
+ *
+ * @param reviews Raw review rows from the client.
+ * @returns Metric-level review inputs ready for candidate building.
+ */
+function normalizeReviewInputs(
+  reviews: Array<{
+    submissionId: string;
+    metricKey: string;
+    decision?: BenchmarkHumanReviewDecision;
+    confirmedScore?: number;
+    channel?: string;
+    reviewer?: string;
+    note?: string;
+    reviewedAt?: string;
+  }>,
+): BenchmarkHumanReviewInput[] {
+  const sessionChannelBySubmission = new Map<string, string>();
+  for (const review of reviews) {
+    if (review.metricKey === SESSION_REVIEW_METRIC_KEY && review.channel?.trim()) {
+      sessionChannelBySubmission.set(review.submissionId, review.channel.trim());
+    }
+  }
+
+  const normalized: BenchmarkHumanReviewInput[] = [];
+  for (const review of reviews) {
+    if (review.metricKey === SESSION_REVIEW_METRIC_KEY) {
+      continue;
+    }
+    const channel = review.channel?.trim() || sessionChannelBySubmission.get(review.submissionId);
+    const decision = review.decision
+      ?? (typeof review.confirmedScore === "number"
+        ? (review.confirmedScore >= 3 ? "accepted" : "rejected")
+        : undefined);
+    if (!decision || !channel) {
+      continue;
+    }
+    normalized.push({
+      submissionId: review.submissionId,
+      metricKey: review.metricKey,
+      decision,
+      channel,
+      reviewer: review.reviewer,
+      note: review.note,
+      reviewedAt: review.reviewedAt,
+    });
+  }
+  return normalized;
 }

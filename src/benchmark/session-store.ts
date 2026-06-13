@@ -55,7 +55,11 @@ export type BenchmarkHumanReviewRecord = {
   runId: string;
   submissionId: string;
   metricKey: string;
+  /** Human-confirmed discrete rubric score for metric-level records. */
+  confirmedScore?: number;
   decision?: BenchmarkHumanReviewDecision;
+  /** Session-level channel tag; only used when `metricKey === "__session__"`. */
+  channel?: string;
   reviewer?: string;
   note?: string;
   reviewedAt?: string;

@@ -97,7 +97,9 @@ describe("runAutoFindDataSkill search", () => {
       action: "search",
       requirementText: "外贸 Shopify AI 客服自动回复，关注转人工率",
       rubricContext: started.state.rubricContext,
-      state: started.state,
+      // Keep the small deterministic fixture (24 sessions) decoupled from the
+      // production 25+25 default; this test only verifies discovery routing.
+      state: { ...started.state, positiveCount: 10, negativeCount: 10 },
       discoveryDeps: mockDiscoveryDeps(),
     });
 
@@ -140,6 +142,8 @@ describe("runAutoFindDataSkill search", () => {
       state: {
         ...first.state,
         phase: "searched",
+        positiveCount: 10,
+        negativeCount: 10,
         csvText: "sessionId,timestamp,role,content\ncompanion_pos_01,2026-01-01T00:00:00.000Z,user,\"old\"",
         selectedDatasetId: "builtin:companion-pack",
       },

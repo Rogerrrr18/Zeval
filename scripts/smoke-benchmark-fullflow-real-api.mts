@@ -35,7 +35,7 @@ import { parseCsvRows } from "../src/parsers/csvParser.ts";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const fixtureDir = join(root, "../src/benchmark/__fixtures__");
-const sampleCsvPath = join(root, "../public/sample-data/companion-autofind-20sessions.csv");
+const sampleCsvPath = join(root, "../public/sample-data/companion-autofind-50sessions.csv");
 const logDir = join(root, "../.zeval-db/test-logs/fullflow-real-api");
 const projectId = process.env.ZEVAL_FULLFLOW_PROJECT_ID ?? "default";
 
@@ -121,7 +121,7 @@ const task = buildBenchmarkTaskPackage(
 const cases = buildCasesFromRawRows(
   task,
   limitedRows,
-  "companion-autofind-20sessions.csv",
+  "companion-autofind-50sessions.csv",
   maxCases,
 );
 const matrix: BenchmarkMatrixCell[] = [{

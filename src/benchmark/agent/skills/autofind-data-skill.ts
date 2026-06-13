@@ -1,5 +1,5 @@
 /**
- * @fileoverview AutoFind 数据技能 — 通过 AutoFind Agent 动态发现、下载并整理 10 正 + 10 负多轮对话 CSV。
+ * @fileoverview AutoFind 数据技能 — 通过 AutoFind Agent 动态发现、下载并整理 25 正 + 25 负多轮对话 CSV。
  *
  * 编排见 `autofind-agent.ts`；工具发现见 `autofind-discovery.ts`；格式归一化见 `autofind-normalizers.ts`。
  * 降级：LLM 不可用时各阶段回退规则模板，不读取本地硬编码缓存。
@@ -122,8 +122,8 @@ function startWorkflow(
     datasetProfile,
     requirementText: mergedRequirement,
     rubricContext,
-    positiveCount: 10,
-    negativeCount: 10,
+    positiveCount: 25,
+    negativeCount: 25,
     includeEnglishNegative: true,
     sources: describeAutoFindSources(datasetProfile),
     warnings: [],
@@ -133,7 +133,7 @@ function startWorkflow(
     reply: [
       "## AutoFind 数据工作流",
       "",
-      "目标：为当前评测任务准备 **10 条正样本 + 10 条负样本** 多轮对话，并导出为 Zeval CSV。",
+      "目标：为当前评测任务准备 **25 条正样本 + 25 条负样本** 多轮对话，并导出为 Zeval CSV。",
       "",
       mergedRequirement
         ? `**当前需求**：${mergedRequirement}`
@@ -148,7 +148,7 @@ function startWorkflow(
       "",
       "### 步骤",
       "1. **检索** — 模型生成关键词并从公开源发现数据集",
-      "2. **整理** — 模型挑选 10 正 + 10 负 session，转为 Zeval CSV",
+      "2. **整理** — 模型挑选 25 正 + 25 负 session，转为 Zeval CSV",
       "3. **保存** — 写入 `public/sample-data/`",
       "4. **应用** — 在对话里输入「应用」加载到评测数据区",
       "",
@@ -330,7 +330,7 @@ async function handleChatWorkflow(
       reply: [
         "好的，正在应用数据集到当前评测任务。",
         "",
-        `文件：\`${state.fileName ?? "companion-autofind-20sessions.csv"}\``,
+        `文件：\`${state.fileName ?? "companion-autofind-50sessions.csv"}\``,
         "（前端将自动调用 ingest 流程）",
       ].join("\n"),
       state: { ...state, phase: "saved" },
@@ -370,7 +370,7 @@ async function handleChatWorkflow(
       "- **开始搜索** — 从 HuggingFace / GitHub / 网页检索并整理公开数据集",
       "- **保存** — 写入 `public/sample-data/`",
       "- **应用** — 加载到评测数据区",
-      "- **正样本 10 负样本 10** — 调整数量",
+      "- **正样本 25 负样本 25** — 调整数量",
       "",
       `你刚才说：「${text}」`,
       "如果这是补充检索条件，我会在下次搜索时一并考虑。",
@@ -613,7 +613,7 @@ function buildOutputFileName(requirementText: string): string {
     .replace(/[^a-z0-9\u3400-\u9fff]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 32);
-  return slug ? `${slug}-autofind-20sessions.csv` : "companion-autofind-20sessions.csv";
+  return slug ? `${slug}-autofind-50sessions.csv` : "companion-autofind-50sessions.csv";
 }
 
 function clampCount(value: number, fallback: number): number {

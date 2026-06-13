@@ -1,6 +1,5 @@
 import { benchmarkProgress } from "@/benchmark/progress";
-import { readBenchmarkRunStatus } from "@/benchmark/progress-recovery";
-
+import { readBenchmarkRunStatus, shouldKeepRunStreamOpen } from "@/benchmark/progress-recovery";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
@@ -21,19 +20,19 @@ export async function GET(request: Request) {
       controller.enqueue(encoder.encode(":heartbeat\n\n"));
 
       const recovered = await readBenchmarkRunStatus(runId);
-      if (recovered.snapshot && recovered.source !== "memory") {
+      if (recovered.snapshot) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(recovered.snapshot)}\n\n`));
-        if (recovered.snapshot.phase === "completed" || recovered.snapshot.phase === "failed") {
-          controller.close();
-          return;
-        }
       }
 
-      const unsubscribe = benchmarkProgress.subscribe(runId, (snapshot) => {
-        try {
+      if (!shouldKeepRunStreamOpen(recovered)) {
+        controller.close();
+        return;
+      }
+
+      const unsubscribe = benchmarkProgress.subscribe(runId, (snapshot) => {        try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(snapshot)}\n\n`));
 
-          if (snapshot.phase === "completed" || snapshot.phase === "failed") {
+          if (snapshot.phase === "completed") {
             setTimeout(() => {
               try {
                 controller.close();
@@ -42,8 +41,7 @@ export async function GET(request: Request) {
               }
             }, 3000);
             unsubscribe();
-          }
-        } catch {
+          }        } catch {
           unsubscribe();
         }
       });

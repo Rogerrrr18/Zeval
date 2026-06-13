@@ -20,7 +20,8 @@ export type BenchmarkProgressPhase =
   | "submitting"
   | "evaluating"
   | "completed"
-  | "failed";
+  | "failed"
+  | "interrupted";
 
 export type SubmissionProgressItem = {
   agentFramework: AgentFrameworkId;
@@ -91,6 +92,8 @@ export type ProgressListener = (snapshot: BenchmarkProgressSnapshot) => void;
 class BenchmarkProgressTracker {
   private snapshots = new Map<string, BenchmarkProgressSnapshot>();
   private listeners = new Map<string, Set<ProgressListener>>();
+  private cancelledRuns = new Set<string>();
+  private persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   init(runId: string, matrix: BenchmarkMatrixCell[], caseCount: number): void {
     const totalSubmissions = matrix.length * caseCount;
@@ -132,6 +135,9 @@ class BenchmarkProgressTracker {
     const current = this.snapshots.get(runId);
     if (!current) return;
     const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
+    if (patch.phase && isActiveBenchmarkPhase(patch.phase) && patch.error === undefined) {
+      next.error = undefined;
+    }
     this.snapshots.set(runId, next);
     this.persist(runId);
     this.listeners.get(runId)?.forEach((listener) => listener(next));
@@ -166,7 +172,53 @@ class BenchmarkProgressTracker {
   }
 
   setResult(runId: string, result: BenchmarkRunResult): void {
+    this.clearCancel(runId);
     this.update(runId, { phase: "completed", result });
+  }
+
+  /**
+   * Register a cooperative cancel request for an active run.
+   *
+   * @param runId Benchmark run id.
+   */
+  requestCancel(runId: string): void {
+    this.cancelledRuns.add(runId);
+  }
+
+  /**
+   * Whether a run has been marked for cancellation.
+   *
+   * @param runId Benchmark run id.
+   * @returns True when cancel was requested.
+   */
+  isCancelled(runId: string): boolean {
+    return this.cancelledRuns.has(runId);
+  }
+
+  /**
+   * Clear a pending cancel flag after the run stops.
+   *
+   * @param runId Benchmark run id.
+   */
+  clearCancel(runId: string): void {
+    this.cancelledRuns.delete(runId);
+  }
+
+  /**
+   * Persist an interrupted checkpoint and notify listeners.
+   *
+   * @param runId Benchmark run id.
+   * @param error User-facing interruption reason.
+   */
+  interrupt(runId: string, error: string): void {
+    this.clearCancel(runId);
+    this.addEvent(runId, {
+      phase: "interrupted",
+      status: "warning",
+      title: "评测已中断",
+      detail: error,
+    });
+    this.update(runId, { phase: "interrupted", error });
   }
 
   getSnapshot(runId: string): BenchmarkProgressSnapshot | undefined {
@@ -183,15 +235,60 @@ class BenchmarkProgressTracker {
   cleanup(runId: string): void {
     this.snapshots.delete(runId);
     this.listeners.delete(runId);
+    this.cancelledRuns.delete(runId);
   }
 
   private persist(runId: string): void {
     const snapshot = this.snapshots.get(runId);
     if (!snapshot) return;
-    void persistBenchmarkRunSnapshot(snapshot).catch(() => {
-      // Progress streaming should not fail just because disk persistence did.
-    });
+    const existingTimer = this.persistTimers.get(runId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+    this.persistTimers.set(
+      runId,
+      setTimeout(() => {
+        this.persistTimers.delete(runId);
+        const latest = this.snapshots.get(runId);
+        if (!latest) return;
+        void persistBenchmarkRunSnapshot(latest).catch(() => {
+          // Progress streaming should not fail just because disk persistence did.
+        });
+      }, 800),
+    );
+  }
+
+  /**
+   * Flush pending snapshot persistence immediately (e.g. before run completion).
+   * @param runId Benchmark run id.
+   */
+  async flushPersist(runId: string): Promise<void> {
+    const pending = this.persistTimers.get(runId);
+    if (pending) {
+      clearTimeout(pending);
+      this.persistTimers.delete(runId);
+    }
+    const snapshot = this.snapshots.get(runId);
+    if (!snapshot) return;
+    await persistBenchmarkRunSnapshot(snapshot).catch(() => undefined);
   }
 }
 
 export const benchmarkProgress = new BenchmarkProgressTracker();
+
+const ACTIVE_BENCHMARK_PHASES = new Set<BenchmarkProgressPhase>([
+  "preparing",
+  "ingesting",
+  "building_cases",
+  "submitting",
+  "evaluating",
+]);
+
+/**
+ * Whether a benchmark phase indicates the run is actively progressing.
+ * @param phase Benchmark progress phase.
+ * @returns True for non-terminal in-flight phases.
+ */
+export function isActiveBenchmarkPhase(phase: BenchmarkProgressPhase): boolean {
+  return ACTIVE_BENCHMARK_PHASES.has(phase);
+}

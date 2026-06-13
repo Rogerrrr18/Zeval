@@ -10,7 +10,12 @@ import type {
   LearnPolicyOptions,
 } from "./admission-policy-types.ts";
 
-const DEFAULT_MIN_SAMPLES = 8;
+/**
+ * Minimum accept/reject samples per channel before quantile rules are emitted.
+ * Lowered to 3 so a 20-label batch (spread across up to 5 channels) can still
+ * produce usable per-channel accept/reject rules instead of only uncertainty.
+ */
+const DEFAULT_MIN_SAMPLES = 3;
 
 /**
  * Compute linear-interpolation percentile of a numeric array.

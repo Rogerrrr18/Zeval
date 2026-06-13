@@ -3,13 +3,20 @@
  */
 
 import { approveRubricMetrics } from "@/benchmark/rubric";
-import { runBenchmarkEvaluation } from "@/benchmark/runner";
+import { assembleBenchmarkRunResult, evaluateSubmissionMetrics } from "@/benchmark/runner";
+import { computeSubmissionProgressCounts } from "@/benchmark/progress-sync";
 import { benchmarkProgress } from "@/benchmark/progress";
 import {
   persistBenchmarkGenericRunArtifact,
   readBenchmarkRunArtifact,
   type BenchmarkGenericRunArtifact,
 } from "@/benchmark/progress-artifacts";
+import {
+  assertBenchmarkRunActive,
+  BenchmarkRunCancelledError,
+  interruptBenchmarkRun,
+} from "@/benchmark/run-cancellation";
+import type { BenchmarkProgressSnapshot } from "@/benchmark/progress";
 import { buildEvalAnythingDesign, renderEvalAnythingDesignSummary } from "@/benchmark/eval-anything-philosophy";
 import { snapScoreToRubricLevels } from "@/benchmark/rubric-judge";
 import {
@@ -54,6 +61,18 @@ const DEFAULT_MATRIX: BenchmarkMatrixCell[] = [
 ];
 
 export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInput) {
+  try {
+    return await runGenericBenchmarkStreamingInternal(input);
+  } catch (error) {
+    if (error instanceof BenchmarkRunCancelledError) {
+      interruptBenchmarkRun(input.runId, "评测已由用户手动停止。");
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function runGenericBenchmarkStreamingInternal(input: RunGenericBenchmarkInput) {
   const approvedMetricKeys = input.rubric.modules
     .flatMap((module) => module.metrics)
     .filter((metric) => metric.approvalStatus === "approved")
@@ -68,15 +87,24 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
   const task = buildTaskPackage(input.requirementText, rubric, matrix);
   const cases = buildCasesFromDataset(task, input.dataset);
   const totalMetrics = cases.length * matrix.length * approvedMetricKeys.length;
+  const existingArtifact = await readBenchmarkRunArtifact(input.runId);
   const resumeArtifact = input.resumeRunId
     ? (await readBenchmarkRunArtifact(input.resumeRunId))?.genericRun
-    : (await readBenchmarkRunArtifact(input.runId))?.genericRun;
+    : existingArtifact?.genericRun;
   const reusableArtifact = isReusableGenericArtifact(resumeArtifact, input.requirementText, task)
     ? resumeArtifact
     : null;
   const metricResultsForArtifact = dedupeMetricResults(reusableArtifact?.metricResults ?? []);
 
-  benchmarkProgress.init(input.runId, matrix, cases.length);
+  restoreOrInitProgress({
+    runId: input.runId,
+    matrix,
+    cases,
+    approvedMetricCount: approvedMetricKeys.length,
+    reusableArtifact,
+    existingSnapshot: existingArtifact?.snapshot ?? null,
+    totalMetrics,
+  });
   if (task.evalDesign) {
     benchmarkProgress.addEvent(input.runId, {
       phase: "preparing",
@@ -119,7 +147,84 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
       detail: `将复用 ${reusableArtifact.submissions.filter((item) => item.status === "completed").length} 条被测输出和 ${metricResultsForArtifact.length} 条指标评审结果。`,
     });
   }
-  await persistGenericArtifact(input.runId, input.requirementText, task, cases, reusableArtifact?.submissions ?? [], metricResultsForArtifact);
+  await persistGenericArtifact(input.runId, input.requirementText, task, cases, reusableArtifact?.submissions ?? [], metricResultsForArtifact)
+    .catch(() => undefined);
+  assertBenchmarkRunActive(input.runId);
+
+  const existingMetricByKey = new Map(
+    metricResultsForArtifact.map((result) => [metricCacheKey(result), result]),
+  );
+
+  let checkpointPersistTimer: ReturnType<typeof setTimeout> | null = null;
+  let submissionsRef: BenchmarkAgentSubmission[] = reusableArtifact?.submissions ?? [];
+  const scheduleCheckpointPersist = () => {
+    if (checkpointPersistTimer) {
+      clearTimeout(checkpointPersistTimer);
+    }
+    checkpointPersistTimer = setTimeout(() => {
+      checkpointPersistTimer = null;
+      void persistGenericArtifact(
+        input.runId,
+        input.requirementText,
+        task,
+        cases,
+        submissionsRef,
+        metricResultsForArtifact,
+      ).catch(() => undefined);
+    }, 2000);
+  };
+  const flushCheckpointPersist = async () => {
+    if (checkpointPersistTimer) {
+      clearTimeout(checkpointPersistTimer);
+      checkpointPersistTimer = null;
+    }
+    await persistGenericArtifact(
+      input.runId,
+      input.requirementText,
+      task,
+      cases,
+      submissionsRef,
+      metricResultsForArtifact,
+    ).catch(() => undefined);
+  };
+
+  const llmJudge = createLlmJudge();
+
+  const syncEvaluatedMetrics = () => {
+    benchmarkProgress.update(input.runId, {
+      evaluatedMetrics: metricResultsForArtifact.length,
+      phase: "evaluating",
+      activeAnalysis: "正在逐指标调用评测器。每个指标会根据用户确认的 rubric 表单、案例上下文、期望标准和被测输出给出分数、理由与证据。",
+    });
+  };
+
+  const evaluateMetricsForSubmission = async (
+    submission: BenchmarkAgentSubmission,
+    taskCase: BenchmarkCase,
+  ) => {
+    if (submission.status !== "completed") {
+      return;
+    }
+    await evaluateSubmissionMetrics({
+      runId: input.runId,
+      task,
+      taskCase,
+      submission,
+      evaluatorContext: { llmJudge },
+      existingMetricByKey,
+      metricResults: metricResultsForArtifact,
+      shouldCancel: () => benchmarkProgress.isCancelled(input.runId),
+      onMetricReused: () => {
+        syncEvaluatedMetrics();
+      },
+      onMetricEvaluated: (metricResult) => {
+        upsertMetricResult(metricResultsForArtifact, metricResult);
+        syncEvaluatedMetrics();
+        scheduleCheckpointPersist();
+        addMetricEvaluationEvent(input.runId, metricResult);
+      },
+    });
+  };
 
   const submissions = await buildSubmissions({
     runId: input.runId,
@@ -128,56 +233,19 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
     matrix,
     existingSubmissions: reusableArtifact?.submissions ?? [],
     metricResultsForArtifact,
+    onSubmissionReady: evaluateMetricsForSubmission,
   });
+  submissionsRef = submissions;
 
-  benchmarkProgress.update(input.runId, {
-    phase: "evaluating",
-    activeAnalysis: "正在逐指标调用评测器。每个指标会根据用户确认的 rubric 表单、案例上下文、期望标准和被测输出给出分数、理由与证据。",
-  });
-  benchmarkProgress.addEvent(input.runId, {
-    phase: "evaluating",
-    status: "running",
-    title: "进入指标评审",
-    detail: `将对 ${cases.length} 个案例执行 ${approvedMetricKeys.length} 项已确认指标评审。`,
-  });
+  assertBenchmarkRunActive(input.runId);
 
-  const result = await runBenchmarkEvaluation({
+  const result = assembleBenchmarkRunResult({
     runId: input.runId,
     task,
     cases,
     submissions,
     matrix,
-    evaluatorContext: {
-      llmJudge: createLlmJudge(),
-    },
-    existingMetricResults: metricResultsForArtifact,
-    onMetricReused: (metricResult) => {
-      const snap = benchmarkProgress.getSnapshot(input.runId);
-      if (!snap) return;
-      benchmarkProgress.update(input.runId, {
-        evaluatedMetrics: snap.evaluatedMetrics + 1,
-      });
-      benchmarkProgress.addEvent(input.runId, {
-        phase: "evaluating",
-        status: "completed",
-        title: "复用指标结果",
-        detail: `${metricResult.metricKey} 已从上次中断 run 中复用，无需重新调用评测模型。`,
-        caseId: metricResult.caseId,
-        metricName: metricResult.metricKey,
-        score: metricResult.score,
-        evidence: metricResult.evidence.slice(0, 3),
-      });
-    },
-    onMetricEvaluated: (metricResult) => {
-      const snap = benchmarkProgress.getSnapshot(input.runId);
-      if (!snap) return;
-      benchmarkProgress.update(input.runId, {
-        evaluatedMetrics: snap.evaluatedMetrics + 1,
-      });
-      upsertMetricResult(metricResultsForArtifact, metricResult);
-      void persistGenericArtifact(input.runId, input.requirementText, task, cases, submissions, metricResultsForArtifact);
-      addMetricEvaluationEvent(input.runId, metricResult);
-    },
+    metricResults: metricResultsForArtifact,
   });
 
   benchmarkProgress.addEvent(input.runId, {
@@ -187,7 +255,10 @@ export async function runGenericBenchmarkStreaming(input: RunGenericBenchmarkInp
     detail: `平均分 ${result.summary.averageScore.toFixed(1)}%，共生成 ${result.summary.metricResultCount} 条指标评审结果。`,
   });
   benchmarkProgress.setResult(input.runId, result);
-  await persistGenericArtifact(input.runId, input.requirementText, task, cases, submissions, result.metricResults);
+  await benchmarkProgress.flushPersist(input.runId);
+  await flushCheckpointPersist();
+  await persistGenericArtifact(input.runId, input.requirementText, task, cases, submissions, result.metricResults)
+    .catch(() => undefined);
   return { task, result };
 }
 
@@ -243,6 +314,7 @@ async function buildSubmissions(input: {
   matrix: BenchmarkMatrixCell[];
   existingSubmissions?: BenchmarkAgentSubmission[];
   metricResultsForArtifact: BenchmarkMetricEvaluationResult[];
+  onSubmissionReady?: (submission: BenchmarkAgentSubmission, taskCase: BenchmarkCase) => Promise<void>;
 }): Promise<BenchmarkAgentSubmission[]> {
   const submissions: BenchmarkAgentSubmission[] = [];
   const existingByKey = new Map(
@@ -253,26 +325,11 @@ async function buildSubmissions(input: {
 
   for (const matrixCell of input.matrix) {
     for (const taskCase of input.cases) {
+      assertBenchmarkRunActive(input.runId);
       const existingSubmission = existingByKey.get(submissionCacheKey(matrixCell.agentFramework, matrixCell.model, taskCase.caseId));
       if (existingSubmission) {
         submissions.push(existingSubmission);
-        markSubmissionDone(input.runId, matrixCell, taskCase, true, existingSubmission.durationMs);
-        benchmarkProgress.addEvent(input.runId, {
-          phase: "submitting",
-          status: "completed",
-          title: "复用被测输出",
-          detail: `案例 ${taskCase.caseId} 已从上次中断 run 中复用，无需重新调用被测模型。`,
-          caseId: taskCase.caseId,
-          evidence: extractOutputEvidence(existingSubmission.parsedOutput ?? {}),
-        });
-        await persistGenericArtifact(
-          input.runId,
-          input.task.requirementText,
-          input.task,
-          input.cases,
-          submissions,
-          input.metricResultsForArtifact,
-        );
+        await input.onSubmissionReady?.(existingSubmission, taskCase);
         continue;
       }
 
@@ -307,7 +364,7 @@ async function buildSubmissions(input: {
             startedMs,
           });
           submissions.push(submission);
-          markSubmissionDone(input.runId, matrixCell, taskCase, true, submission.durationMs);
+          markSubmissionDone(input.runId, matrixCell, taskCase, submissions, input.matrix, input.cases, true, submission.durationMs);
           await persistGenericArtifact(
             input.runId,
             input.task.requirementText,
@@ -324,6 +381,7 @@ async function buildSubmissions(input: {
             caseId: taskCase.caseId,
             evidence: extractOutputEvidence(submission.parsedOutput ?? {}),
           });
+          await input.onSubmissionReady?.(submission, taskCase);
           continue;
         }
 
@@ -369,7 +427,7 @@ async function buildSubmissions(input: {
           artifacts: {},
         };
         submissions.push(submission);
-        markSubmissionDone(input.runId, matrixCell, taskCase, true, submission.durationMs);
+        markSubmissionDone(input.runId, matrixCell, taskCase, submissions, input.matrix, input.cases, true, submission.durationMs);
         await persistGenericArtifact(
           input.runId,
           input.task.requirementText,
@@ -386,7 +444,11 @@ async function buildSubmissions(input: {
           caseId: taskCase.caseId,
           evidence: extractOutputEvidence(parsedOutput),
         });
+        await input.onSubmissionReady?.(submission, taskCase);
       } catch (error) {
+        if (error instanceof BenchmarkRunCancelledError) {
+          throw error;
+        }
         const message = error instanceof Error ? error.message : String(error);
         submissions.push({
           submissionId: `${input.runId}_${matrixCell.agentFramework}_${taskCase.caseId}`,
@@ -403,7 +465,7 @@ async function buildSubmissions(input: {
           completedAt: new Date().toISOString(),
           durationMs: Date.now() - startedMs,
         });
-        markSubmissionDone(input.runId, matrixCell, taskCase, false);
+        markSubmissionDone(input.runId, matrixCell, taskCase, submissions, input.matrix, input.cases, false);
         await persistGenericArtifact(
           input.runId,
           input.task.requirementText,
@@ -440,6 +502,42 @@ async function persistGenericArtifact(
     cases,
     submissions,
     metricResults: dedupeMetricResults(metricResults),
+  });
+}
+
+function restoreOrInitProgress(input: {
+  runId: string;
+  matrix: BenchmarkMatrixCell[];
+  cases: BenchmarkCase[];
+  approvedMetricCount: number;
+  reusableArtifact: BenchmarkGenericRunArtifact | null;
+  existingSnapshot: BenchmarkProgressSnapshot | null;
+  totalMetrics: number;
+}): void {
+  if (input.reusableArtifact && input.existingSnapshot) {
+    const submissionCounts = computeSubmissionProgressCounts(
+      input.matrix,
+      input.cases,
+      input.reusableArtifact.submissions,
+    );
+    benchmarkProgress.restoreSnapshot({
+      ...input.existingSnapshot,
+      runId: input.runId,
+      phase: "building_cases",
+      error: undefined,
+      totalSubmissions: input.matrix.length * input.cases.length,
+      completedSubmissions: submissionCounts.completedSubmissions,
+      failedSubmissions: submissionCounts.failedSubmissions,
+      matrixProgress: submissionCounts.matrixProgress,
+      evaluatedMetrics: input.reusableArtifact.metricResults.length,
+      totalMetrics: input.totalMetrics,
+    });
+    return;
+  }
+
+  benchmarkProgress.init(input.runId, input.matrix, input.cases.length);
+  benchmarkProgress.update(input.runId, {
+    totalMetrics: input.totalMetrics,
   });
 }
 
@@ -847,24 +945,14 @@ function markSubmissionDone(
   runId: string,
   matrixCell: BenchmarkMatrixCell,
   taskCase: BenchmarkCase,
+  submissions: BenchmarkAgentSubmission[],
+  matrix: BenchmarkMatrixCell[],
+  cases: BenchmarkCase[],
   success: boolean,
   durationMs?: number,
 ): void {
-  const snap = benchmarkProgress.getSnapshot(runId);
-  if (!snap) return;
-  benchmarkProgress.update(runId, {
-    completedSubmissions: snap.completedSubmissions + 1,
-    failedSubmissions: snap.failedSubmissions + (success ? 0 : 1),
-    matrixProgress: snap.matrixProgress.map((row) =>
-      row.agentFramework === matrixCell.agentFramework && row.model === matrixCell.model
-        ? {
-            ...row,
-            completed: row.completed + (success ? 1 : 0),
-            failed: row.failed + (success ? 0 : 1),
-          }
-        : row,
-    ),
-  });
+  const submissionCounts = computeSubmissionProgressCounts(matrix, cases, submissions);
+  benchmarkProgress.update(runId, submissionCounts);
   benchmarkProgress.addItem(runId, {
     agentFramework: matrixCell.agentFramework,
     model: matrixCell.model,

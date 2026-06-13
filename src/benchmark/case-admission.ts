@@ -41,6 +41,8 @@ export type BenchmarkHumanReviewInput = {
   submissionId: string;
   metricKey: string;
   decision: BenchmarkHumanReviewDecision;
+  /** Reviewer-selected admission channel (see `admission-channels.ts`). */
+  channel?: string;
   reviewer?: string;
   note?: string;
   reviewedAt?: string;
@@ -188,6 +190,7 @@ export function buildBenchmarkDatasetCaseCandidatesFromReviews(
       metadata: {
         ...baseCandidate.metadata,
         humanReviewDecision: review.decision,
+        humanReviewChannel: review.channel,
         humanReviewNote: review.note?.trim(),
         humanReviewedAt: reviewedAt,
         humanReviewer: review.reviewer?.trim() || "benchmark-reviewer",

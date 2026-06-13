@@ -19,7 +19,7 @@ import { parseCsvRows } from "../src/parsers/csvParser.ts";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const fixtureDir = join(root, "../src/benchmark/__fixtures__");
-const sampleCsvPath = join(root, "../public/sample-data/companion-autofind-20sessions.csv");
+const sampleCsvPath = join(root, "../public/sample-data/companion-autofind-50sessions.csv");
 const rubric = JSON.parse(
   readFileSync(join(fixtureDir, "rubric-companion-min.json"), "utf8"),
 ) as BenchmarkRubricSet;
@@ -33,8 +33,8 @@ const task = buildBenchmarkTaskPackage(
 const cases = buildCasesFromRawRows(
   task,
   rows,
-  "companion-autofind-20sessions.csv",
-  20,
+  "companion-autofind-50sessions.csv",
+  50,
 );
 const matrix: BenchmarkMatrixCell[] = [{
   agentFramework: "zeval",

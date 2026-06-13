@@ -20,7 +20,7 @@ import type { BenchmarkMatrixCell, BenchmarkRubricSet } from "./types.ts";
 import { parseCsvRows } from "../parsers/csvParser.ts";
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), "__fixtures__");
-const sampleCsvPath = join(fixtureDir, "../../../public/sample-data/companion-autofind-20sessions.csv");
+const sampleCsvPath = join(fixtureDir, "../../../public/sample-data/companion-autofind-50sessions.csv");
 
 function loadCompanionRubric(): BenchmarkRubricSet {
   return JSON.parse(readFileSync(join(fixtureDir, "rubric-companion-min.json"), "utf8")) as BenchmarkRubricSet;
@@ -43,7 +43,7 @@ describe("companion transcript benchmark", () => {
       "评估陪伴式心理咨询 transcript 的共情、追问与话题聚焦质量。",
       rubric,
     );
-    const cases = buildCasesFromRawRows(task, rows, "companion-autofind-20sessions.csv", 20);
+    const cases = buildCasesFromRawRows(task, rows, "companion-autofind-50sessions.csv", 50);
     const runId = "smoke_companion_transcript";
     const submissions = cases.map((taskCase) => buildTranscriptSubmission({
       runId,
@@ -77,9 +77,9 @@ describe("companion transcript benchmark", () => {
     const normalized = result.metricResults.map((item) => item.normalizedScore);
     const blockedCount = result.metricResults.filter((item) => item.status === "blocked").length;
 
-    assert.equal(cases.length, 20);
-    assert.equal(posScores.length, 10);
-    assert.equal(negScores.length, 10);
+    assert.equal(cases.length, 50);
+    assert.equal(posScores.length, 25);
+    assert.equal(negScores.length, 25);
     assert.ok(posAvg > negAvg, `posAvg=${posAvg}, negAvg=${negAvg}`);
     assert.ok(posAvg - negAvg >= 15, `score gap too small: ${posAvg - negAvg}`);
     assert.ok(stdDev(normalized) > 5);

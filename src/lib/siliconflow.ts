@@ -195,7 +195,7 @@ export async function requestSiliconFlowChatCompletion(
       if (attempt >= maxAttempts || !isRetryableLlmError(error)) {
         throw error;
       }
-      await sleep(buildRetryDelayMs(attempt));
+      await sleep(buildRetryDelayMs(attempt, error));
     } finally {
       clearTimeout(timeout);
     }
@@ -595,12 +595,18 @@ function dedupeStrings(values: string[]): string[] {
 }
 
 /**
- * Build a short exponential backoff with jitter for LLM retries.
+ * Build an exponential backoff with jitter for LLM retries.
+ * Rate-limit (429) errors use longer delays to give the provider time to recover.
  * @param attempt Current 1-based attempt number.
+ * @param error Optional error from the failed attempt, used to tune delay for 429.
  * @returns Delay in milliseconds before the next attempt.
  */
-function buildRetryDelayMs(attempt: number): number {
-  const base = Math.min(5000, 500 * 2 ** Math.max(0, attempt - 1));
+function buildRetryDelayMs(attempt: number, error?: unknown): number {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const isRateLimited = /SiliconFlow 请求失败: 429/.test(message);
+  const base = isRateLimited
+    ? Math.min(30000, 2000 * 2 ** Math.max(0, attempt - 1))
+    : Math.min(5000, 500 * 2 ** Math.max(0, attempt - 1));
   return base + Math.floor(Math.random() * 250);
 }
 

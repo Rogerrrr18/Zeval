@@ -25,13 +25,16 @@ describe("normalizeDatasetToCsv", () => {
     assert.equal(isZevalCsv(csv), true);
   });
 
-  it("normalizes instruction/response CSV into grouped multi-turn sessions", () => {
+  it("normalizes instruction/response CSV into grouped multi-turn sessions (>=3 turns)", () => {
+    // Six single-turn rows merge into two 3-turn sessions (group size = 3).
     const csv = [
       "flags,instruction,category,intent,response",
-      'A,"question about order 1",ORDER,track,"I can help with order 1."',
+      'A,"question about order {{Order Number}}",ORDER,track,"Visit {{Website URL}} for order {{Order Number}}."',
       'A,"follow up on order 1",ORDER,track,"Checking logistics for order 1."',
+      'A,"still waiting on order 1",ORDER,track,"Order 1 is on the way."',
       'A,"question about order 2",ORDER,track,"I can help with order 2."',
       'A,"follow up on order 2",ORDER,track,"Checking logistics for order 2."',
+      'A,"still waiting on order 2",ORDER,track,"Order 2 is on the way."',
     ].join("\n");
     const normalized = normalizeDatasetToCsv({
       rawText: csv,
@@ -43,6 +46,12 @@ describe("normalizeDatasetToCsv", () => {
     assert.ok(normalized);
     assert.match(normalized!, /cs_pos_/);
     assert.match(normalized!, /cs_neg_/);
+    // Each session must carry at least 3 user turns (3 轮).
+    const posUserTurns = normalized!
+      .split(/\r?\n/)
+      .filter((line) => /^cs_pos_01,/.test(line) && /,user,/.test(line)).length;
+    assert.ok(posUserTurns >= 3, `expected >=3 user turns, got ${posUserTurns}`);
+    assert.doesNotMatch(normalized!, /\{\{[^}]+\}\}/, "Bitext slots should be filled before export");
   });
 
   it("normalizes generic customer-service dialogue JSON", () => {

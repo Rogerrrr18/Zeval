@@ -2,7 +2,9 @@
  * @fileoverview Benchmark Mode scoring runner.
  */
 
-import { evaluateBenchmarkMetric, type BenchmarkEvaluatorContext } from "@/benchmark/evaluators";
+import { type BenchmarkEvaluatorContext } from "@/benchmark/evaluators";
+import { evaluateBenchmarkMetricWithRetry } from "@/benchmark/metric-eval-retry";
+import { BenchmarkRunCancelledError } from "@/benchmark/run-cancellation";
 import { assignQualityTiers, type RerankCaseInput } from "@/benchmark/rerank";
 import { getApprovedRubricMetrics, validateApprovedRubric } from "@/benchmark/rubric";
 import { assertMinimumApprovedMetrics, MIN_APPROVED_METRICS } from "@/benchmark/rubric-guards";
@@ -29,54 +31,76 @@ export type RunBenchmarkEvaluationInput = {
   matrix: BenchmarkMatrixCell[];
   evaluatorContext?: BenchmarkEvaluatorContext;
   existingMetricResults?: BenchmarkMetricEvaluationResult[];
+  /** Mutable accumulator for incremental metric evaluation. */
+  metricResults?: BenchmarkMetricEvaluationResult[];
   badcaseThreshold?: number;
   goldencaseThreshold?: number;
   /** Called after each metric is evaluated for progress tracking. */
   onMetricEvaluated?: (result: BenchmarkMetricEvaluationResult) => void;
   /** Called when a metric result is reused from a previous interrupted run. */
   onMetricReused?: (result: BenchmarkMetricEvaluationResult) => void;
+  /** When true, abort before the next metric evaluation. */
+  shouldCancel?: () => boolean;
+};
+
+export type EvaluateSubmissionMetricsInput = {
+  runId: string;
+  task: BenchmarkTaskPackage;
+  taskCase: BenchmarkCase;
+  submission: BenchmarkAgentSubmission;
+  evaluatorContext?: BenchmarkEvaluatorContext;
+  existingMetricByKey: Map<string, BenchmarkMetricEvaluationResult>;
+  metricResults: BenchmarkMetricEvaluationResult[];
+  onMetricEvaluated?: (result: BenchmarkMetricEvaluationResult) => void;
+  onMetricReused?: (result: BenchmarkMetricEvaluationResult) => void;
+  shouldCancel?: () => boolean;
 };
 
 /**
- * Score one benchmark task package across a matrix of Agent framework/model submissions.
+ * Evaluate all approved rubric metrics for one submission.
+ * Skips metrics already present in `existingMetricByKey` and invokes `onMetricReused`.
+ *
+ * @param input Per-submission evaluation context.
  */
-export async function runBenchmarkEvaluation(
-  input: RunBenchmarkEvaluationInput,
-): Promise<BenchmarkRunResult> {
-  const rubricErrors = validateApprovedRubric(input.task.rubric);
-  if (rubricErrors.length > 0) {
-    throw new Error(`Benchmark rubric is not runnable: ${rubricErrors.join("; ")}`);
-  }
-
+export async function evaluateSubmissionMetrics(input: EvaluateSubmissionMetricsInput): Promise<void> {
   const approvedMetrics = getApprovedRubricMetrics(input.task.rubric);
-  const minimumMetrics = Number(process.env.ZEVAL_BENCHMARK_MIN_METRICS ?? MIN_APPROVED_METRICS);
-  if (Number.isFinite(minimumMetrics) && minimumMetrics > 0) {
-    assertMinimumApprovedMetrics(approvedMetrics.length, minimumMetrics);
-  }
-  const caseById = new Map(input.cases.map((taskCase) => [taskCase.caseId, taskCase]));
-  const existingMetricByKey = new Map(
-    (input.existingMetricResults ?? []).map((result) => [metricCacheKey(result.submissionId, result.metricKey), result]),
-  );
-  const metricResults: BenchmarkMetricEvaluationResult[] = [];
-
-  for (const submission of input.submissions) {
-    const taskCase = caseById.get(submission.caseId);
-    if (!taskCase) {
+  for (const metric of approvedMetrics) {
+    if (input.shouldCancel?.()) {
+      throw new BenchmarkRunCancelledError(input.runId);
+    }
+    const cacheKey = metricCacheKey(input.submission.submissionId, metric.metricKey);
+    const existingMetricResult = input.existingMetricByKey.get(cacheKey);
+    if (existingMetricResult) {
+      if (!input.metricResults.some((item) => metricCacheKey(item.submissionId, item.metricKey) === cacheKey)) {
+        input.metricResults.push(existingMetricResult);
+      }
+      input.onMetricReused?.(existingMetricResult);
       continue;
     }
-    for (const metric of approvedMetrics) {
-      const existingMetricResult = existingMetricByKey.get(metricCacheKey(submission.submissionId, metric.metricKey));
-      if (existingMetricResult) {
-        metricResults.push(existingMetricResult);
-        input.onMetricReused?.(existingMetricResult);
-        continue;
-      }
-      const metricResult = await evaluateBenchmarkMetric(metric, taskCase, submission, input.evaluatorContext);
-      metricResults.push(metricResult);
-      input.onMetricEvaluated?.(metricResult);
-    }
+    const metricResult = await evaluateBenchmarkMetricWithRetry(
+      metric,
+      input.taskCase,
+      input.submission,
+      input.evaluatorContext,
+    );
+    input.metricResults.push(metricResult);
+    input.existingMetricByKey.set(cacheKey, metricResult);
+    input.onMetricEvaluated?.(metricResult);
   }
+}
 
+/**
+ * Assemble the final benchmark run result from submissions and metric results.
+ *
+ * @param input Run inputs plus collected metric results.
+ * @returns Aggregated benchmark run result.
+ */
+export function assembleBenchmarkRunResult(
+  input: Omit<RunBenchmarkEvaluationInput, "existingMetricResults" | "onMetricEvaluated" | "onMetricReused" | "shouldCancel" | "metricResults"> & {
+    metricResults: BenchmarkMetricEvaluationResult[];
+  },
+): BenchmarkRunResult {
+  const metricResults = input.metricResults;
   const caseScores = applyRerankToCaseScores(buildBenchmarkCaseScores(metricResults));
   const leaderboard = buildBenchmarkLeaderboard(caseScores);
   const averageScore = caseScores.length
@@ -107,6 +131,62 @@ export async function runBenchmarkEvaluation(
     },
     generatedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Score one benchmark task package across a matrix of Agent framework/model submissions.
+ */
+export async function runBenchmarkEvaluation(
+  input: RunBenchmarkEvaluationInput,
+): Promise<BenchmarkRunResult> {
+  const rubricErrors = validateApprovedRubric(input.task.rubric);
+  if (rubricErrors.length > 0) {
+    throw new Error(`Benchmark rubric is not runnable: ${rubricErrors.join("; ")}`);
+  }
+
+  const approvedMetrics = getApprovedRubricMetrics(input.task.rubric);
+  const minimumMetrics = Number(process.env.ZEVAL_BENCHMARK_MIN_METRICS ?? MIN_APPROVED_METRICS);
+  if (Number.isFinite(minimumMetrics) && minimumMetrics > 0) {
+    assertMinimumApprovedMetrics(approvedMetrics.length, minimumMetrics);
+  }
+  const caseById = new Map(input.cases.map((taskCase) => [taskCase.caseId, taskCase]));
+  const existingMetricByKey = new Map(
+    (input.existingMetricResults ?? []).map((result) => [metricCacheKey(result.submissionId, result.metricKey), result]),
+  );
+  const metricResults = input.metricResults ?? [];
+
+  for (const submission of input.submissions) {
+    if (input.shouldCancel?.()) {
+      throw new BenchmarkRunCancelledError(input.runId);
+    }
+    const taskCase = caseById.get(submission.caseId);
+    if (!taskCase) {
+      continue;
+    }
+    await evaluateSubmissionMetrics({
+      runId: input.runId,
+      task: input.task,
+      taskCase,
+      submission,
+      evaluatorContext: input.evaluatorContext,
+      existingMetricByKey,
+      metricResults,
+      onMetricEvaluated: input.onMetricEvaluated,
+      onMetricReused: input.onMetricReused,
+      shouldCancel: input.shouldCancel,
+    });
+  }
+
+  return assembleBenchmarkRunResult({
+    runId: input.runId,
+    task: input.task,
+    cases: input.cases,
+    submissions: input.submissions,
+    matrix: input.matrix,
+    metricResults,
+    badcaseThreshold: input.badcaseThreshold,
+    goldencaseThreshold: input.goldencaseThreshold,
+  });
 }
 
 /**

@@ -2082,6 +2082,72 @@ button.datasetUploadButton:disabled {
   font-size: 12px;
 }
 
+.progressHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progressCancelButton {
+  padding: 6px 12px;
+  border: 1px solid rgba(220, 38, 38, 0.45);
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.12);
+  color: #475569;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.progressCancelButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.progressStatusPanel {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px;
+  border-radius: 10px;
+}
+
+.progressStatusPanelRunning {
+  border: 1px solid rgba(34, 197, 94, 0.32);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.progressStatusPanelRunning strong {
+  color: #475569;
+}
+
+.progressStatusPanelError {
+  border: 1px solid rgba(220, 38, 38, 0.28);
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.progressStatusPanelError strong {
+  color: #fecaca;
+}
+
+.progressStatusPanel p {
+  margin: 6px 0;
+  color: var(--nl-text-primary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.progressStatusPanel span {
+  color: var(--nl-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.progressStatusPanel strong {
+  font-size: 13px;
+  font-weight: 850;
+}
+
 .progressFailurePanel {
   display: flex;
   justify-content: space-between;
@@ -2600,6 +2666,7 @@ button.datasetUploadButton:disabled {
   padding: 14px;
   background: rgba(236, 253, 245, 0.55);
   border-color: rgba(14, 116, 144, 0.25);
+  overflow: visible;
 }
 
 .focusToolbar {
@@ -2957,6 +3024,181 @@ button.datasetUploadButton:disabled {
   padding-top: 2px;
 }
 
+.unifiedReviewCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(14, 116, 144, 0.25);
+  border-radius: 8px;
+  background: var(--nl-bg-2);
+  overflow: visible;
+}
+
+.sessionChannelBar {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--nl-border);
+  border-radius: 8px;
+  background: var(--nl-surface);
+}
+
+.sessionChannelBar > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.sessionChannelBar strong {
+  color: var(--nl-text-primary);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.sessionChannelBar span {
+  color: var(--nl-text-muted);
+  font-size: 12px;
+}
+
+.unifiedReviewBody {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.36fr) minmax(0, 1.64fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.unifiedReviewBody > .sessionOverviewCard {
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+}
+
+.unifiedReviewMain {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  height: 100%;
+  min-height: 100%;
+}
+
+.unifiedReviewMain .rubricCompareCard {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.unifiedReviewMain .rubricFocusHeader {
+  flex-shrink: 0;
+}
+
+.unifiedReviewFooter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.rubricFocusHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--nl-border);
+  border-radius: 8px;
+  background: var(--nl-surface);
+}
+
+.rubricFocusHeader > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rubricFocusHeader strong {
+  color: var(--nl-text-primary);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.rubricFocusHeader span {
+  color: var(--nl-text-muted);
+  font-size: 11px;
+}
+
+.rubricFocusHeader b {
+  flex-shrink: 0;
+  color: var(--nl-accent);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.reviewSavedHint {
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--nl-text-secondary);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.unifiedReviewCard .transcriptDrawer {
+  margin: 0;
+}
+
+.unifiedReviewCard .sessionOverviewCard {
+  position: relative;
+  overflow: visible;
+  z-index: 2;
+  height: 100%;
+  min-height: 100%;
+}
+
+.unifiedReviewCard .sessionMetricBars {
+  flex: 1 1 auto;
+}
+
+.sessionMetricBarWrap {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sessionMetricBarHovered {
+  border-color: rgba(14, 116, 144, 0.35) !important;
+  background: rgba(236, 253, 245, 0.65) !important;
+}
+
+.metricDetailPopover {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 10px);
+  z-index: 30;
+  width: min(420px, 52vw);
+  max-height: min(420px, 62vh);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(14, 116, 144, 0.28);
+  border-radius: 10px;
+  background: var(--nl-bg);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.16);
+  pointer-events: none;
+}
+
+.metricDetailPopover::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: -6px;
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  border-left: 1px solid rgba(14, 116, 144, 0.28);
+  border-bottom: 1px solid rgba(14, 116, 144, 0.28);
+  background: var(--nl-bg);
+}
+
 .metricTabs button {
   min-width: 132px;
   display: flex;
@@ -3041,6 +3283,7 @@ button.datasetUploadButton:disabled {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  overflow: visible;
 }
 
 .sessionOverviewHeader,
@@ -3112,15 +3355,37 @@ button.datasetUploadButton:disabled {
 .sessionMetricBars {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .sessionMetricBar {
   display: grid;
-  grid-template-columns: minmax(96px, 1fr) minmax(90px, 1.4fr) 42px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 52px) 22px;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
   color: var(--nl-text-secondary);
   font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+}
+
+.sessionMetricBar:hover {
+  border-color: var(--nl-border);
+  background: var(--nl-surface);
+}
+
+.sessionMetricBarActive {
+  border-color: var(--nl-accent) !important;
+  background: var(--nl-accent-soft) !important;
 }
 
 .sessionMetricBar span {
@@ -3131,6 +3396,7 @@ button.datasetUploadButton:disabled {
 }
 
 .sessionMetricBar div {
+  min-width: 0;
   height: 7px;
   overflow: hidden;
   border-radius: 999px;
@@ -3145,9 +3411,14 @@ button.datasetUploadButton:disabled {
 }
 
 .sessionMetricBar b {
+  flex-shrink: 0;
+  min-width: 18px;
+  max-width: 22px;
   color: var(--nl-text-primary);
+  font-size: 11px;
   font-weight: 850;
   text-align: right;
+  line-height: 1;
 }
 
 .rubricCompareLevels {
@@ -3155,11 +3426,26 @@ button.datasetUploadButton:disabled {
   gap: 8px;
 }
 
-.rubricCompareLevels div {
+.rubricCompareLevels div,
+.rubricCompareLevelButton {
   padding: 9px 10px;
   border: 1px solid var(--nl-border);
   border-radius: 7px;
   background: var(--nl-surface);
+}
+
+.rubricCompareLevelButton {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rubricCompareLevelButton:disabled {
+  cursor: default;
+}
+
+.rubricCompareLevelButton:not(:disabled):hover {
+  border-color: var(--nl-accent);
 }
 
 .rubricCompareLevels span {
@@ -3186,6 +3472,37 @@ button.datasetUploadButton:disabled {
   display: grid;
   grid-template-columns: minmax(160px, 0.75fr) minmax(220px, 1.25fr);
   gap: 10px;
+}
+
+.unifiedReviewMain .reviewFocusFields {
+  display: grid;
+  grid-template-columns: minmax(108px, 0.62fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.unifiedReviewMain .reviewField {
+  grid-column: auto;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 68px;
+  gap: 6px;
+  align-content: end;
+}
+
+.unifiedReviewMain .reviewField input,
+.unifiedReviewMain .reviewField textarea {
+  height: 68px;
+  min-height: 68px;
+  max-height: 68px;
+  resize: none;
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+.unifiedReviewMain .reviewField input {
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .reviewSaveButton {
@@ -3631,6 +3948,97 @@ button.datasetUploadButton:disabled {
   border-color: var(--nl-accent);
 }
 
+.reviewChannelPicker {
+  display: grid;
+  gap: 6px;
+}
+
+.reviewChannelLabel {
+  color: var(--nl-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.reviewChannelRequired {
+  margin-left: 4px;
+  color: var(--nl-warn, #c45c26);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.reviewChannelButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reviewChannelButtons button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--nl-border);
+  border-radius: 7px;
+  background: var(--nl-surface);
+  color: var(--nl-text-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reviewChannelButtons button:hover,
+.reviewChannelActive {
+  border-color: var(--nl-accent);
+  background: var(--nl-accent-soft) !important;
+  color: var(--nl-accent) !important;
+}
+
+.policyPanel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--nl-border);
+  border-radius: 8px;
+  background: var(--nl-bg-2);
+}
+
+.policyPanelInfo {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.policyPanelInfo strong {
+  color: var(--nl-text-primary);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.policyPanelInfo span {
+  color: var(--nl-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.policyGenerateButton {
+  min-height: 34px;
+  flex-shrink: 0;
+  padding: 0 14px;
+  border: 1px solid var(--nl-accent);
+  border-radius: 7px;
+  background: var(--nl-accent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.policyGenerateButton:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
 .reviewField textarea::placeholder {
   color: var(--nl-text-muted);
 }
@@ -3688,10 +4096,28 @@ button.datasetUploadButton:disabled {
 
   .explainGrid,
   .focusContentGrid,
+  .unifiedReviewBody,
   .readableCompare,
-  .reviewFocusFields,
   .reviewItem {
     grid-template-columns: 1fr;
+  }
+
+  .unifiedReviewMain .reviewFocusFields {
+    grid-template-columns: 1fr;
+  }
+
+  .metricDetailPopover {
+    position: fixed;
+    left: 50% !important;
+    top: auto !important;
+    bottom: 16px;
+    transform: translateX(-50%);
+    width: min(92vw, 420px);
+    max-height: 45vh;
+  }
+
+  .metricDetailPopover::before {
+    display: none;
   }
 
   .focusToolbar,

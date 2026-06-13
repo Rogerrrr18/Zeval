@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  experimental: {
+    middlewareClientMaxBodySize: "50mb",
+  },
   turbopack: {
     root: projectRoot,
   },

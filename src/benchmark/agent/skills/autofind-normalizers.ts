@@ -2,6 +2,8 @@
  * @fileoverview Normalize discovered dataset payloads into Zeval CSV.
  */
 
+import { resolveTemplatePlaceholders } from "../../../pii/template-placeholders.ts";
+
 export type NormalizeCsvInput = {
   rawText: string;
   contentType?: string;
@@ -753,6 +755,25 @@ function normalizeLooseCsv(rawText: string, input: NormalizeCsvInput): string | 
  * @param sessions Parsed single-turn sessions.
  * @returns Grouped sessions with at least four turns when possible.
  */
+/**
+ * Number of consecutive single-turn rows merged into one multi-turn session.
+ * Single-turn datasets (e.g. Bitext instruction/response pairs) are ordered by
+ * intent, so merging 3 consecutive rows yields a coherent same-intent 3-turn
+ * customer-service conversation (user 问 + assistant 答 = 1 轮).
+ */
+const SINGLE_TURN_GROUP_SIZE = 3;
+
+/**
+ * Merge single-turn rows into multi-turn sessions.
+ *
+ * Genuine multi-turn sources (every session already has >= 4 messages / >= 2
+ * 轮) are returned untouched. Otherwise consecutive rows are merged in groups
+ * of `SINGLE_TURN_GROUP_SIZE`, keeping only sessions that reach >= 3 轮 (6
+ * messages) so downstream evaluation always sees multi-turn transcripts.
+ *
+ * @param sessions Per-row single-turn message lists.
+ * @returns Multi-turn dialogue items (falls back to input when none qualify).
+ */
 function groupSingleTurnRows(
   sessions: Array<{
     session_id: string;
@@ -764,12 +785,10 @@ function groupSingleTurnRows(
   }
 
   const grouped: GenericDialogueItem[] = [];
-  for (let index = 0; index < sessions.length; index += 2) {
-    const first = sessions[index];
-    const second = sessions[index + 1];
-    if (!first) break;
-    const messages = [...first.messages, ...(second?.messages ?? [])];
-    if (messages.length >= 4) {
+  for (let index = 0; index < sessions.length; index += SINGLE_TURN_GROUP_SIZE) {
+    const slice = sessions.slice(index, index + SINGLE_TURN_GROUP_SIZE);
+    const messages = slice.flatMap((session) => session.messages);
+    if (messages.length >= SINGLE_TURN_GROUP_SIZE * 2) {
       grouped.push({
         session_id: `group_${grouped.length + 1}`,
         messages,
@@ -795,12 +814,23 @@ function sessionsToCsv(
   usable.forEach((session, sessionIndex) => {
     let timestamp = base + sessionIndex * 3_600_000;
     for (const message of session.messages) {
+      // Collapse embedded newlines/whitespace so every record stays on a single
+      // physical line. The app CSV parser (`parseCsvRows`) splits per line and
+      // cannot reconstruct quoted fields that span multiple lines, so multi-line
+      // source content (e.g. Bitext responses) would otherwise be truncated.
+      const singleLineContent = message.content
+        .replace(/\r\n?|\n/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const resolvedContent = resolveTemplatePlaceholders(singleLineContent, {
+        sessionId: session.sessionId,
+      }).text;
       rows.push(
         [
           session.sessionId,
           new Date(timestamp).toISOString(),
           message.role,
-          `"${message.content.replace(/"/g, '""')}"`,
+          `"${resolvedContent.replace(/"/g, '""')}"`,
         ].join(","),
       );
       timestamp += 20_000;

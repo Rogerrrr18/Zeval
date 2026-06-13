@@ -50,6 +50,23 @@ import type {
   AutoFindRubricContext,
   AutoFindWorkflowState,
 } from "@/benchmark/agent/skills/autofind-data-skill";
+import {
+  ADMISSION_CHANNELS,
+  ADMISSION_POLICY_MIN_LABELS,
+  admissionChannelLabel,
+} from "@/benchmark/admission-channels";
+import {
+  SESSION_REVIEW_METRIC_KEY,
+  buildSessionAdmitReviews,
+  countLabeledSessions,
+  findMetricReviewRecord,
+  findSessionReviewRecord,
+  inferReviewDecisionFromScore,
+  isMetricReviewConfirmed,
+  resolveConfirmedScore,
+  resolveMetricPassThreshold,
+} from "@/benchmark/human-review";
+import { slimBenchmarkRunResult, subsetRunResultForAdmit } from "@/benchmark/run-result-slim";
 import type { IngestResponse, UploadFormat } from "@/types/pipeline";
 import { useProject } from "@/components/shell/ProjectContext";
 import { DEFAULT_PROJECT } from "@/lib/projectStore";
@@ -82,6 +99,7 @@ type StartBenchmarkRunResponse = {
 type BenchmarkRunStatusResponse = {
   source?: "memory" | "artifact" | "none";
   stale?: boolean;
+  resumable?: boolean;
   snapshot?: BenchmarkProgressSnapshot | null;
   error?: string;
 };
@@ -132,7 +150,7 @@ const DEFAULT_COPILOT_TURNS: ChatTurn[] = [
 const DEFAULT_AUTOFIND_TURNS: ChatTurn[] = [
   {
     kind: "ai",
-    text: "我是 AutoFind 数据助手。我会调用模型根据你的评测需求生成检索词、选择公开数据集，并整理 10 正 + 10 负多轮对话。回复「开始搜索」或点击下方快捷操作即可。",
+    text: "我是 AutoFind 数据助手。我会调用模型根据你的评测需求生成检索词、选择公开数据集，并整理 25 正 + 25 负多轮对话。回复「开始搜索」或点击下方快捷操作即可。",
   },
 ];
 
@@ -423,19 +441,30 @@ function mergeBenchmarkSessions(
 }
 
 /**
- * Check whether a progress snapshot indicates a recoverable completed run.
+ * Check whether a one-time run-status recovery should run after session hydrate.
  *
  * @param progress Benchmark progress snapshot.
- * @returns True when run-status recovery should be attempted.
+ * @param runResult Completed run result when available.
+ * @returns True only for interrupted/failed/incomplete terminal states.
  */
-function shouldRecoverBenchmarkRun(
+function shouldRecoverBenchmarkRunOnHydrate(
   progress: BenchmarkProgressSnapshot | null | undefined,
   runResult: BenchmarkRunResult | null,
 ): boolean {
   if (!progress?.runId || runResult || progress.result) return false;
+  if (progress.phase === "interrupted" || progress.phase === "failed") return true;
+  if (progress.phase === "completed") return true;
   const metricsDone =
     progress.totalMetrics > 0 && progress.evaluatedMetrics >= progress.totalMetrics;
-  return progress.phase === "completed" || progress.phase === "failed" || metricsDone;
+  return metricsDone && progress.phase !== "completed";
+}
+
+function isActiveBenchmarkProgressPhase(phase: BenchmarkProgressSnapshot["phase"]): boolean {
+  return phase === "preparing"
+    || phase === "ingesting"
+    || phase === "building_cases"
+    || phase === "submitting"
+    || phase === "evaluating";
 }
 
 function createBenchmarkSession(projectId: string): BenchmarkSession {
@@ -553,10 +582,14 @@ async function persistRemoteBenchmarkSessions(
   activeSessionId: string | null,
 ): Promise<void> {
   try {
+    const slimSessions = sessions.map((session) => ({
+      ...session,
+      runResult: session.runResult ? slimBenchmarkRunResult(session.runResult) : session.runResult,
+    }));
     await fetch("/api/benchmarks/sessions", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, sessions, activeSessionId }),
+      body: JSON.stringify({ projectId, sessions: slimSessions, activeSessionId }),
     });
   } catch {
     // The local cache remains available if the server write is interrupted.
@@ -713,8 +746,14 @@ export function NotebookLayout() {
   const [humanReviewRecords, setHumanReviewRecords] = useState<BenchmarkHumanReviewRecord[]>([]);
   const [runError, setRunError] = useState("");
   const [running, setRunning] = useState(false);
+  const [cancellingRun, setCancellingRun] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("rubric");
   const runStreamRef = useRef<EventSource | null>(null);
+  const runningRef = useRef(false);
+  const recoverOnHydrateRef = useRef<string | null>(null);
+  const recoverDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const remotePersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  runningRef.current = running;
 
   // ── Knowledge files ─
   const [knowledgeFiles, setKnowledgeFiles] = useState<KnowledgeFile[]>([]);
@@ -735,7 +774,9 @@ export function NotebookLayout() {
     setCopilotTurns(session.copilotTurns);
     setSelectedFileId(session.selectedFileId);
     setRunning(false);
-    setProgress(session.progress ?? session.runHistory?.[0]?.progress ?? null);
+    setCancellingRun(false);
+    const sessionProgress = session.progress ?? session.runHistory?.[0]?.progress ?? null;
+    setProgress(sessionProgress);
     setRunResult(resolveSessionRunResult(session));
     setRunHistory(session.runHistory ?? []);
     setHumanReviewRecords(session.humanReviewRecords ?? []);
@@ -747,12 +788,28 @@ export function NotebookLayout() {
     );
     setAutofindInput("");
     setAutofindRunning(false);
-    setRunError("");
+    setRunError(
+      sessionProgress?.phase === "interrupted" || sessionProgress?.phase === "failed"
+        ? sessionProgress.error ?? ""
+        : "",
+    );
+    if (
+      !resolveSessionRunResult(session) &&
+      (sessionProgress?.phase === "interrupted" || sessionProgress?.phase === "failed")
+    ) {
+      setViewMode("progress");
+    }
   }, []);
 
   useEffect(() => {
     return () => {
       runStreamRef.current?.close();
+      if (recoverDebounceRef.current) {
+        clearTimeout(recoverDebounceRef.current);
+      }
+      if (remotePersistTimerRef.current) {
+        clearTimeout(remotePersistTimerRef.current);
+      }
     };
   }, []);
 
@@ -785,11 +842,19 @@ export function NotebookLayout() {
     };
   }, [activeProjectId, applySession]);
 
-  // ── Recover completed runs after refresh when session cache is stale ─
+  // ── Recover interrupted/failed runs once after session hydrate ─
   useEffect(() => {
-    if (!sessionHydrated || running || !shouldRecoverBenchmarkRun(progress, runResult)) return;
-    void recoverBenchmarkRunStatus(progress!.runId);
-  }, [sessionHydrated, running, progress, runResult]);
+    if (!sessionHydrated || running) return;
+    const runId = progress?.runId;
+    if (!runId || !shouldRecoverBenchmarkRunOnHydrate(progress, runResult)) return;
+    if (recoverOnHydrateRef.current === runId) return;
+    recoverOnHydrateRef.current = runId;
+    void recoverBenchmarkRunStatus(runId);
+  }, [sessionHydrated, running, progress?.runId, progress?.phase, runResult]);
+
+  useEffect(() => {
+    recoverOnHydrateRef.current = null;
+  }, [activeSessionId]);
 
   const effectiveRunResult = runResult ?? progress?.result ?? null;
 
@@ -824,7 +889,12 @@ export function NotebookLayout() {
       );
       writeBenchmarkSessions(activeProjectId, next);
       writeActiveBenchmarkSessionId(activeProjectId, activeSessionId);
-      void persistRemoteBenchmarkSessions(activeProjectId, next, activeSessionId);
+      if (remotePersistTimerRef.current) {
+        clearTimeout(remotePersistTimerRef.current);
+      }
+      remotePersistTimerRef.current = setTimeout(() => {
+        void persistRemoteBenchmarkSessions(activeProjectId, next, activeSessionId);
+      }, 3000);
       return next;
     });
   }, [
@@ -1227,7 +1297,7 @@ export function NotebookLayout() {
         if (data.state) setAutofindState(data.state);
 
         if (/应用|加载|导入|apply/i.test(text) && data.state?.csvText) {
-          const fileName = data.state.fileName ?? "companion-autofind-20sessions.csv";
+          const fileName = data.state.fileName ?? "companion-autofind-50sessions.csv";
           if (data.state.phase !== "saved") {
             await fetch("/api/benchmarks/autofind", {
               method: "POST",
@@ -1259,6 +1329,53 @@ export function NotebookLayout() {
     [autofindInput, autofindRunning, autofindState, buildAutoFindRubricContext, requirement],
   );
 
+  function attachBenchmarkRunStream(runId: string) {
+    runStreamRef.current?.close();
+    const source = new EventSource(`/api/benchmarks/run-stream?runId=${encodeURIComponent(runId)}`);
+    runStreamRef.current = source;
+    source.onmessage = (event) => {
+      const snapshot = JSON.parse(event.data) as BenchmarkProgressSnapshot;
+      setProgress(snapshot);
+      if (snapshot.phase === "completed" && snapshot.result) {
+        setRunResult(snapshot.result);
+        setRunHistory((prev) => buildNextRunHistory(prev, snapshot.result!, snapshot));
+        setRunning(false);
+        setCancellingRun(false);
+        setViewMode("result");
+        source.close();
+        runStreamRef.current = null;
+      } else if (snapshot.phase === "failed") {
+        setRunError(snapshot.error ?? "评测失败");
+        if (!runningRef.current) {
+          setRunning(false);
+        }
+        setCancellingRun(false);
+      } else if (snapshot.phase === "interrupted") {
+        setRunError(snapshot.error ?? "评测已中断");
+        if (!runningRef.current) {
+          setRunning(false);
+        }
+        setCancellingRun(false);
+      } else if (isActiveBenchmarkProgressPhase(snapshot.phase)) {
+        setRunError("");
+        setRunning(true);
+        setCancellingRun(false);
+      } else {
+        setRunError("");
+      }
+    };
+    source.onerror = () => {
+      source.close();
+      runStreamRef.current = null;
+      if (recoverDebounceRef.current) {
+        clearTimeout(recoverDebounceRef.current);
+      }
+      recoverDebounceRef.current = setTimeout(() => {
+        void recoverBenchmarkRunStatus(runId);
+      }, 2000);
+    };
+  }
+
   async function handleRunBenchmark(resumeRunId?: string) {
     const safeResumeRunId = typeof resumeRunId === "string" ? resumeRunId : undefined;
     if (!rubric) {
@@ -1283,8 +1400,11 @@ export function NotebookLayout() {
 
     runStreamRef.current?.close();
     setRunning(true);
-    setProgress(null);
-    setRunResult(null);
+    setCancellingRun(false);
+    if (!safeResumeRunId) {
+      setProgress(null);
+      setRunResult(null);
+    }
     setRunError("");
     setViewMode("progress");
 
@@ -1304,33 +1424,28 @@ export function NotebookLayout() {
         throw new Error(data.error ?? "启动评测失败");
       }
 
-      const source = new EventSource(`/api/benchmarks/run-stream?runId=${encodeURIComponent(data.runId)}`);
-      runStreamRef.current = source;
-      source.onmessage = (event) => {
-        const snapshot = JSON.parse(event.data) as BenchmarkProgressSnapshot;
-        setProgress(snapshot);
-        if (snapshot.phase === "completed" && snapshot.result) {
-          setRunResult(snapshot.result);
-          setProgress(snapshot);
-          setRunHistory((prev) => buildNextRunHistory(prev, snapshot.result!, snapshot));
-          setRunning(false);
-          setViewMode("result");
-          source.close();
-          runStreamRef.current = null;
-        } else if (snapshot.phase === "failed") {
-          setRunError(snapshot.error ?? "评测失败");
-          setRunning(false);
-          source.close();
-          runStreamRef.current = null;
-        }
-      };
-      source.onerror = () => {
-        source.close();
-        runStreamRef.current = null;
-        void recoverBenchmarkRunStatus(data.runId!);
-      };
+      attachBenchmarkRunStream(data.runId);
     } catch (error) {
       setRunError(error instanceof Error ? error.message : "启动评测失败");
+      setRunning(false);
+    }
+  }
+
+  async function handleCancelBenchmark() {
+    if (!progress?.runId || cancellingRun) return;
+    setCancellingRun(true);
+    runStreamRef.current?.close();
+    runStreamRef.current = null;
+    try {
+      await fetch("/api/benchmarks/run-cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId: progress.runId }),
+      });
+      await recoverBenchmarkRunStatus(progress.runId);
+    } catch (error) {
+      setRunError(error instanceof Error ? error.message : "停止评测失败");
+      setCancellingRun(false);
       setRunning(false);
     }
   }
@@ -1349,24 +1464,51 @@ export function NotebookLayout() {
         setProgress(status.snapshot);
         if (status.snapshot.phase === "completed" && status.snapshot.result) {
           setRunResult(status.snapshot.result);
-          setProgress(status.snapshot);
           setRunHistory((prev) => buildNextRunHistory(prev, status.snapshot!.result!, status.snapshot!));
           setRunning(false);
+          setCancellingRun(false);
           setViewMode("result");
           return;
         }
-        if (status.snapshot.phase === "failed") {
-          setRunError(status.snapshot.error ?? "评测失败");
+        if (status.snapshot.phase === "failed" || status.snapshot.phase === "interrupted") {
+          setRunError(status.snapshot.error ?? (status.snapshot.phase === "interrupted" ? "评测已中断" : "评测失败"));
+          if (status.source === "memory") {
+            setRunError("");
+            attachBenchmarkRunStream(runId);
+            setRunning(true);
+            setCancellingRun(false);
+            setViewMode("progress");
+            return;
+          }
           setRunning(false);
+          setCancellingRun(false);
+          setViewMode("progress");
+          return;
+        }
+        if (status.source === "memory") {
+          setRunError("");
+          attachBenchmarkRunStream(runId);
+          setRunning(true);
+          setCancellingRun(false);
+          setViewMode("progress");
+          return;
+        }
+        if (isActiveBenchmarkProgressPhase(status.snapshot.phase) && status.resumable) {
+          setRunError("");
+          setRunning(false);
+          setCancellingRun(false);
+          setViewMode("progress");
           return;
         }
       }
 
       setRunError(status.source === "none" ? "进度连接中断，且后端没有找到该 run 的状态。" : "进度连接中断，请稍后重试。");
       setRunning(false);
+      setCancellingRun(false);
     } catch (error) {
       setRunError(error instanceof Error ? error.message : "进度连接中断，请稍后重试。");
       setRunning(false);
+      setCancellingRun(false);
     }
   }
 
@@ -1635,9 +1777,11 @@ export function NotebookLayout() {
               <ProgressWorkspace
                 progress={progress}
                 running={running}
+                cancelling={cancellingRun}
                 error={runError}
                 onContinue={() => progress?.runId && void handleRunBenchmark(progress.runId)}
                 onRestart={() => void handleRunBenchmark()}
+                onCancel={() => void handleCancelBenchmark()}
               />
             )}
             {viewMode === "result" && effectiveRunResult && (
@@ -1732,7 +1876,7 @@ export function NotebookLayout() {
               <>
                 <div className={styles.requirementCard}>
                   <span>AutoFind 工作流</span>
-                  <p>10 正样本 + 10 负样本 · 保存至 public/sample-data</p>
+                  <p>25 正样本 + 25 负样本 · 保存至 public/sample-data</p>
                 </div>
                 {autofindTurns.map((turn, i) => (
                   <div
@@ -2267,7 +2411,7 @@ function BenchmarkDatasetPanel(props: {
             className={styles.datasetUploadButton}
             onClick={() => void props.onAutoFind()}
             disabled={props.uploadState === "uploading"}
-            title="在右侧 AutoFind 标签中自动检索 10 正 + 10 负样本"
+            title="在右侧 AutoFind 标签中自动检索 25 正 + 25 负样本"
           >
             AutoFind
           </button>
@@ -2689,12 +2833,26 @@ function MetricReferenceList(props: { references: BenchmarkMetricReference[] }) 
   );
 }
 
+function computeBenchmarkProgressPercent(progress: BenchmarkProgressSnapshot): number {
+  const submissionDone = progress.completedSubmissions + progress.failedSubmissions;
+  const submissionTotal = progress.totalSubmissions;
+  const metricDone = progress.evaluatedMetrics;
+  const metricTotal = progress.totalMetrics;
+  const totalWork = submissionTotal + metricTotal;
+  if (totalWork <= 0) {
+    return 0;
+  }
+  return Math.round(((submissionDone + metricDone) / totalWork) * 100);
+}
+
 function ProgressWorkspace(props: {
   progress: BenchmarkProgressSnapshot | null;
   running: boolean;
+  cancelling: boolean;
   error: string;
   onContinue: () => void;
   onRestart: () => void;
+  onCancel: () => void;
 }) {
   if (props.error && !props.progress) {
     return (
@@ -2717,9 +2875,7 @@ function ProgressWorkspace(props: {
     );
   }
 
-  const pct = props.progress.totalMetrics > 0
-    ? Math.round((props.progress.evaluatedMetrics / props.progress.totalMetrics) * 100)
-    : 0;
+  const pct = computeBenchmarkProgressPercent(props.progress);
   const phaseLabel: Record<BenchmarkProgressSnapshot["phase"], string> = {
     preparing: "准备中",
     ingesting: "数据接入",
@@ -2728,7 +2884,27 @@ function ProgressWorkspace(props: {
     evaluating: "指标评审",
     completed: "完成",
     failed: "失败",
+    interrupted: "已中断",
   };
+
+  const canCancel = props.running
+    && props.progress.phase !== "completed"
+    && props.progress.phase !== "failed"
+    && props.progress.phase !== "interrupted";
+
+  const isActiveRun = props.running
+    || (isActiveBenchmarkProgressPhase(props.progress.phase)
+      && props.progress.phase !== "interrupted"
+      && props.progress.phase !== "failed");
+
+  const isResumablePause = !isActiveRun
+    && (props.progress.phase === "interrupted" || props.progress.phase === "failed");
+
+  const isProblemState = isResumablePause
+    || ((Boolean(props.error) || Boolean(props.progress.error)) && !isActiveRun);
+
+  const showStatusPanel = isActiveRun || isProblemState;
+  const statusSummary = `已完成 ${props.progress.completedSubmissions}/${props.progress.totalSubmissions} 个被测输出，${props.progress.evaluatedMetrics}/${props.progress.totalMetrics} 个指标评审。${isProblemState ? "继续评测会优先复用已落盘的结果。" : ""}`;
 
   return (
     <div className={styles.workspace}>
@@ -2737,24 +2913,49 @@ function ProgressWorkspace(props: {
           <h2>评测进度</h2>
           {props.progress.updatedAt && <p>最近更新: {formatSessionTime(props.progress.updatedAt)}</p>}
         </div>
-        <span className={styles.progressPhase}>{phaseLabel[props.progress.phase]}</span>
+        <div className={styles.progressHeaderActions}>
+          {canCancel && (
+            <button
+              type="button"
+              className={styles.progressCancelButton}
+              onClick={props.onCancel}
+              disabled={props.cancelling}
+            >
+              {props.cancelling ? "正在停止..." : "停止评测"}
+            </button>
+          )}
+          <span className={styles.progressPhase}>{phaseLabel[props.progress.phase]}</span>
+        </div>
       </div>
 
-      {(props.progress.phase === "failed" || props.error) && (
-        <div className={styles.progressFailurePanel}>
+      {showStatusPanel && (
+        <div
+          className={`${styles.progressStatusPanel} ${isActiveRun ? styles.progressStatusPanelRunning : styles.progressStatusPanelError}`}
+        >
           <div>
-            <strong>评测已中断</strong>
-            <p>{props.progress.error || props.error || "后端评测进程中断，请继续或重新运行。"}</p>
-            <span>
-              已完成 {props.progress.completedSubmissions}/{props.progress.totalSubmissions} 个被测输出，
-              {props.progress.evaluatedMetrics}/{props.progress.totalMetrics} 个指标评审。继续评测会优先复用已落盘的结果。
-            </span>
+            <strong>{isActiveRun ? "正在评测" : isResumablePause ? "评测已暂停" : "连接中断"}</strong>
+            <p>
+              {isActiveRun
+                ? (props.progress.activeAnalysis ?? "评测任务运行中，请稍候。")
+                : (props.progress.error || props.error || "进度连接中断，请稍后重试。")}
+            </p>
+            <span>{statusSummary}</span>
           </div>
           <div className={styles.progressFailureActions}>
-            <button type="button" className={styles.progressPrimaryButton} onClick={props.onContinue} disabled={props.running}>
+            <button
+              type="button"
+              className={styles.progressPrimaryButton}
+              onClick={props.onContinue}
+              disabled={isActiveRun || props.running}
+            >
               继续评测
             </button>
-            <button type="button" className={styles.progressSecondaryButton} onClick={props.onRestart} disabled={props.running}>
+            <button
+              type="button"
+              className={styles.progressSecondaryButton}
+              onClick={props.onRestart}
+              disabled={isActiveRun || props.running}
+            >
               从头重跑
             </button>
           </div>
@@ -2895,6 +3096,9 @@ function ResultWorkspace(props: {
   const [admitting, setAdmitting] = useState(false);
   const [admissionMessage, setAdmissionMessage] = useState("");
   const [admissionError, setAdmissionError] = useState("");
+  const [generatingPolicy, setGeneratingPolicy] = useState(false);
+  const [policyMessage, setPolicyMessage] = useState("");
+  const [policyError, setPolicyError] = useState("");
   const [casePickerOpen, setCasePickerOpen] = useState(false);
   const [caseSearch, setCaseSearch] = useState("");
   const [caseFilter, setCaseFilter] = useState<CasePickerFilter>("all");
@@ -2906,12 +3110,26 @@ function ResultWorkspace(props: {
     .slice(0, 8);
   const capabilityGaps = buildCapabilityGapRows(props.result.caseScores);
   const runReviewRecords = props.humanReviewRecords.filter((record) => record.runId === props.result.runId);
+  const metricReviewRecords = runReviewRecords.filter((record) => record.metricKey !== SESSION_REVIEW_METRIC_KEY);
   const reviewQueue = buildHumanReviewQueue(props.result.metricResults);
-  const completedReviews = runReviewRecords.filter((record) => record.decision).length;
-  const savedReviews = runReviewRecords.filter((record) => record.savedAt).length;
+  const confirmedMetricCount = metricReviewRecords.filter((record) => isMetricReviewConfirmed(record)).length;
+  const savedReviews = metricReviewRecords.filter((record) => record.savedAt).length;
   const metricNameMap = buildMetricDisplayNameMap(props.rubric);
+  const rubricMetricByKey = buildRubricMetricMap(props.rubric);
   const metricOrder = buildRubricMetricOrder(props.rubric);
   const sessionRows = buildResultSessionRows(props.result, runReviewRecords, metricNameMap, metricOrder);
+  const submissionMetricCounts = new Map(
+    sessionRows.map((row) => [
+      row.caseScore.submissionId,
+      row.metricResults.filter((result) => result.status !== "skipped" && result.status !== "unsupported").length,
+    ]),
+  );
+  const labeledSessionCount = countLabeledSessions(
+    props.result.runId,
+    runReviewRecords,
+    submissionMetricCounts,
+  );
+  const policyReady = labeledSessionCount >= ADMISSION_POLICY_MIN_LABELS;
   const defaultCaseId = sessionRows.find((row) => row.attentionMetricCount > 0)?.caseScore.caseId
     ?? sessionRows[0]?.caseScore.caseId
     ?? "";
@@ -2933,17 +3151,30 @@ function ResultWorkspace(props: {
   const nextSession = selectedSessionIndex >= 0 && selectedSessionIndex < sessionRows.length - 1
     ? sessionRows[selectedSessionIndex + 1]
     : null;
-  const selectedReview = selectedMetricResult ? findReview(selectedMetricResult) : undefined;
+  const selectedReview = selectedMetricResult
+    ? findMetricReviewRecord(runReviewRecords, props.result.runId, selectedMetricResult)
+    : undefined;
+  const selectedSessionReview = selectedSession
+    ? findSessionReviewRecord(runReviewRecords, props.result.runId, selectedSession.caseScore.submissionId)
+    : undefined;
   const selectedRubricMetric = selectedMetricResult ? findRubricMetric(props.rubric, selectedMetricResult.metricKey) : null;
+  const selectedConfirmedScore = selectedReview?.confirmedScore ?? selectedMetricResult?.score;
   const selectedTranscript = getBenchmarkCaseTranscript(selectedSession?.benchmarkCase);
-  const selectedSessionReviews = selectedSession
-    ? runReviewRecords.filter((record) => record.submissionId === selectedSession.caseScore.submissionId)
+  const sessionAdmitPayload = selectedSession
+    ? buildSessionAdmitReviews(
+      props.result.runId,
+      selectedSession.caseScore.submissionId,
+      runReviewRecords,
+      selectedMetricResults,
+      rubricMetricByKey,
+    )
     : [];
-  const saveableSessionReviews = selectedSessionReviews.filter((record) => record.decision && !record.savedAt);
-  const selectedSaveableReview = selectedReview?.decision && !selectedReview.savedAt ? [selectedReview] : [];
-  const selectedSessionPendingReviews = selectedMetricResults.filter((result) =>
-    isMetricReviewCandidate(result) && !findReview(result)?.decision,
+  const sessionReadyToSave = sessionAdmitPayload.length > 0
+    && selectedMetricResults.some((result) => !findMetricReviewRecord(runReviewRecords, props.result.runId, result)?.savedAt);
+  const selectedSessionPendingReviews = selectedMetricResults.filter(
+    (result) => !isMetricReviewConfirmed(findMetricReviewRecord(runReviewRecords, props.result.runId, result)),
   ).length;
+  const sessionChannelMissing = selectedSession && !selectedSessionReview?.channel;
   const pickerRows = buildCasePickerRows(sessionRows, caseSearch, caseFilter, caseSort, metricNameMap);
   const explainSignalLabel = `${weakestMetrics.length} 个指标 · ${sessionRows.filter((row) => row.attentionMetricCount > 0).length} 个会话`;
 
@@ -2978,7 +3209,47 @@ function ResultWorkspace(props: {
   }, [casePickerOpen]);
 
   function findReview(result: BenchmarkMetricEvaluationResult): BenchmarkHumanReviewRecord | undefined {
-    return runReviewRecords.find((record) => record.submissionId === result.submissionId && record.metricKey === result.metricKey);
+    return findMetricReviewRecord(runReviewRecords, props.result.runId, result);
+  }
+
+  function updateSessionReview(submissionId: string, patch: Partial<BenchmarkHumanReviewRecord>) {
+    props.onHumanReviewRecordsChange((current) => {
+      const existing = findSessionReviewRecord(current, props.result.runId, submissionId);
+      const nextRecord: BenchmarkHumanReviewRecord = {
+        runId: props.result.runId,
+        submissionId,
+        metricKey: SESSION_REVIEW_METRIC_KEY,
+        reviewer: existing?.reviewer ?? "benchmark-reviewer",
+        note: existing?.note ?? "",
+        reviewedAt: existing?.reviewedAt,
+        ...existing,
+        ...patch,
+        savedAt: undefined,
+      };
+      if (existing) {
+        return current.map((record) =>
+          record.runId === props.result.runId &&
+          record.submissionId === submissionId &&
+          record.metricKey === SESSION_REVIEW_METRIC_KEY
+            ? nextRecord
+            : record,
+        );
+      }
+      return [...current, nextRecord];
+    });
+  }
+
+  function confirmMetricScore(result: BenchmarkMetricEvaluationResult, confirmedScore: number) {
+    const rubricMetric = findRubricMetric(props.rubric, result.metricKey);
+    const passThreshold = resolveMetricPassThreshold(rubricMetric);
+    const decision = inferReviewDecisionFromScore(confirmedScore, passThreshold);
+    updateReview(result, {
+      confirmedScore,
+      decision,
+      reviewedAt: new Date().toISOString(),
+      savedAt: undefined,
+      admission: undefined,
+    });
   }
 
   function selectSession(caseId: string) {
@@ -3011,8 +3282,19 @@ function ResultWorkspace(props: {
     });
   }
 
-  async function admitReviewBatch(records: BenchmarkHumanReviewRecord[], emptyMessage: string) {
-    const reviews = records.filter((record) => record.decision && !record.savedAt);
+  async function admitReviewBatch(
+    reviews: Array<{
+      submissionId: string;
+      metricKey: string;
+      decision: HumanReviewDecision;
+      channel: string;
+      reviewer?: string;
+      note?: string;
+      reviewedAt?: string;
+      confirmedScore?: number;
+    }>,
+    emptyMessage: string,
+  ) {
     if (reviews.length === 0) {
       setAdmissionError(emptyMessage);
       return;
@@ -3022,6 +3304,11 @@ function ResultWorkspace(props: {
     setAdmissionError("");
     setAdmissionMessage("");
     try {
+      const metricKeys = new Set(reviews.map((record) => record.metricKey));
+      const submissionId = reviews[0]?.submissionId;
+      const runResultPayload = submissionId
+        ? subsetRunResultForAdmit(props.result, submissionId, metricKeys)
+        : slimBenchmarkRunResult(props.result);
       const response = await fetch("/api/benchmarks/admit-cases", {
         method: "POST",
         headers: {
@@ -3030,11 +3317,13 @@ function ResultWorkspace(props: {
         },
         body: JSON.stringify({
           baselineVersion: props.result.runId,
-          runResult: props.result,
+          runResult: runResultPayload,
           reviews: reviews.map((record) => ({
             submissionId: record.submissionId,
             metricKey: record.metricKey,
             decision: record.decision,
+            channel: record.channel,
+            confirmedScore: record.confirmedScore,
             reviewer: record.reviewer?.trim() || "benchmark-reviewer",
             note: record.note?.trim(),
             reviewedAt: record.reviewedAt ?? new Date().toISOString(),
@@ -3053,7 +3342,11 @@ function ResultWorkspace(props: {
       const savedAt = new Date().toISOString();
       const submittedKeys = new Set(reviews.map((record) => `${record.submissionId}:${record.metricKey}`));
       props.onHumanReviewRecordsChange((current) => current.map((record) => {
-        if (record.runId !== props.result.runId || !record.decision) return record;
+        if (record.runId !== props.result.runId) return record;
+        if (record.metricKey === SESSION_REVIEW_METRIC_KEY) {
+          const submissionIds = new Set(reviews.map((item) => item.submissionId));
+          return submissionIds.has(record.submissionId) ? { ...record, savedAt } : record;
+        }
         if (!submittedKeys.has(`${record.submissionId}:${record.metricKey}`)) return record;
         const result = props.result.metricResults.find(
           (item) => item.submissionId === record.submissionId && item.metricKey === record.metricKey,
@@ -3084,6 +3377,44 @@ function ResultWorkspace(props: {
       setAdmissionError(message);
     } finally {
       setAdmitting(false);
+    }
+  }
+
+  async function generateAdmissionPolicy() {
+    const labels = buildAdmissionLabelRows(props.result, runReviewRecords);
+    if (labels.length === 0) {
+      setPolicyError("没有可用于学习的人工标定记录（需先为 session 选择 channel 并确认全部指标分数）。");
+      return;
+    }
+
+    setGeneratingPolicy(true);
+    setPolicyError("");
+    setPolicyMessage("");
+    try {
+      const response = await fetch("/api/benchmarks/admission-policy", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-zeval-project-id": props.projectId,
+        },
+        body: JSON.stringify({ action: "learn", projectId: props.projectId, labels }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        policy?: { policyId: string; labelCount: number; channels: Record<string, unknown> };
+      };
+      if (!response.ok || !payload.policy) {
+        throw new Error(payload.error ?? "生成入池策略失败。");
+      }
+      const channelCount = Object.keys(payload.policy.channels ?? {}).length;
+      setPolicyMessage(
+        `已生成 ${payload.policy.policyId}：基于 ${payload.policy.labelCount} 条标定、${channelCount} 个 channel 的二级指标特征。`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setPolicyError(message);
+    } finally {
+      setGeneratingPolicy(false);
     }
   }
 
@@ -3179,10 +3510,31 @@ function ResultWorkspace(props: {
         <div className={styles.resultSectionHeader}>
           <div>
             <h3>逐条校验工作台</h3>
-            <p>先选择 Session ID，再选择二级指标；面板只展示当前 session × 当前指标的证据和人工判断。</p>
+            <p>先选择 Session 并打 channel 标签，再逐条确认各二级指标的 rubric 分数。</p>
           </div>
-          <span>{completedReviews}/{reviewQueue.length} 已处理 · {savedReviews} 已入池</span>
+          <span>{confirmedMetricCount}/{props.result.metricResults.length} 指标已确认 · {labeledSessionCount} session 已标 channel · {savedReviews} 已入池</span>
         </div>
+
+        <div className={styles.policyPanel}>
+          <div className={styles.policyPanelInfo}>
+            <strong>自动化入池策略</strong>
+            <span>
+              已标注 {labeledSessionCount} / {ADMISSION_POLICY_MIN_LABELS} session ·
+              {policyReady ? " 可按 channel 二级指标特征生成 / 更新策略" : ` 还需 ${ADMISSION_POLICY_MIN_LABELS - labeledSessionCount} 条即可生成`}
+            </span>
+          </div>
+          <button
+            type="button"
+            className={styles.policyGenerateButton}
+            onClick={() => void generateAdmissionPolicy()}
+            disabled={generatingPolicy || !policyReady}
+          >
+            {generatingPolicy ? "生成中..." : "生成入池策略"}
+          </button>
+        </div>
+
+        {policyMessage && <div className={styles.reviewSuccess}>{policyMessage}</div>}
+        {policyError && <div className={styles.reviewError}>{policyError}</div>}
 
         {admissionMessage && <div className={styles.reviewSuccess}>{admissionMessage}</div>}
         {admissionError && <div className={styles.reviewError}>{admissionError}</div>}
@@ -3196,10 +3548,15 @@ function ResultWorkspace(props: {
               </div>
               <button
                 type="button"
-                onClick={() => void admitReviewBatch(saveableSessionReviews, "当前 session 还没有可保存的人工判断。")}
-                disabled={admitting || saveableSessionReviews.length === 0}
+                onClick={() => void admitReviewBatch(
+                  sessionAdmitPayload,
+                  sessionChannelMissing
+                    ? "请先为本 session 选择沉淀 channel。"
+                    : "请先确认本 session 下全部二级指标分数。",
+                )}
+                disabled={admitting || !sessionReadyToSave}
               >
-                {admitting ? "保存中..." : `保存本 session 已审 (${saveableSessionReviews.length})`}
+                {admitting ? "保存中..." : `保存本 session 入池 (${sessionAdmitPayload.length})`}
               </button>
             </div>
 
@@ -3314,130 +3671,100 @@ function ResultWorkspace(props: {
               )}
             </div>
 
-            <div className={styles.metricTabsBlock}>
-              <div>
-                <strong>二级标签 · 指标</strong>
-                <span>只切换当前 session 下的评分维度。</span>
+            <div className={styles.unifiedReviewCard}>
+              <div className={styles.sessionChannelBar}>
+                <div>
+                  <strong>Session 沉淀 channel</strong>
+                  <span>每个 session 只需打标一次，策略学习会按 channel 聚合二级指标特征。</span>
+                </div>
+                <div className={styles.reviewChannelButtons}>
+                  {ADMISSION_CHANNELS.map((channel) => (
+                    <button
+                      key={channel.id}
+                      type="button"
+                      title={channel.description}
+                      className={selectedSessionReview?.channel === channel.id ? styles.reviewChannelActive : ""}
+                      onClick={() => selectedSession && updateSessionReview(selectedSession.caseScore.submissionId, {
+                        channel: channel.id,
+                        reviewedAt: new Date().toISOString(),
+                      })}
+                    >
+                      {channel.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className={styles.metricTabs} role="tablist" aria-label="二级指标">
-                {selectedMetricResults.map((result) => (
-                <button
-                  key={result.metricKey}
-                  type="button"
-                  className={result.metricKey === selectedMetricResult.metricKey ? styles.metricTabActive : ""}
-                  onClick={() => setActiveMetricKey(result.metricKey)}
-                >
-                  <span>{metricDisplayNameFromEvent(result.metricKey, metricNameMap)}</span>
-                  <b>{result.normalizedScore.toFixed(0)}%</b>
-                </button>
-              ))}
-              </div>
-            </div>
 
-            <div className={styles.focusContentGrid}>
-              <details className={styles.transcriptDrawer}>
-                <summary>
-                  <span>原始会话</span>
-                  <b>{getSourceSessionLabel(selectedSession.benchmarkCase)} · {selectedTranscript ? "可展开对照证据" : "暂无 transcript"}</b>
-                </summary>
-                <pre>{selectedTranscript || "当前案例没有保存原始会话 transcript。"}</pre>
-              </details>
+            <details className={styles.transcriptDrawer}>
+              <summary>
+                <span>原始会话</span>
+                <b>{getSourceSessionLabel(selectedSession.benchmarkCase)} · {selectedTranscript ? "可展开" : "暂无"}</b>
+              </summary>
+              <pre>{selectedTranscript || "当前案例没有保存原始会话 transcript。"}</pre>
+            </details>
 
+            <div className={styles.unifiedReviewBody}>
               <SessionOverviewCard
                 session={selectedSession}
                 metricNameMap={metricNameMap}
                 pendingReviewCount={selectedSessionPendingReviews}
+                activeMetricKey={selectedMetricResult.metricKey}
+                onSelectMetric={setActiveMetricKey}
+                reviewRecords={runReviewRecords}
+                runId={props.result.runId}
               />
 
-              <div className={styles.metricFocusCard}>
-                <div className={styles.metricFocusHeader}>
+              <div className={styles.unifiedReviewMain}>
+                <div className={styles.rubricFocusHeader}>
                   <div>
-                    <strong>当前维度：{metricDisplayNameFromEvent(selectedMetricResult.metricKey, metricNameMap)}</strong>
-                    <span>{selectedMetricResult.evaluatorType ? evaluatorDisplayName(selectedMetricResult.evaluatorType) : "评估器"} · Channel: {reviewDecisionChannel(selectedMetricResult, selectedReview?.decision)}</span>
+                    <strong>{metricDisplayNameFromEvent(selectedMetricResult.metricKey, metricNameMap)}</strong>
+                    <span>点击左侧指标切换；悬浮可查看详细分析</span>
                   </div>
-                  <b>{selectedMetricResult.normalizedScore.toFixed(1)}%</b>
+                  <b>{selectedConfirmedScore?.toFixed(1) ?? selectedMetricResult.score.toFixed(1)} / 5</b>
                 </div>
-                <MetricExplainCard result={selectedMetricResult} metricNameMap={metricNameMap} />
-              </div>
 
-              <RubricFormCompare metric={selectedRubricMetric} result={selectedMetricResult} />
+                <RubricFormCompare
+                  metric={selectedRubricMetric}
+                  result={selectedMetricResult}
+                  selectedScore={selectedConfirmedScore}
+                  onSelectScore={(score) => confirmMetricScore(selectedMetricResult, score)}
+                />
 
-              <div className={styles.reviewFocusCard}>
-                <div className={styles.reviewFocusHeader}>
-                  <div>
-                    <strong>人工校验</strong>
-                    <span>{selectedReview?.decision ? humanReviewDecisionLabel(selectedReview.decision) : "待人工判断"} · {reviewDecisionChannel(selectedMetricResult, selectedReview?.decision)}</span>
+                <div className={styles.unifiedReviewFooter}>
+                  {selectedReview?.admission && (
+                    <div className={styles.reviewSavedHint}>
+                      已入池 · {sourceDisplayName(selectedReview.admission.source)} · {selectedReview.admission.caseId}
+                    </div>
+                  )}
+
+                  <div className={styles.reviewFocusFields}>
+                    <label className={styles.reviewField}>
+                      <span>审核人</span>
+                      <input
+                        value={selectedReview?.reviewer ?? selectedSessionReview?.reviewer ?? "benchmark-reviewer"}
+                        onChange={(event) => updateReview(selectedMetricResult, { reviewer: event.target.value })}
+                      />
+                    </label>
+                    <label className={styles.reviewField}>
+                      <span>Session 备注</span>
+                      <textarea
+                        value={selectedSessionReview?.note ?? ""}
+                        placeholder="记录本 session 的 channel 选择依据（可选）"
+                        onChange={(event) => selectedSession && updateSessionReview(selectedSession.caseScore.submissionId, { note: event.target.value })}
+                      />
+                    </label>
+                    <label className={styles.reviewField}>
+                      <span>指标备注</span>
+                      <textarea
+                        value={selectedReview?.note ?? ""}
+                        placeholder="若调分了，可写下依据（可选）"
+                        onChange={(event) => updateReview(selectedMetricResult, { note: event.target.value })}
+                      />
+                    </label>
                   </div>
-                  {selectedReview?.admission && <b>{sourceDisplayName(selectedReview.admission.source)} · {selectedReview.admission.caseId}</b>}
-                  {!selectedReview?.admission && selectedReview?.savedAt && <b>重复已跳过</b>}
                 </div>
-
-                <div className={styles.reviewDecisionButtons}>
-                  <button
-                    type="button"
-                    className={selectedReview?.decision === "accepted" ? styles.reviewDecisionActive : ""}
-                    onClick={() => updateReview(selectedMetricResult, {
-                      decision: "accepted",
-                      reviewedAt: new Date().toISOString(),
-                      admission: undefined,
-                      savedAt: undefined,
-                    })}
-                  >
-                    认可
-                  </button>
-                  <button
-                    type="button"
-                    className={selectedReview?.decision === "rejected" ? styles.reviewDecisionActive : ""}
-                    onClick={() => updateReview(selectedMetricResult, {
-                      decision: "rejected",
-                      reviewedAt: new Date().toISOString(),
-                      admission: undefined,
-                      savedAt: undefined,
-                    })}
-                  >
-                    驳回
-                  </button>
-                  <button
-                    type="button"
-                    className={selectedReview?.decision === "needs_evidence" ? styles.reviewDecisionActive : ""}
-                    onClick={() => updateReview(selectedMetricResult, {
-                      decision: "needs_evidence",
-                      reviewedAt: new Date().toISOString(),
-                      admission: undefined,
-                      savedAt: undefined,
-                    })}
-                  >
-                    补证据
-                  </button>
-                </div>
-
-                <div className={styles.reviewFocusFields}>
-                  <label className={styles.reviewField}>
-                    <span>审核人</span>
-                    <input
-                      value={selectedReview?.reviewer ?? "benchmark-reviewer"}
-                      onChange={(event) => updateReview(selectedMetricResult, { reviewer: event.target.value })}
-                    />
-                  </label>
-                  <label className={styles.reviewField}>
-                    <span>人工备注</span>
-                    <textarea
-                      value={selectedReview?.note ?? ""}
-                      placeholder="写下你认可 / 驳回 / 补证据的依据"
-                      onChange={(event) => updateReview(selectedMetricResult, { note: event.target.value })}
-                    />
-                  </label>
-                </div>
-
-                <button
-                  type="button"
-                  className={styles.reviewSaveButton}
-                  onClick={() => void admitReviewBatch(selectedSaveableReview, "请先完成当前指标的人工判断。")}
-                  disabled={admitting || selectedSaveableReview.length === 0}
-                >
-                  {admitting ? "保存中..." : "保存本条入池"}
-                </button>
               </div>
+            </div>
             </div>
           </div>
         ) : (
@@ -3526,16 +3853,25 @@ function buildResultSessionRows(
       });
     const caseReviews = reviewRecords.filter((record) => record.submissionId === caseScore.submissionId);
     const reviewByMetric = new Map(caseReviews.map((record) => [record.metricKey, record]));
+    const reviewableMetrics = metricResults.filter(
+      (metricResult) => metricResult.status !== "skipped" && metricResult.status !== "unsupported",
+    );
+    const sessionReview = findSessionReviewRecord(reviewRecords, result.runId, caseScore.submissionId);
+    const hasSessionChannel = Boolean(sessionReview?.channel);
+    const pendingReviewCount = reviewableMetrics.filter(
+      (metricResult) => !isMetricReviewConfirmed(reviewByMetric.get(metricResult.metricKey)),
+    ).length + (hasSessionChannel ? 0 : 1);
+    const savedReviewCount = reviewableMetrics.filter(
+      (metricResult) => reviewByMetric.get(metricResult.metricKey)?.savedAt,
+    ).length;
     const weakestMetric = [...metricResults].sort((left, right) => left.normalizedScore - right.normalizedScore)[0];
     return {
       caseScore,
       benchmarkCase: casesById.get(caseScore.caseId),
       metricResults,
       attentionMetricCount: metricResults.filter(isMetricAttention).length,
-      pendingReviewCount: metricResults.filter((metricResult) =>
-        isMetricReviewCandidate(metricResult) && !reviewByMetric.get(metricResult.metricKey)?.decision,
-      ).length,
-      savedReviewCount: caseReviews.filter((record) => record.savedAt).length,
+      pendingReviewCount,
+      savedReviewCount,
       weakestMetric,
     };
   });
@@ -3591,6 +3927,20 @@ function buildRubricMetricOrder(rubric: BenchmarkRubricSet | null): Map<string, 
   return order;
 }
 
+/**
+ * Build rubric metric lookup by metric key for pass-threshold resolution.
+ *
+ * @param rubric Active rubric set.
+ * @returns Map from metricKey to rubric metric definition.
+ */
+function buildRubricMetricMap(rubric: BenchmarkRubricSet | null): Map<string, BenchmarkRubricMetric> {
+  const map = new Map<string, BenchmarkRubricMetric>();
+  for (const metric of rubric?.modules.flatMap((module) => module.metrics) ?? []) {
+    map.set(metric.metricKey, metric);
+  }
+  return map;
+}
+
 function findRubricMetric(rubric: BenchmarkRubricSet | null, metricKey: string): BenchmarkRubricMetric | null {
   return rubric?.modules.flatMap((module) => module.metrics).find((metric) => metric.metricKey === metricKey) ?? null;
 }
@@ -3637,6 +3987,86 @@ function averageMetricConfidence(results: BenchmarkMetricEvaluationResult[]): nu
   return results.reduce((sum, result) => sum + result.confidence, 0) / results.length;
 }
 
+type AdmissionLabelRow = {
+  sessionId: string;
+  caseId: string;
+  channel: string;
+  metricKey: string;
+  decision: HumanReviewDecision;
+  autoScore: number;
+  confidence: number;
+  qualityScore?: number;
+  qualityTier?: string;
+  autoPassed: boolean;
+  judgeVariance?: number;
+};
+
+/**
+ * Join decided human review records with their run metric results into
+ * admission label rows grouped by the reviewer-selected channel.
+ *
+ * @param result Benchmark run result holding metric results and rerank stats.
+ * @param reviewRecords Human review records for this run.
+ * @returns Label rows consumable by the admission-policy learner.
+ */
+function buildAdmissionLabelRows(
+  result: BenchmarkRunResult,
+  reviewRecords: BenchmarkHumanReviewRecord[],
+): AdmissionLabelRow[] {
+  const resultByKey = new Map(
+    result.metricResults.map((item) => [`${item.submissionId}:${item.metricKey}`, item]),
+  );
+  const sessionIdByCaseId = new Map(
+    result.cases.map((benchmarkCase) => [
+      benchmarkCase.caseId,
+      String(benchmarkCase.input?.sessionId ?? benchmarkCase.caseId),
+    ]),
+  );
+  const rerankBySubmissionId = new Map(
+    result.caseScores
+      .filter((caseScore) => caseScore.rerank)
+      .map((caseScore) => [caseScore.submissionId, caseScore.rerank!]),
+  );
+
+  const rows: AdmissionLabelRow[] = [];
+  const sessionChannelBySubmission = new Map<string, string>();
+  for (const record of reviewRecords) {
+    if (record.metricKey === SESSION_REVIEW_METRIC_KEY && record.channel?.trim()) {
+      sessionChannelBySubmission.set(record.submissionId, record.channel.trim());
+    }
+  }
+
+  for (const record of reviewRecords) {
+    if (record.metricKey === SESSION_REVIEW_METRIC_KEY) continue;
+    const metricResult = resultByKey.get(`${record.submissionId}:${record.metricKey}`);
+    if (!metricResult || metricResult.status === "skipped" || metricResult.status === "unsupported") {
+      continue;
+    }
+    const confirmedScore = resolveConfirmedScore(record, metricResult.score);
+    if (confirmedScore === undefined) continue;
+    const channel = sessionChannelBySubmission.get(record.submissionId);
+    if (!channel) continue;
+    const decision = record.decision && record.decision !== "needs_evidence"
+      ? record.decision
+      : inferReviewDecisionFromScore(confirmedScore, 3);
+    const rerank = rerankBySubmissionId.get(record.submissionId);
+    rows.push({
+      sessionId: sessionIdByCaseId.get(metricResult.caseId) ?? metricResult.caseId,
+      caseId: metricResult.caseId,
+      channel,
+      metricKey: metricResult.metricKey,
+      decision,
+      autoScore: metricResult.score,
+      confidence: metricResult.confidence,
+      qualityScore: rerank?.qualityScore,
+      qualityTier: rerank?.qualityTier,
+      autoPassed: metricResult.passed,
+      judgeVariance: metricResult.judgeVariance,
+    });
+  }
+  return rows;
+}
+
 function reviewDecisionChannel(
   result: BenchmarkMetricEvaluationResult,
   decision?: HumanReviewDecision,
@@ -3651,10 +4081,16 @@ function SessionOverviewCard(props: {
   session: ResultSessionRow;
   metricNameMap: Map<string, string>;
   pendingReviewCount: number;
+  activeMetricKey?: string;
+  onSelectMetric?: (metricKey: string) => void;
+  reviewRecords?: BenchmarkHumanReviewRecord[];
+  runId?: string;
 }) {
+  const [hoveredMetricKey, setHoveredMetricKey] = useState<string | null>(null);
   const score = props.session.caseScore.taskScore;
   const qScore = averageMetricConfidence(props.session.metricResults);
   const weakestMetric = props.session.weakestMetric;
+
   return (
     <section className={styles.sessionOverviewCard}>
       <div className={styles.sessionOverviewHeader}>
@@ -3667,45 +4103,78 @@ function SessionOverviewCard(props: {
       <div className={styles.sessionOverviewMeta}>
         <span>Q 分 {(qScore * 100).toFixed(0)}</span>
         <span>tier: {scoreTierLabel(score)}</span>
-        <span>{props.pendingReviewCount} 个待审</span>
+        <span>{props.pendingReviewCount} 待确认</span>
         {weakestMetric && <span>最弱：{metricDisplayNameFromEvent(weakestMetric.metricKey, props.metricNameMap)} {weakestMetric.normalizedScore.toFixed(0)}%</span>}
       </div>
       <div className={styles.sessionMetricBars}>
-        {props.session.metricResults.map((result) => (
-          <div key={result.metricKey} className={styles.sessionMetricBar}>
-            <span>{metricDisplayNameFromEvent(result.metricKey, props.metricNameMap)}</span>
-            <div><i style={{ width: `${Math.max(2, Math.min(100, result.normalizedScore))}%` }} /></div>
-            <b>{result.normalizedScore.toFixed(0)}%</b>
+        {props.session.metricResults.map((result) => {
+          const metricReview = props.reviewRecords && props.runId
+            ? findMetricReviewRecord(props.reviewRecords, props.runId, result)
+            : undefined;
+          const confirmed = isMetricReviewConfirmed(metricReview);
+          const isActive = props.activeMetricKey === result.metricKey;
+          const isHovered = hoveredMetricKey === result.metricKey;
+          return (
+          <div
+            key={result.metricKey}
+            className={styles.sessionMetricBarWrap}
+            onMouseEnter={() => setHoveredMetricKey(result.metricKey)}
+            onMouseLeave={() => setHoveredMetricKey((current) => (current === result.metricKey ? null : current))}
+          >
+            <button
+              type="button"
+              className={`${styles.sessionMetricBar} ${isActive ? styles.sessionMetricBarActive : ""} ${isHovered ? styles.sessionMetricBarHovered : ""}`}
+              onClick={() => props.onSelectMetric?.(result.metricKey)}
+            >
+              <span>{metricDisplayNameFromEvent(result.metricKey, props.metricNameMap)}{confirmed ? " ✓" : ""}</span>
+              <div><i style={{ width: `${Math.max(2, Math.min(100, result.normalizedScore))}%` }} /></div>
+              <b>{(metricReview?.confirmedScore ?? result.score).toFixed(0)}</b>
+            </button>
+            {isHovered && (
+              <div className={styles.metricDetailPopover} role="tooltip">
+                <MetricExplainCard result={result} metricNameMap={props.metricNameMap} compact />
+              </div>
+            )}
           </div>
-        ))}
+        );
+        })}
       </div>
     </section>
   );
 }
 
-function RubricFormCompare(props: { metric: BenchmarkRubricMetric | null; result: BenchmarkMetricEvaluationResult }) {
+function RubricFormCompare(props: {
+  metric: BenchmarkRubricMetric | null;
+  result: BenchmarkMetricEvaluationResult;
+  selectedScore?: number;
+  onSelectScore?: (score: number) => void;
+}) {
   const rubricForm = props.metric?.config?.rubricForm ?? [];
+  const activeScore = props.selectedScore ?? props.result.score;
   return (
     <section className={styles.rubricCompareCard}>
       <div className={styles.rubricCompareHeader}>
         <div>
           <strong>rubricForm 对照</strong>
-          <span>{props.metric?.config?.criteria ?? "当前指标没有保存单独的 rubricForm。"}</span>
+          <span>{props.onSelectScore ? "点击档位确认人工分数" : (props.metric?.config?.criteria ?? "当前指标没有保存单独的 rubricForm。")}</span>
         </div>
-        <b>{props.result.score.toFixed(1)} / 5</b>
+        <b>{activeScore.toFixed(1)} / 5</b>
       </div>
       {rubricForm.length === 0 ? (
         <p className={styles.explainEmpty}>暂无评分档位。</p>
       ) : (
         <div className={styles.rubricCompareLevels}>
           {rubricForm.map((level) => (
-            <div
+            <button
               key={`${props.result.metricKey}-${level.score}-${level.label}`}
-              className={Math.abs(level.score - props.result.score) < 0.5 ? styles.rubricCompareLevelActive : ""}
+              type="button"
+              className={`${styles.rubricCompareLevelButton} ${Math.abs(level.score - activeScore) < 0.5 ? styles.rubricCompareLevelActive : ""}`}
+              onClick={() => props.onSelectScore?.(level.score)}
+              disabled={!props.onSelectScore}
             >
               <span>{level.score} 分 · {level.label}</span>
               <p>{level.description}</p>
-            </div>
+            </button>
           ))}
         </div>
       )}

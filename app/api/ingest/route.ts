@@ -5,6 +5,7 @@ import { normalizeSourceWithMappingPlan } from "@/data-onboarding/normalize";
 import { previewCsvLines } from "@/lib/csv";
 import { inferFormatFromFileName, parseByFormat } from "@/parsers";
 import { redactRawRows } from "@/pii/redaction";
+import { resolveTemplatePlaceholdersInRows } from "@/pii/template-placeholders";
 import { toCanonicalCsv } from "@/pipeline/enrich";
 import { buildStructuredTaskMetricsFromSource } from "@/pipeline/structuredTaskMetrics";
 import { ingestRequestSchema } from "@/schemas/api";
@@ -35,7 +36,8 @@ export async function POST(request: Request) {
       : mappingPlan
         ? normalizeSourceWithMappingPlan(body.text, mappingPlan)
         : [];
-    const redaction = redactRawRows(mappedRows);
+    const placeholderResolution = resolveTemplatePlaceholdersInRows(mappedRows);
+    const redaction = redactRawRows(placeholderResolution.rows);
     const rawRows = redaction.rows;
     if (rawRows.length === 0) {
       return NextResponse.json(
@@ -50,6 +52,11 @@ export async function POST(request: Request) {
     const warnings: string[] = [];
     if (!hasTimestamp) {
       warnings.push("检测到缺失 timestamp，部分时序指标将在评估阶段降级。");
+    }
+    if (placeholderResolution.report.resolvedSlots > 0) {
+      warnings.push(
+        `已填充 ${placeholderResolution.report.resolvedSlots} 处 Bitext 模板占位符（{{…}}），避免评测关注错位。`,
+      );
     }
     if (redaction.report.redactedFields > 0) {
       warnings.push(`PII 脱敏已处理 ${redaction.report.redactedFields} 处：${redaction.report.categories.join(", ")}。`);

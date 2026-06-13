@@ -136,6 +136,24 @@ describe("evaluateLlmJudge guards", () => {
     assert.notEqual(result.score, scale.max);
   });
 
+  it("M1-07: converts rejected llm judge into error metric instead of throwing", async () => {
+    const result = await evaluateBenchmarkMetric(
+      baseMetric({
+        metricKey: "empathy",
+        evaluatorType: "llm_judge",
+      }),
+      baseCase(),
+      baseSubmission({ answer: "ok" }),
+      {
+        llmJudge: async () => {
+          throw new Error("SiliconFlow 请求失败: 429");
+        },
+      },
+    );
+    assert.equal(result.status, "error");
+    assert.match(result.reason, /429/);
+  });
+
   it("M1-06: score distribution is not degenerate", async () => {
     const mockScores = [1, 1, 3, 3, 5, 5, 3, 1];
     const normalizedScores: number[] = [];

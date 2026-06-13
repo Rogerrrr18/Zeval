@@ -50,7 +50,7 @@ export async function evaluateBenchmarkMetric(
       case "f1_match":
         return evaluateF1Match(metric, taskCase, submission);
       case "llm_judge":
-        return evaluateLlmJudge(metric, taskCase, submission, context);
+        return await evaluateLlmJudge(metric, taskCase, submission, context);
       case "human_label":
         return evaluateHumanLabel(metric, taskCase, submission);
       case "code_exec":

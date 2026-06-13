@@ -11,12 +11,16 @@ import type {
 } from "@/benchmark/types";
 import type { RawChatlogRow } from "@/types/pipeline";
 
-const DEFAULT_MAX_DATASET_CASES = 8;
+const DEFAULT_MAX_DATASET_CASES = 50;
 
 /**
  * Resolve the session cap for benchmark case building.
  *
- * @returns Max sessions per run from `ZEVAL_BENCHMARK_MAX_CASES` or default 8.
+ * MVP raised the default cap from 8 to 50 so a single benchmark run can cover
+ * enough sessions to feed the downstream automated admission-pool learning loop
+ * (which only needs 20 human labels to (re)generate a policy).
+ *
+ * @returns Max sessions per run from `ZEVAL_BENCHMARK_MAX_CASES` or default 50.
  */
 export function getMaxDatasetCases(): number {
   const configured = Number(process.env.ZEVAL_BENCHMARK_MAX_CASES ?? DEFAULT_MAX_DATASET_CASES);
