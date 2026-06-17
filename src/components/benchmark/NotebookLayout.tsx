@@ -1535,6 +1535,12 @@ export function NotebookLayout() {
           messages,
           requirementText: requirement,
           rubric,
+          userId: "default",
+          includeKnowledgeBase: knowledgeFiles.length > 0,
+          knowledgeQuery: [requirement, text].filter(Boolean).join("\n\n"),
+          knowledgeFileIds: selectedFileId
+            ? [selectedFileId]
+            : knowledgeFiles.map((file) => file.fileId),
         }),
       });
       const data = (await response.json()) as BenchmarkRubricAgentResponse;
