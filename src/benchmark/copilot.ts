@@ -15,6 +15,7 @@ import { consolidateSparseLlmModules } from "@/benchmark/rubric-structure";
 import type {
   BenchmarkCapabilityDimension,
   BenchmarkDomain,
+  BenchmarkEvaluatorConfig,
   BenchmarkEvaluatorType,
   BenchmarkMetricReference,
   BenchmarkReferenceSourceType,
@@ -68,8 +69,26 @@ type LlmRubricMetricPayload = {
   humanApprovalRequired?: boolean;
   failureTags?: string[];
   criteria?: string;
+  outputPath?: string;
+  expectedPath?: string;
+  pattern?: string;
+  tolerance?: number;
+  predictedItemsPath?: string;
+  expectedItemsPath?: string;
+  childMetricKeys?: string[];
+  config?: LlmEvaluatorConfigPayload;
   rubricForm?: LlmRubricScoreLevelPayload[];
   references?: Array<LlmRubricReferencePayload | string>;
+};
+
+type LlmEvaluatorConfigPayload = {
+  outputPath?: unknown;
+  expectedPath?: unknown;
+  pattern?: unknown;
+  tolerance?: unknown;
+  predictedItemsPath?: unknown;
+  expectedItemsPath?: unknown;
+  childMetricKeys?: unknown;
 };
 
 type LlmRubricScoreLevelPayload = {
@@ -121,9 +140,16 @@ const ALLOWED_EVALUATORS: BenchmarkEvaluatorType[] = [
   "hybrid",
 ];
 
-const CUSTOM_RUBRIC_EVALUATORS: BenchmarkEvaluatorType[] = [
+const GENERATED_RUBRIC_EVALUATORS: BenchmarkEvaluatorType[] = [
   "llm_judge",
   "human_label",
+  "exact_match",
+  "regex_match",
+  "numeric_tolerance",
+  "f1_match",
+  "code_exec",
+  "unit_test",
+  "environment_state_test",
 ];
 
 const ALLOWED_DOMAINS: BenchmarkDomain[] = [
@@ -198,11 +224,16 @@ export async function draftBenchmarkRubric(
               "criteria 和 rubricForm.description 要写清楚可复核的评分规则，并在关键规则后用 [referenceId] 形式标注依据。",
               "Return JSON only.",
               "Allowed capabilities: task_completion, instruction_following, factual_grounding, data_extraction, reasoning_quality, tool_use_correctness, format_compliance, latency_efficiency, safety_policy, business_judgment.",
-              "Allowed evaluatorType for generated custom metrics: llm_judge, human_label.",
-              "Use llm_judge for most metrics; use human_label only when the metric clearly requires domain expert review.",
+              "Allowed evaluatorType for generated custom metrics: llm_judge, human_label, exact_match, regex_match, numeric_tolerance, f1_match, code_exec, unit_test, environment_state_test.",
+              "Evaluator selection rule: use objective evaluators whenever the expected answer can be checked mechanically; use llm_judge only for open-ended semantic quality; use human_label only for high-risk domain expert review.",
+              "For exact_match you must provide outputPath and expectedPath, e.g. parsedOutput.decision vs expected.decision.",
+              "For regex_match you must provide pattern and preferably outputPath, e.g. JSON/schema/format checks.",
+              "For numeric_tolerance you must provide outputPath, expectedPath and tolerance.",
+              "For f1_match you must provide predictedItemsPath and expectedItemsPath for entity/list coverage.",
+              "For code_exec, unit_test, environment_state_test, only use them when the harness can produce evaluatorResults artifacts.",
               "Allowed domain: hr, finance, procurement, software, healthcare, research, custom.",
               'Allowed sourceType: paper, public_benchmark, standard, dataset, framework, documentation, research_report.',
-              'Output schema: {"domain":"custom","title":"中文标题","description":"中文描述","researchSummary":"中文依据摘要","preferredCapabilities":["task_completion","business_judgment"],"modules":[{"capability":"task_completion","displayName":"问题承接与解决","description":"中文说明","weight":3,"metrics":[{"metricKey":"intent_match","displayName":"意图识别准确率","description":"中文指标说明","evaluatorType":"llm_judge","weight":3,"passThreshold":3,"evidenceRequired":true,"humanApprovalRequired":true,"failureTags":["domain_issue"],"criteria":"中文评分准则，包含 [R1] 引用","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明，包含 [R1] 引用"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"论文或公开 benchmark 标题","sourceType":"paper","url":"https://...","authors":["作者"],"publisher":"机构","year":2023,"benchmarkName":"benchmark 名称","relevance":"中文说明该来源如何支撑此指标","confidence":0.9}]},{"metricKey":"solution_quality","displayName":"解决方案可执行性","description":"中文指标说明","evaluatorType":"llm_judge","weight":3,"passThreshold":3,"evidenceRequired":true,"humanApprovalRequired":true,"failureTags":["domain_issue"],"criteria":"中文评分准则","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"来源标题","sourceType":"paper","url":"https://...","relevance":"中文说明","confidence":0.9}]}]}]}',
+              'Output schema: {"domain":"custom","title":"中文标题","description":"中文描述","researchSummary":"中文依据摘要","preferredCapabilities":["task_completion","business_judgment"],"modules":[{"capability":"task_completion","displayName":"问题承接与解决","description":"中文说明","weight":3,"metrics":[{"metricKey":"decision_accuracy","displayName":"决策准确率","description":"中文指标说明","evaluatorType":"exact_match","outputPath":"parsedOutput.decision","expectedPath":"expected.decision","weight":3,"passThreshold":3,"evidenceRequired":false,"humanApprovalRequired":false,"failureTags":["wrong_decision"],"criteria":"中文评分准则，包含 [R1] 引用","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明，包含 [R1] 引用"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"论文或公开 benchmark 标题","sourceType":"paper","url":"https://...","authors":["作者"],"publisher":"机构","year":2023,"benchmarkName":"benchmark 名称","relevance":"中文说明该来源如何支撑此指标","confidence":0.9}]},{"metricKey":"solution_quality","displayName":"解决方案可执行性","description":"中文指标说明","evaluatorType":"llm_judge","weight":3,"passThreshold":3,"evidenceRequired":true,"humanApprovalRequired":true,"failureTags":["domain_issue"],"criteria":"中文评分准则","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"来源标题","sourceType":"paper","url":"https://...","relevance":"中文说明","confidence":0.9}]}]}]}',
             ].join("\n"),
           },
           {
@@ -391,9 +422,17 @@ function sanitizeLlmMetrics(
       const displayName = ensureChineseText(metric.displayName, `${moduleDisplayName}指标${metricIndex + 1}`);
       const metricKey = buildUniqueMetricKey(metric.metricKey ?? displayName, capability, usedMetricKeys);
       const rawEvaluatorType = metric.evaluatorType;
-      const evaluatorType: BenchmarkEvaluatorType = rawEvaluatorType && isCustomRubricEvaluator(rawEvaluatorType)
+      const requestedEvaluatorType: BenchmarkEvaluatorType = rawEvaluatorType && isGeneratedRubricEvaluator(rawEvaluatorType)
         ? rawEvaluatorType
-        : "llm_judge";
+        : inferGeneratedRubricEvaluator(metric, capability, metricKey, displayName);
+      const evaluatorConfig = normalizeGeneratedEvaluatorConfig({
+        metric,
+        evaluatorType: requestedEvaluatorType,
+        capability,
+        metricKey,
+        displayName,
+      });
+      const evaluatorType = evaluatorConfig.evaluatorType;
 
       return {
         metricKey,
@@ -413,12 +452,253 @@ function sanitizeLlmMetrics(
         failureTags: normalizeFailureTags(metric.failureTags, metricKey),
         config: {
           criteria: ensureChineseText(metric.criteria, `按照「${displayName}」的业务要求进行 0 到 5 分评分，并说明证据。`),
+          ...evaluatorConfig.config,
           rubricForm: normalizeRubricForm(metric.rubricForm, displayName),
           references: normalizeMetricReferences(metric.references, capability, researchReferences),
         },
       } satisfies BenchmarkRubricMetric;
     })
     .slice(0, 3);
+}
+
+/**
+ * Infer the best generated evaluator when the LLM omits evaluatorType.
+ *
+ * @param metric Raw LLM metric payload.
+ * @param capability Parent capability dimension.
+ * @param metricKey Stable metric key after sanitization.
+ * @param displayName User-facing metric name.
+ * @returns Evaluator type biased toward objective checks when the signal is structured.
+ */
+function inferGeneratedRubricEvaluator(
+  metric: LlmRubricMetricPayload,
+  capability: BenchmarkCapabilityDimension,
+  metricKey: string,
+  displayName: string,
+): BenchmarkEvaluatorType {
+  const text = `${capability}\n${metricKey}\n${displayName}\n${metric.description ?? ""}\n${metric.criteria ?? ""}`.toLowerCase();
+  if (capability === "data_extraction" || /(entity|entities|field|slot|extract|coverage|覆盖|抽取|字段|实体|要点)/i.test(text)) {
+    return "f1_match";
+  }
+  if (capability === "format_compliance" || /(format|schema|json|csv|xml|regex|结构|格式|模板)/i.test(text)) {
+    return "regex_match";
+  }
+  if (capability === "latency_efficiency" || /(latency|duration|runtime|cost|budget|timeout|ms|seconds|时延|耗时|成本|预算|超时)/i.test(text)) {
+    return "numeric_tolerance";
+  }
+  if (capability === "tool_use_correctness" || /(tool|api|browser|file|database|environment|state|工具|调用|文件|数据库|环境状态)/i.test(text)) {
+    return "environment_state_test";
+  }
+  if (capability === "safety_policy" || /(safety|privacy|bias|policy|pii|compliance|安全|隐私|偏见|合规)/i.test(text)) {
+    return "human_label";
+  }
+  if (/(accuracy|decision|classification|label|pass|fail|match|准确率|决策|分类|标签|是否|命中)/i.test(text)) {
+    return "exact_match";
+  }
+  return "llm_judge";
+}
+
+/**
+ * Build evaluator config for generated custom metrics and downgrade unrunnable
+ * objective evaluators to llm_judge when required paths are absent.
+ *
+ * @param input Raw metric and evaluator context.
+ * @returns Runnable evaluator type plus evaluator-specific config.
+ */
+function normalizeGeneratedEvaluatorConfig(input: {
+  metric: LlmRubricMetricPayload;
+  evaluatorType: BenchmarkEvaluatorType;
+  capability: BenchmarkCapabilityDimension;
+  metricKey: string;
+  displayName: string;
+}): { evaluatorType: BenchmarkEvaluatorType; config: BenchmarkEvaluatorConfig } {
+  const rawConfig = isRecord(input.metric.config) ? input.metric.config : {};
+  const config: BenchmarkEvaluatorConfig = {};
+  const outputPath = stringValue(input.metric.outputPath) ?? stringValue(rawConfig.outputPath);
+  const expectedPath = stringValue(input.metric.expectedPath) ?? stringValue(rawConfig.expectedPath);
+  const pattern = stringValue(input.metric.pattern) ?? stringValue(rawConfig.pattern);
+  const tolerance = numberValue(input.metric.tolerance) ?? numberValue(rawConfig.tolerance);
+  const predictedItemsPath = stringValue(input.metric.predictedItemsPath) ?? stringValue(rawConfig.predictedItemsPath);
+  const expectedItemsPath = stringValue(input.metric.expectedItemsPath) ?? stringValue(rawConfig.expectedItemsPath);
+  const childMetricKeys = normalizeChildMetricKeys(input.metric.childMetricKeys ?? rawConfig.childMetricKeys);
+
+  switch (input.evaluatorType) {
+    case "exact_match": {
+      const inferred = inferExactMatchPaths(input.metricKey, input.displayName, input.capability);
+      const finalOutputPath = outputPath ?? inferred.outputPath;
+      const finalExpectedPath = expectedPath ?? inferred.expectedPath;
+      if (!finalOutputPath || !finalExpectedPath) return { evaluatorType: "llm_judge", config };
+      return {
+        evaluatorType: "exact_match",
+        config: { ...config, outputPath: finalOutputPath, expectedPath: finalExpectedPath },
+      };
+    }
+    case "regex_match": {
+      const finalPattern = pattern ?? inferRegexPattern(input.metricKey, input.displayName, input.capability);
+      if (!finalPattern) return { evaluatorType: "llm_judge", config };
+      return {
+        evaluatorType: "regex_match",
+        config: {
+          ...config,
+          pattern: finalPattern,
+          outputPath: outputPath ?? inferFormatOutputPath(input.metricKey, input.displayName),
+        },
+      };
+    }
+    case "numeric_tolerance": {
+      const inferred = inferNumericTolerancePaths(input.metricKey, input.displayName, input.capability);
+      const finalOutputPath = outputPath ?? inferred.outputPath;
+      const finalExpectedPath = expectedPath ?? inferred.expectedPath;
+      if (!finalOutputPath || !finalExpectedPath) return { evaluatorType: "llm_judge", config };
+      return {
+        evaluatorType: "numeric_tolerance",
+        config: {
+          ...config,
+          outputPath: finalOutputPath,
+          expectedPath: finalExpectedPath,
+          tolerance: tolerance ?? inferred.tolerance ?? 0,
+        },
+      };
+    }
+    case "f1_match": {
+      const inferred = inferF1Paths(input.metricKey, input.displayName, input.capability);
+      const finalPredictedPath = predictedItemsPath ?? inferred.predictedItemsPath;
+      const finalExpectedItemsPath = expectedItemsPath ?? inferred.expectedItemsPath;
+      if (!finalPredictedPath || !finalExpectedItemsPath) return { evaluatorType: "llm_judge", config };
+      return {
+        evaluatorType: "f1_match",
+        config: {
+          ...config,
+          predictedItemsPath: finalPredictedPath,
+          expectedItemsPath: finalExpectedItemsPath,
+        },
+      };
+    }
+    case "hybrid":
+      return childMetricKeys.length
+        ? { evaluatorType: "hybrid", config: { ...config, childMetricKeys } }
+        : { evaluatorType: "llm_judge", config };
+    default:
+      return { evaluatorType: input.evaluatorType, config };
+  }
+}
+
+/**
+ * Infer standard exact-match paths for common classification fields.
+ *
+ * @param metricKey Stable metric key.
+ * @param displayName User-facing metric name.
+ * @param capability Parent capability dimension.
+ * @returns Output and expected dot paths when a safe convention is available.
+ */
+function inferExactMatchPaths(
+  metricKey: string,
+  displayName: string,
+  capability: BenchmarkCapabilityDimension,
+): Pick<BenchmarkEvaluatorConfig, "outputPath" | "expectedPath"> {
+  const text = `${metricKey}\n${displayName}`.toLowerCase();
+  if (/(decision|决策|筛选|accept|reject|通过|拒绝)/i.test(text) || capability === "business_judgment") {
+    return { outputPath: "parsedOutput.decision", expectedPath: "expected.decision" };
+  }
+  if (/(label|class|category|分类|标签|类别)/i.test(text)) {
+    return { outputPath: "parsedOutput.label", expectedPath: "expected.label" };
+  }
+  if (/(answer|答案|结果)/i.test(text)) {
+    return { outputPath: "parsedOutput.answer", expectedPath: "expected.answer" };
+  }
+  return {};
+}
+
+/**
+ * Infer regex patterns for common format-compliance checks.
+ *
+ * @param metricKey Stable metric key.
+ * @param displayName User-facing metric name.
+ * @param capability Parent capability dimension.
+ * @returns Regex pattern, or undefined when no safe default exists.
+ */
+function inferRegexPattern(
+  metricKey: string,
+  displayName: string,
+  capability: BenchmarkCapabilityDimension,
+): string | undefined {
+  const text = `${metricKey}\n${displayName}`.toLowerCase();
+  if (capability === "format_compliance" || /json|schema|结构|格式/.test(text)) return "\\{[\\s\\S]*\\}";
+  if (/csv/.test(text)) return "^[^\\n,]+(,[^\\n,]+)+";
+  return undefined;
+}
+
+/**
+ * Infer the output path used for format checks.
+ *
+ * @param metricKey Stable metric key.
+ * @param displayName User-facing metric name.
+ * @returns Dot path into parsed submission output.
+ */
+function inferFormatOutputPath(metricKey: string, displayName: string): string | undefined {
+  const text = `${metricKey}\n${displayName}`.toLowerCase();
+  if (/json|schema|结构|格式/.test(text)) return "parsedOutput";
+  return undefined;
+}
+
+/**
+ * Infer numeric tolerance paths for latency, budget and score metrics.
+ *
+ * @param metricKey Stable metric key.
+ * @param displayName User-facing metric name.
+ * @param capability Parent capability dimension.
+ * @returns Numeric output path, expected path and default tolerance when safe.
+ */
+function inferNumericTolerancePaths(
+  metricKey: string,
+  displayName: string,
+  capability: BenchmarkCapabilityDimension,
+): Pick<BenchmarkEvaluatorConfig, "outputPath" | "expectedPath" | "tolerance"> {
+  const text = `${metricKey}\n${displayName}`.toLowerCase();
+  if (capability === "latency_efficiency" || /(latency|duration|runtime|timeout|时延|耗时|超时)/i.test(text)) {
+    return { outputPath: "durationMs", expectedPath: "expected.maxDurationMs", tolerance: 0 };
+  }
+  if (/(cost|budget|token|成本|预算)/i.test(text)) {
+    return { outputPath: "cost", expectedPath: "expected.maxCost", tolerance: 0 };
+  }
+  if (/(score|分数|评分)/i.test(text)) {
+    return { outputPath: "parsedOutput.score", expectedPath: "expected.score", tolerance: 0 };
+  }
+  return {};
+}
+
+/**
+ * Infer list coverage paths for entity and key-point extraction.
+ *
+ * @param metricKey Stable metric key.
+ * @param displayName User-facing metric name.
+ * @param capability Parent capability dimension.
+ * @returns Predicted and expected list paths when safe.
+ */
+function inferF1Paths(
+  metricKey: string,
+  displayName: string,
+  capability: BenchmarkCapabilityDimension,
+): Pick<BenchmarkEvaluatorConfig, "predictedItemsPath" | "expectedItemsPath"> {
+  const text = `${metricKey}\n${displayName}`.toLowerCase();
+  if (capability === "data_extraction" || /(entity|entities|实体|字段|抽取)/i.test(text)) {
+    return { predictedItemsPath: "parsedOutput.entities", expectedItemsPath: "expected.entities" };
+  }
+  if (/(key.?point|要点|coverage|覆盖)/i.test(text)) {
+    return { predictedItemsPath: "parsedOutput.keyPoints", expectedItemsPath: "expected.keyPoints" };
+  }
+  return {};
+}
+
+/**
+ * Normalize child metric keys for hybrid metric configs.
+ *
+ * @param value Raw child metric key payload.
+ * @returns Non-empty child metric keys.
+ */
+function normalizeChildMetricKeys(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item).trim()).filter(Boolean).slice(0, 8);
 }
 
 export async function researchBenchmarkReferences(input: DraftBenchmarkRubricInput): Promise<RubricResearchBrief> {
@@ -759,8 +1039,8 @@ function isBenchmarkReferenceSourceType(value: string | undefined): value is Ben
   return Boolean(value && ALLOWED_REFERENCE_SOURCE_TYPES.includes(value as BenchmarkReferenceSourceType));
 }
 
-function isCustomRubricEvaluator(value: string): value is BenchmarkEvaluatorType {
-  return isBenchmarkEvaluatorType(value) && CUSTOM_RUBRIC_EVALUATORS.includes(value);
+function isGeneratedRubricEvaluator(value: string): value is BenchmarkEvaluatorType {
+  return isBenchmarkEvaluatorType(value) && GENERATED_RUBRIC_EVALUATORS.includes(value);
 }
 
 function isBenchmarkCapabilityDimension(value: string): value is BenchmarkCapabilityDimension {
