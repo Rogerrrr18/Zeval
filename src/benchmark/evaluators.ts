@@ -6,6 +6,7 @@ import {
   shouldBlockMaxScoreWithoutEvidence,
   snapScoreToRubricLevels,
 } from "@/benchmark/rubric-judge";
+import { BenchmarkRunCancelledError } from "@/benchmark/run-cancellation";
 import type {
   BenchmarkAgentSubmission,
   BenchmarkCase,
@@ -69,6 +70,9 @@ export async function evaluateBenchmarkMetric(
         });
     }
   } catch (error) {
+    if (error instanceof BenchmarkRunCancelledError) {
+      throw error;
+    }
     return buildResult(metric, taskCase, submission, {
       score: metric.scale.min,
       status: "error",

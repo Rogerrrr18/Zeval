@@ -8,6 +8,7 @@ import { BenchmarkRunCancelledError } from "@/benchmark/run-cancellation";
 import { assignQualityTiers, type RerankCaseInput } from "@/benchmark/rerank";
 import { getApprovedRubricMetrics, validateApprovedRubric } from "@/benchmark/rubric";
 import { assertMinimumApprovedMetrics, MIN_APPROVED_METRICS } from "@/benchmark/rubric-guards";
+import { mapWithConcurrency } from "@/lib/concurrency";
 import type {
   AgentFrameworkId,
   BenchmarkAgentSubmission,
@@ -41,6 +42,8 @@ export type RunBenchmarkEvaluationInput = {
   onMetricReused?: (result: BenchmarkMetricEvaluationResult) => void;
   /** When true, abort before the next metric evaluation. */
   shouldCancel?: () => boolean;
+  /** Maximum number of approved metrics to evaluate at the same time. */
+  metricConcurrency?: number;
 };
 
 export type EvaluateSubmissionMetricsInput = {
@@ -54,6 +57,8 @@ export type EvaluateSubmissionMetricsInput = {
   onMetricEvaluated?: (result: BenchmarkMetricEvaluationResult) => void;
   onMetricReused?: (result: BenchmarkMetricEvaluationResult) => void;
   shouldCancel?: () => boolean;
+  /** Maximum number of approved metrics to evaluate at the same time. */
+  metricConcurrency?: number;
 };
 
 /**
@@ -64,7 +69,8 @@ export type EvaluateSubmissionMetricsInput = {
  */
 export async function evaluateSubmissionMetrics(input: EvaluateSubmissionMetricsInput): Promise<void> {
   const approvedMetrics = getApprovedRubricMetrics(input.task.rubric);
-  for (const metric of approvedMetrics) {
+  const metricConcurrency = Math.max(1, Math.floor(input.metricConcurrency ?? 1));
+  await mapWithConcurrency(approvedMetrics, metricConcurrency, async (metric) => {
     if (input.shouldCancel?.()) {
       throw new BenchmarkRunCancelledError(input.runId);
     }
@@ -75,7 +81,7 @@ export async function evaluateSubmissionMetrics(input: EvaluateSubmissionMetrics
         input.metricResults.push(existingMetricResult);
       }
       input.onMetricReused?.(existingMetricResult);
-      continue;
+      return;
     }
     const metricResult = await evaluateBenchmarkMetricWithRetry(
       metric,
@@ -83,10 +89,13 @@ export async function evaluateSubmissionMetrics(input: EvaluateSubmissionMetrics
       input.submission,
       input.evaluatorContext,
     );
+    if (input.shouldCancel?.()) {
+      throw new BenchmarkRunCancelledError(input.runId);
+    }
     input.metricResults.push(metricResult);
     input.existingMetricByKey.set(cacheKey, metricResult);
     input.onMetricEvaluated?.(metricResult);
-  }
+  });
 }
 
 /**
@@ -174,6 +183,7 @@ export async function runBenchmarkEvaluation(
       onMetricEvaluated: input.onMetricEvaluated,
       onMetricReused: input.onMetricReused,
       shouldCancel: input.shouldCancel,
+      metricConcurrency: input.metricConcurrency,
     });
   }
 

@@ -16,7 +16,7 @@ import {
   BenchmarkRunCancelledError,
   interruptBenchmarkRun,
 } from "@/benchmark/run-cancellation";
-import type { BenchmarkProgressSnapshot } from "@/benchmark/progress";
+import type { BenchmarkJudgeProgressMember, BenchmarkProgressSnapshot } from "@/benchmark/progress";
 import { buildEvalAnythingDesign, renderEvalAnythingDesignSummary } from "@/benchmark/eval-anything-philosophy";
 import { snapScoreToRubricLevels } from "@/benchmark/rubric-judge";
 import {
@@ -41,6 +41,7 @@ import type {
   BenchmarkTaskPackage,
 } from "@/benchmark/types";
 import type { BenchmarkDatasetSnapshot } from "@/benchmark/session-store";
+import { mapWithConcurrency } from "@/lib/concurrency";
 export type RunGenericBenchmarkInput = {
   runId: string;
   requirementText: string;
@@ -188,12 +189,14 @@ async function runGenericBenchmarkStreamingInternal(input: RunGenericBenchmarkIn
     ).catch(() => undefined);
   };
 
-  const llmJudge = createLlmJudge();
+  const llmJudge = createLlmJudge({ runId: input.runId });
+  const metricConcurrency = resolveBenchmarkMetricConcurrency();
 
   const syncEvaluatedMetrics = () => {
     benchmarkProgress.update(input.runId, {
       evaluatedMetrics: metricResultsForArtifact.length,
       phase: "evaluating",
+      judgeProgress: undefined,
       activeAnalysis: "正在逐指标调用评测器。每个指标会根据用户确认的 rubric 表单、案例上下文、期望标准和被测输出给出分数、理由与证据。",
     });
   };
@@ -214,6 +217,7 @@ async function runGenericBenchmarkStreamingInternal(input: RunGenericBenchmarkIn
       existingMetricByKey,
       metricResults: metricResultsForArtifact,
       shouldCancel: () => benchmarkProgress.isCancelled(input.runId),
+      metricConcurrency,
       onMetricReused: () => {
         syncEvaluatedMetrics();
       },
@@ -322,110 +326,52 @@ async function buildSubmissions(input: {
       .filter((submission) => submission.status === "completed")
       .map((submission) => [submissionCacheKey(submission.agentFramework, submission.model, submission.caseId), submission]),
   );
+  const workItems = input.matrix.flatMap((matrixCell) =>
+    input.cases.map((taskCase) => ({ matrixCell, taskCase })),
+  );
+  const workOrder = new Map(
+    workItems.map((item, index) => [submissionCacheKey(item.matrixCell.agentFramework, item.matrixCell.model, item.taskCase.caseId), index]),
+  );
 
-  for (const matrixCell of input.matrix) {
-    for (const taskCase of input.cases) {
-      assertBenchmarkRunActive(input.runId);
-      const existingSubmission = existingByKey.get(submissionCacheKey(matrixCell.agentFramework, matrixCell.model, taskCase.caseId));
-      if (existingSubmission) {
-        submissions.push(existingSubmission);
-        await input.onSubmissionReady?.(existingSubmission, taskCase);
-        continue;
-      }
+  await mapWithConcurrency(workItems, resolveBenchmarkSubmissionConcurrency(), async ({ matrixCell, taskCase }) => {
+    assertBenchmarkRunActive(input.runId);
+    const existingSubmission = existingByKey.get(submissionCacheKey(matrixCell.agentFramework, matrixCell.model, taskCase.caseId));
+    if (existingSubmission) {
+      submissions.push(existingSubmission);
+      await input.onSubmissionReady?.(existingSubmission, taskCase);
+      return;
+    }
 
-      benchmarkProgress.addItem(input.runId, {
-        agentFramework: matrixCell.agentFramework,
-        model: matrixCell.model,
-        caseId: taskCase.caseId,
-        status: "running",
-      });
-      benchmarkProgress.update(input.runId, {
-        phase: "submitting",
-        activeAnalysis: `正在让被测智能体处理案例 ${taskCase.caseId}，随后会用确认后的指标逐项评分。`,
-      });
-      benchmarkProgress.addEvent(input.runId, {
-        phase: "submitting",
-        status: "running",
-        title: "生成被测输出",
-        detail: `正在处理案例 ${taskCase.caseId}，输入来自上传数据的一个 session。`,
-        caseId: taskCase.caseId,
-      });
+    benchmarkProgress.addItem(input.runId, {
+      agentFramework: matrixCell.agentFramework,
+      model: matrixCell.model,
+      caseId: taskCase.caseId,
+      status: "running",
+    });
+    benchmarkProgress.update(input.runId, {
+      phase: "submitting",
+      activeAnalysis: `正在并行处理评测案例；当前生成案例 ${taskCase.caseId} 的被测输出。`,
+    });
+    benchmarkProgress.addEvent(input.runId, {
+      phase: "submitting",
+      status: "running",
+      title: "生成被测输出",
+      detail: `正在处理案例 ${taskCase.caseId}，输入来自上传数据的一个 session。`,
+      caseId: taskCase.caseId,
+    });
 
-      const startedAt = new Date().toISOString();
-      const startedMs = Date.now();
-      try {
-        if (isTranscriptEvalMode()) {
-          const submission = buildTranscriptSubmission({
-            runId: input.runId,
-            task: input.task,
-            matrixCell,
-            taskCase,
-            startedAt,
-            startedMs,
-          });
-          submissions.push(submission);
-          markSubmissionDone(input.runId, matrixCell, taskCase, submissions, input.matrix, input.cases, true, submission.durationMs);
-          await persistGenericArtifact(
-            input.runId,
-            input.task.requirementText,
-            input.task,
-            input.cases,
-            submissions,
-            input.metricResultsForArtifact,
-          );
-          benchmarkProgress.addEvent(input.runId, {
-            phase: "submitting",
-            status: "completed",
-            title: "复用历史 transcript",
-            detail: `案例 ${taskCase.caseId} 使用 transcript 评测模式，直接评历史助手回复。`,
-            caseId: taskCase.caseId,
-            evidence: extractOutputEvidence(submission.parsedOutput ?? {}),
-          });
-          await input.onSubmissionReady?.(submission, taskCase);
-          continue;
-        }
-
-        const rawOutput = await requestSiliconFlowChatCompletion(
-          [
-            {
-              role: "system",
-              content: [
-                "你是被测业务智能体，请根据用户任务给出可评测的业务输出。",
-                "必须返回 JSON，不要输出 Markdown。",
-                '输出格式：{"answer":"任务结果","evidence":["证据1","证据2"],"notes":"必要说明"}',
-              ].join("\n"),
-            },
-            {
-              role: "user",
-              content: [
-                `评测任务：${input.task.title}`,
-                `任务需求：${input.task.requirementText}`,
-                "请基于案例 transcript 完成任务，不要臆造未出现的信息。",
-                "案例输入：",
-                JSON.stringify(taskCase.input, null, 2),
-              ].join("\n\n"),
-            },
-          ],
-          { stage: "benchmark_generic_submission", temperature: 0.2, seed: 42 },
-        );
-        const parsedOutput = parseRecord(rawOutput);
-        const completedAt = new Date().toISOString();
-        const submission: BenchmarkAgentSubmission = {
-          submissionId: `${input.runId}_${matrixCell.agentFramework}_${taskCase.caseId}`,
+    const startedAt = new Date().toISOString();
+    const startedMs = Date.now();
+    try {
+      if (isTranscriptEvalMode()) {
+        const submission = buildTranscriptSubmission({
           runId: input.runId,
-          benchmarkId: input.task.benchmarkId,
-          taskId: input.task.taskId,
-          caseId: taskCase.caseId,
-          agentFramework: matrixCell.agentFramework,
-          model: matrixCell.model,
-          status: "completed",
-          rawOutput,
-          parsedOutput,
+          task: input.task,
+          matrixCell,
+          taskCase,
           startedAt,
-          completedAt,
-          durationMs: Date.now() - startedMs,
-          artifacts: {},
-        };
+          startedMs,
+        });
         submissions.push(submission);
         markSubmissionDone(input.runId, matrixCell, taskCase, submissions, input.matrix, input.cases, true, submission.durationMs);
         await persistGenericArtifact(
@@ -439,53 +385,120 @@ async function buildSubmissions(input: {
         benchmarkProgress.addEvent(input.runId, {
           phase: "submitting",
           status: "completed",
-          title: "被测输出完成",
-          detail: `案例 ${taskCase.caseId} 已生成可评测输出，用时 ${submission.durationMs ?? 0}ms。`,
+          title: "复用历史 transcript",
+          detail: `案例 ${taskCase.caseId} 使用 transcript 评测模式，直接评历史助手回复。`,
           caseId: taskCase.caseId,
-          evidence: extractOutputEvidence(parsedOutput),
+          evidence: extractOutputEvidence(submission.parsedOutput ?? {}),
         });
         await input.onSubmissionReady?.(submission, taskCase);
-      } catch (error) {
-        if (error instanceof BenchmarkRunCancelledError) {
-          throw error;
-        }
-        const message = error instanceof Error ? error.message : String(error);
-        submissions.push({
-          submissionId: `${input.runId}_${matrixCell.agentFramework}_${taskCase.caseId}`,
-          runId: input.runId,
-          benchmarkId: input.task.benchmarkId,
-          taskId: input.task.taskId,
-          caseId: taskCase.caseId,
-          agentFramework: matrixCell.agentFramework,
-          model: matrixCell.model,
-          status: "failed",
-          rawOutput: "",
-          error: message,
-          startedAt,
-          completedAt: new Date().toISOString(),
-          durationMs: Date.now() - startedMs,
-        });
-        markSubmissionDone(input.runId, matrixCell, taskCase, submissions, input.matrix, input.cases, false);
-        await persistGenericArtifact(
-          input.runId,
-          input.task.requirementText,
-          input.task,
-          input.cases,
-          submissions,
-          input.metricResultsForArtifact,
-        );
-        benchmarkProgress.addEvent(input.runId, {
-          phase: "submitting",
-          status: "failed",
-          title: "被测输出失败",
-          detail: message,
-          caseId: taskCase.caseId,
-        });
+        return;
       }
-    }
-  }
 
-  return submissions;
+      const rawOutput = await requestSiliconFlowChatCompletion(
+        [
+          {
+            role: "system",
+            content: [
+              "你是被测业务智能体，请根据用户任务给出可评测的业务输出。",
+              "必须返回 JSON，不要输出 Markdown。",
+              '输出格式：{"answer":"任务结果","evidence":["证据1","证据2"],"notes":"必要说明"}',
+            ].join("\n"),
+          },
+          {
+            role: "user",
+            content: [
+              `评测任务：${input.task.title}`,
+              `任务需求：${input.task.requirementText}`,
+              "请基于案例 transcript 完成任务，不要臆造未出现的信息。",
+              "案例输入：",
+              JSON.stringify(taskCase.input, null, 2),
+            ].join("\n\n"),
+          },
+        ],
+        { stage: "benchmark_generic_submission", temperature: 0.2, seed: 42 },
+      );
+      assertBenchmarkRunActive(input.runId);
+      const parsedOutput = parseRecord(rawOutput);
+      const completedAt = new Date().toISOString();
+      const submission: BenchmarkAgentSubmission = {
+        submissionId: `${input.runId}_${matrixCell.agentFramework}_${taskCase.caseId}`,
+        runId: input.runId,
+        benchmarkId: input.task.benchmarkId,
+        taskId: input.task.taskId,
+        caseId: taskCase.caseId,
+        agentFramework: matrixCell.agentFramework,
+        model: matrixCell.model,
+        status: "completed",
+        rawOutput,
+        parsedOutput,
+        startedAt,
+        completedAt,
+        durationMs: Date.now() - startedMs,
+        artifacts: {},
+      };
+      submissions.push(submission);
+      markSubmissionDone(input.runId, matrixCell, taskCase, submissions, input.matrix, input.cases, true, submission.durationMs);
+      await persistGenericArtifact(
+        input.runId,
+        input.task.requirementText,
+        input.task,
+        input.cases,
+        submissions,
+        input.metricResultsForArtifact,
+      );
+      benchmarkProgress.addEvent(input.runId, {
+        phase: "submitting",
+        status: "completed",
+        title: "被测输出完成",
+        detail: `案例 ${taskCase.caseId} 已生成可评测输出，用时 ${submission.durationMs ?? 0}ms。`,
+        caseId: taskCase.caseId,
+        evidence: extractOutputEvidence(parsedOutput),
+      });
+      await input.onSubmissionReady?.(submission, taskCase);
+    } catch (error) {
+      if (error instanceof BenchmarkRunCancelledError) {
+        throw error;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      submissions.push({
+        submissionId: `${input.runId}_${matrixCell.agentFramework}_${taskCase.caseId}`,
+        runId: input.runId,
+        benchmarkId: input.task.benchmarkId,
+        taskId: input.task.taskId,
+        caseId: taskCase.caseId,
+        agentFramework: matrixCell.agentFramework,
+        model: matrixCell.model,
+        status: "failed",
+        rawOutput: "",
+        error: message,
+        startedAt,
+        completedAt: new Date().toISOString(),
+        durationMs: Date.now() - startedMs,
+      });
+      markSubmissionDone(input.runId, matrixCell, taskCase, submissions, input.matrix, input.cases, false);
+      await persistGenericArtifact(
+        input.runId,
+        input.task.requirementText,
+        input.task,
+        input.cases,
+        submissions,
+        input.metricResultsForArtifact,
+      );
+      benchmarkProgress.addEvent(input.runId, {
+        phase: "submitting",
+        status: "failed",
+        title: "被测输出失败",
+        detail: message,
+        caseId: taskCase.caseId,
+      });
+    }
+  });
+
+  return submissions.sort((left, right) => {
+    const leftIndex = workOrder.get(submissionCacheKey(left.agentFramework, left.model, left.caseId)) ?? 0;
+    const rightIndex = workOrder.get(submissionCacheKey(right.agentFramework, right.model, right.caseId)) ?? 0;
+    return leftIndex - rightIndex;
+  });
 }
 
 async function persistGenericArtifact(
@@ -603,6 +616,46 @@ function addMetricEvaluationEvent(runId: string, metricResult: BenchmarkMetricEv
 }
 
 /**
+ * Publish the current LLM judge member progress to the real-time progress snapshot.
+ *
+ * @param runId Benchmark run id; omitted when the judge is used outside streaming mode.
+ * @param input Current metric and judge member state.
+ */
+function updateJudgeProgress(
+  runId: string | undefined,
+  input: {
+    mode: "single" | "panel";
+    aggregation: BenchmarkJudgeAggregationMode;
+    caseId: string;
+    submissionId: string;
+    metricKey: string;
+    metricName: string;
+    members: BenchmarkJudgeProgressMember[];
+    activeJudgeId?: string;
+  },
+): void {
+  if (!runId) return;
+  const members = input.members.map((member) => ({ ...member }));
+  benchmarkProgress.update(runId, {
+    phase: "evaluating",
+    judgeProgress: {
+      mode: input.mode,
+      aggregation: input.aggregation,
+      caseId: input.caseId,
+      submissionId: input.submissionId,
+      metricKey: input.metricKey,
+      metricName: input.metricName,
+      totalMembers: members.length,
+      completedMembers: members.filter((member) => member.status === "completed").length,
+      failedMembers: members.filter((member) => member.status === "failed").length,
+      activeJudgeId: input.activeJudgeId,
+      members,
+    },
+    activeAnalysis: `${input.mode === "panel" ? "Judge Panel" : "Single Judge"} 正在评审 ${input.metricName}：${members.filter((member) => member.status === "completed").length}/${members.length} 个成员已完成。`,
+  });
+}
+
+/**
  * Extract short evidence snippets from a generated submission.
  *
  * @param parsedOutput Parsed model output.
@@ -624,82 +677,143 @@ function isTranscriptEvalMode(): boolean {
   return process.env.ZEVAL_BENCHMARK_EVAL_MODE === "transcript";
 }
 
-function createLlmJudge(): BenchmarkLlmJudge {
+function createLlmJudge(input: { runId?: string } = {}): BenchmarkLlmJudge {
   const panelMode = readJudgePanelMode();
   const panelMembers = readJudgePanelMembers(panelMode);
   const aggregation = readJudgeAggregationMode();
   const disagreementThreshold = readJudgeDisagreementThreshold();
+  const panelConcurrency = resolveJudgePanelConcurrency(panelMode, panelMembers.length);
 
   return async ({ metric, taskCase, submission }) => {
+    if (input.runId) assertBenchmarkRunActive(input.runId);
     const allowedScores = (metric.config?.rubricForm ?? [])
       .map((level) => level.score)
       .filter((score, index, scores) => scores.indexOf(score) === index)
       .sort((left, right) => left - right);
-    const members: BenchmarkLlmJudgeMemberResult[] = [];
-    for (const [index, member] of panelMembers.entries()) {
-      const raw = await requestSiliconFlowChatCompletion(
-        [
+    const members = new Array<BenchmarkLlmJudgeMemberResult | undefined>(panelMembers.length);
+    const progressMembers: BenchmarkJudgeProgressMember[] = panelMembers.map((member) => ({
+      judgeId: member.judgeId,
+      model: member.model,
+      family: member.family,
+      status: "pending",
+    }));
+    updateJudgeProgress(input.runId, {
+      mode: panelMode,
+      aggregation,
+      caseId: taskCase.caseId,
+      submissionId: submission.submissionId,
+      metricKey: metric.metricKey,
+      metricName: metric.displayName,
+      members: progressMembers,
+      activeJudgeId: panelMembers[0]?.judgeId,
+    });
+    await mapWithConcurrency(panelMembers, panelConcurrency, async (member, index) => {
+      if (input.runId) assertBenchmarkRunActive(input.runId);
+      progressMembers[index] = { ...progressMembers[index], status: "running" };
+      updateJudgeProgress(input.runId, {
+        mode: panelMode,
+        aggregation,
+        caseId: taskCase.caseId,
+        submissionId: submission.submissionId,
+        metricKey: metric.metricKey,
+        metricName: metric.displayName,
+        members: progressMembers,
+        activeJudgeId: member.judgeId,
+      });
+      try {
+        const raw = await requestSiliconFlowChatCompletion(
+          [
+            {
+              role: "system",
+              content: [
+                "你是 Zeval benchmark 评测器，也是 Eval-Anything 风格 Judge Panel 的一个独立成员。",
+                "请严格根据指标准则、参考依据、案例输入、期望标准和被测输出评分。",
+                "不要迁就被测模型；如果证据不足，要降低分数和 confidence。",
+                "如果该案例暴露 rubric 歧义、边界样本或需要人工复核，请在 labels 中加入对应标签。",
+                allowedScores.length > 0
+                  ? `score 必须且只能是以下离散档位之一：${allowedScores.join("、")}。`
+                  : "score 必须落在 rubricForm 定义的离散档位上，禁止给出中间分。",
+                "若给最高分，evidence 必须引用 transcript 中的具体片段。",
+                "只返回 JSON，不要输出 Markdown。",
+                '输出格式：{"score":离散档位,"passed":true,"labels":["missing_evidence"],"comment":"中文理由","evidence":["证据1"],"dimensions":{"criteria_fit":0-5,"evidence_grounding":0-5},"confidence":0-1}',
+              ].join("\n"),
+            },
+            {
+              role: "user",
+              content: JSON.stringify({
+                judgeMember: member,
+                evalDesign: taskCase.metadata?.evalDesign,
+                metric: {
+                  key: metric.metricKey,
+                  name: metric.displayName,
+                  capability: metric.capability,
+                  description: metric.description,
+                  criteria: metric.config?.criteria,
+                  rubricForm: metric.config?.rubricForm,
+                  fewshotExamples: (metric.config?.rubricForm ?? []).flatMap((level) =>
+                    (level.fewshot ?? []).map((excerpt) => ({
+                      score: level.score,
+                      label: level.label,
+                      excerpt,
+                    })),
+                  ),
+                  references: metric.config?.references ?? [],
+                  scale: metric.scale,
+                },
+                caseInput: taskCase.input,
+                expected: taskCase.expected,
+                submission: submission.parsedOutput ?? submission.rawOutput,
+              }, null, 2),
+            },
+          ],
           {
-            role: "system",
-            content: [
-              "你是 Zeval benchmark 评测器，也是 Eval-Anything 风格 Judge Panel 的一个独立成员。",
-              "请严格根据指标准则、参考依据、案例输入、期望标准和被测输出评分。",
-              "不要迁就被测模型；如果证据不足，要降低分数和 confidence。",
-              "如果该案例暴露 rubric 歧义、边界样本或需要人工复核，请在 labels 中加入对应标签。",
-              allowedScores.length > 0
-                ? `score 必须且只能是以下离散档位之一：${allowedScores.join("、")}。`
-                : "score 必须落在 rubricForm 定义的离散档位上，禁止给出中间分。",
-              "若给最高分，evidence 必须引用 transcript 中的具体片段。",
-              "只返回 JSON，不要输出 Markdown。",
-              '输出格式：{"score":离散档位,"passed":true,"labels":["missing_evidence"],"comment":"中文理由","evidence":["证据1"],"dimensions":{"criteria_fit":0-5,"evidence_grounding":0-5},"confidence":0-1}',
-            ].join("\n"),
+            stage: panelMode === "panel" ? "benchmark_generic_llm_judge_panel" : "benchmark_generic_llm_judge",
+            model: member.model,
+            temperature: 0.1,
+            seed: 42 + index,
           },
-          {
-            role: "user",
-            content: JSON.stringify({
-              judgeMember: member,
-              evalDesign: taskCase.metadata?.evalDesign,
-              metric: {
-                key: metric.metricKey,
-                name: metric.displayName,
-                capability: metric.capability,
-                description: metric.description,
-                criteria: metric.config?.criteria,
-                rubricForm: metric.config?.rubricForm,
-                fewshotExamples: (metric.config?.rubricForm ?? []).flatMap((level) =>
-                  (level.fewshot ?? []).map((excerpt) => ({
-                    score: level.score,
-                    label: level.label,
-                    excerpt,
-                  })),
-                ),
-                references: metric.config?.references ?? [],
-                scale: metric.scale,
-              },
-              caseInput: taskCase.input,
-              expected: taskCase.expected,
-              submission: submission.parsedOutput ?? submission.rawOutput,
-            }, null, 2),
-          },
-        ],
-        {
-          stage: panelMode === "panel" ? "benchmark_generic_llm_judge_panel" : "benchmark_generic_llm_judge",
-          model: member.model,
-          temperature: 0.1,
-          seed: 42 + index,
-        },
-      );
-      members.push(parseJudgeMemberResult(
-        raw,
-        member,
-        metric.scale.passThreshold,
-        metric.config?.rubricForm,
-        metric.scale,
-      ));
-    }
+        );
+        if (input.runId) assertBenchmarkRunActive(input.runId);
+        const parsedMember = parseJudgeMemberResult(
+          raw,
+          member,
+          metric.scale.passThreshold,
+          metric.config?.rubricForm,
+          metric.scale,
+        );
+        members[index] = parsedMember;
+        progressMembers[index] = { ...progressMembers[index], status: "completed", score: parsedMember.score };
+        updateJudgeProgress(input.runId, {
+          mode: panelMode,
+          aggregation,
+          caseId: taskCase.caseId,
+          submissionId: submission.submissionId,
+          metricKey: metric.metricKey,
+          metricName: metric.displayName,
+          members: progressMembers,
+          activeJudgeId: panelMembers[index + 1]?.judgeId,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        progressMembers[index] = { ...progressMembers[index], status: "failed", error: message };
+        updateJudgeProgress(input.runId, {
+          mode: panelMode,
+          aggregation,
+          caseId: taskCase.caseId,
+          submissionId: submission.submissionId,
+          metricKey: metric.metricKey,
+          metricName: metric.displayName,
+          members: progressMembers,
+          activeJudgeId: undefined,
+        });
+        throw error;
+      }
+    });
+
+    const completedMembers = members.filter((member): member is BenchmarkLlmJudgeMemberResult => Boolean(member));
 
     const aggregated = aggregateJudgeMembers({
-      members,
+      members: completedMembers,
       aggregation,
       disagreementThreshold,
       passThreshold: metric.scale.passThreshold,
@@ -716,11 +830,11 @@ function createLlmJudge(): BenchmarkLlmJudge {
       judge: {
         mode: panelMode,
         aggregation,
-        memberCount: members.length,
+        memberCount: completedMembers.length,
         disagreement: aggregated.disagreement,
         disagreementThreshold,
         panelDisagree: aggregated.panelDisagree,
-        members,
+        members: completedMembers,
       },
     };
   };
@@ -758,6 +872,52 @@ function readJudgeAggregationMode(): BenchmarkJudgeAggregationMode {
 function readJudgeDisagreementThreshold(): number {
   const raw = Number.parseFloat(readZevalEnvValue(["ZEVAL_JUDGE_PANEL_DISAGREEMENT_THRESHOLD"]) ?? "");
   return Number.isFinite(raw) && raw >= 0 ? raw : 1.5;
+}
+
+/**
+ * Resolve how many benchmark submissions can be generated and evaluated concurrently.
+ * This is the outer pipeline parallelism across cases/matrix cells.
+ *
+ * @returns Positive integer concurrency limit.
+ */
+function resolveBenchmarkSubmissionConcurrency(): number {
+  return readPositiveIntegerEnv(["ZEVAL_BENCHMARK_SUBMISSION_CONCURRENCY"], 2);
+}
+
+/**
+ * Resolve how many rubric metrics can be judged concurrently for one submission.
+ * Falls back to a conservative default so local MVP runs speed up without flooding the provider.
+ *
+ * @returns Positive integer concurrency limit.
+ */
+function resolveBenchmarkMetricConcurrency(): number {
+  return readPositiveIntegerEnv(["ZEVAL_BENCHMARK_METRIC_CONCURRENCY"], 2);
+}
+
+/**
+ * Resolve how many judge panel members can run at the same time for one metric.
+ * Single-judge mode always stays serial; panel mode is capped by member count.
+ *
+ * @param mode Judge mode for this run.
+ * @param memberCount Number of configured judge members.
+ * @returns Positive integer concurrency limit.
+ */
+function resolveJudgePanelConcurrency(mode: "single" | "panel", memberCount: number): number {
+  if (mode !== "panel") return 1;
+  return Math.min(memberCount, readPositiveIntegerEnv(["ZEVAL_JUDGE_PANEL_CONCURRENCY"], 2));
+}
+
+/**
+ * Read a positive integer from the first matching environment key.
+ *
+ * @param keys Environment variable keys in priority order.
+ * @param fallback Value used when no key contains a positive integer.
+ * @returns Positive integer value.
+ */
+function readPositiveIntegerEnv(keys: string[], fallback: number): number {
+  const raw = readZevalEnvValue(keys);
+  const parsed = Number.parseInt(raw ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function readJudgePanelMembers(mode: "single" | "panel"): JudgePanelMemberConfig[] {

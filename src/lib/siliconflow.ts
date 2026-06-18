@@ -4,6 +4,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { withLlmConcurrency } from "@/lib/concurrency";
 import { appendJudgeLog } from "@/lib/judgeLog";
 import {
   ZEVAL_JUDGE_MAX_TOKENS,
@@ -135,18 +136,22 @@ export async function requestSiliconFlowChatCompletion(
         requestBody.enable_thinking = enableThinking;
       }
 
-      const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal,
-        cache: "no-store",
+      const { response, payload } = await withLlmConcurrency(async () => {
+        const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        return {
+          response,
+          payload: await parseSiliconFlowResponse(response),
+        };
       });
-
-      const payload = await parseSiliconFlowResponse(response);
       if (!response.ok) {
         const providerMessage = payload.error?.message ? ` ${payload.error.message}` : "";
         throw new Error(`SiliconFlow 请求失败: ${response.status}${providerMessage}`);
