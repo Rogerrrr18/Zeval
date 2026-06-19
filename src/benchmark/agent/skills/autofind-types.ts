@@ -12,7 +12,7 @@ export type AutoFindRubricContext = {
   rubricMetrics?: string[];
 };
 
-export type DatasetCandidateSource = "huggingface" | "github" | "web";
+export type DatasetCandidateSource = "benchhub" | "huggingface" | "github" | "web";
 
 export type DatasetCandidate = {
   id: string;

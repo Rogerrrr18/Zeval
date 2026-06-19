@@ -82,7 +82,7 @@ export async function resolveHuggingFaceDownloadUrls(datasetId: string): Promise
  * @returns Ordered absolute URLs or virtual HF rows URLs.
  */
 export async function resolveCandidateDownloadUrls(candidate: DatasetCandidate): Promise<string[]> {
-  let url = unwrapRedirectUrl(candidate.downloadUrl ?? candidate.url);
+  const url = unwrapRedirectUrl(candidate.downloadUrl ?? candidate.url);
   if (!isFetchableUrl(url)) {
     throw new Error(`无效下载 URL: ${candidate.url}`);
   }
@@ -199,15 +199,16 @@ async function walkHuggingFaceTree(
 
 async function listGitHubDataFileUrls(owner: string, repo: string): Promise<string[]> {
   const searchRoots = ["", "data", "dataset", "datasets", "dialogue", "dialogues", "src/data"];
-  const files: string[] = [];
+  const files = new Map<string, string>();
+  const visited = new Set<string>();
 
   for (const root of searchRoots) {
-    await collectGitHubFiles(owner, repo, root, 0, 2, files);
+    await collectGitHubFiles(owner, repo, root, 0, 4, files, visited);
   }
 
-  return rankHuggingFaceDataFiles(files.map((path) => ({ path }))).map(
-    (file) => `https://raw.githubusercontent.com/${owner}/${repo}/main/${file.path}`,
-  );
+  return rankHuggingFaceDataFiles([...files.keys()].map((path) => ({ path })))
+    .map((file) => files.get(file.path))
+    .filter((url): url is string => Boolean(url));
 }
 
 async function collectGitHubFiles(
@@ -216,12 +217,17 @@ async function collectGitHubFiles(
   path: string,
   depth: number,
   maxDepth: number,
-  files: string[],
+  files: Map<string, string>,
+  visited: Set<string>,
 ): Promise<void> {
+  const visitKey = path || ".";
+  if (visited.has(visitKey)) return;
+  visited.add(visitKey);
+
   const apiPath = path
     ? `https://api.github.com/repos/${owner}/${repo}/contents/${path}`
     : `https://api.github.com/repos/${owner}/${repo}/contents/`;
-  const response = await fetch(apiPath, {
+  const response = await fetchWithRetry(apiPath, {
     headers: {
       "User-Agent": "ZevalAutoFind/1.0",
       Accept: "application/vnd.github+json",
@@ -241,15 +247,34 @@ async function collectGitHubFiles(
   for (const entry of entries) {
     if (!entry.path) continue;
     if (entry.type === "file") {
-      if (DATA_FILE_PATTERN.test(entry.name ?? entry.path)) {
-        files.push(entry.path);
+      if (DATA_FILE_PATTERN.test(entry.name ?? entry.path) && entry.download_url) {
+        files.set(entry.path, entry.download_url);
       }
       continue;
     }
     if (entry.type === "dir" && depth < maxDepth) {
-      await collectGitHubFiles(owner, repo, entry.path, depth + 1, maxDepth, files);
+      await collectGitHubFiles(owner, repo, entry.path, depth + 1, maxDepth, files, visited);
     }
   }
+}
+
+/**
+ * Fetch a GitHub API URL with a small retry budget for transient network timeouts.
+ *
+ * @param url GitHub API URL.
+ * @param init Fetch options.
+ * @returns Fetch response.
+ */
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 function scoreDataFile(file: { path: string; size?: number }): number {

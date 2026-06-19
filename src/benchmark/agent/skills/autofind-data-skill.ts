@@ -8,6 +8,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  createDefaultAutoFindAgentLlmDeps,
   runAutoFindAgent,
   type AutoFindAgentLlmDeps,
 } from "./autofind-agent";
@@ -65,6 +66,7 @@ export type RunAutoFindInput = {
   state?: AutoFindWorkflowState | null;
   discoveryDeps?: AutoFindDiscoveryDeps;
   agentLlmDeps?: AutoFindAgentLlmDeps;
+  signal?: AbortSignal;
 };
 
 export type RunAutoFindResult = {
@@ -95,14 +97,14 @@ export async function runAutoFindDataSkill(input: RunAutoFindInput): Promise<Run
   });
 
   if (input.action === "search") {
-    return searchWorkflow(state, input.discoveryDeps, input.agentLlmDeps);
+    return searchWorkflow(state, input.discoveryDeps, input.agentLlmDeps, input.signal);
   }
 
   if (input.action === "save") {
-    return saveWorkflow(state);
+    return saveWorkflow(state, input.signal);
   }
 
-  return handleChatWorkflow(state, input.message ?? "", input.discoveryDeps, input.agentLlmDeps);
+  return handleChatWorkflow(state, input.message ?? "", input.discoveryDeps, input.agentLlmDeps, input.signal);
 }
 
 /**
@@ -171,15 +173,10 @@ async function searchWorkflow(
   state: AutoFindWorkflowState,
   discoveryDeps?: AutoFindDiscoveryDeps,
   agentLlmDeps?: AutoFindAgentLlmDeps,
+  signal?: AbortSignal,
 ): Promise<RunAutoFindResult> {
   const warnings = [...state.warnings];
   const searchProfile = buildSearchProfile(state);
-  let discoverySources: string[] = [];
-  let discoveredCandidates: DatasetCandidate[] = [];
-  let selectedDatasetId: string | undefined;
-  let verifiedDownloadUrl: string | undefined;
-  let agentTrace: string[] = [];
-  let llmAssisted = false;
 
   const discovery = await runAutoFindAgent(
     {
@@ -190,15 +187,15 @@ async function searchWorkflow(
       negativeCount: state.negativeCount,
     },
     discoveryDeps,
-    agentLlmDeps,
+    agentLlmDeps ?? createDefaultAutoFindAgentLlmDeps(signal),
   );
   const csvText = discovery.csvText;
-  discoverySources = discovery.sources;
-  discoveredCandidates = discovery.candidates;
-  selectedDatasetId = discovery.selectedCandidate.id;
-  verifiedDownloadUrl = discovery.verifiedDownloadUrl;
-  agentTrace = discovery.agentTrace;
-  llmAssisted = discovery.llmAssisted;
+  const discoverySources = discovery.sources;
+  const discoveredCandidates = discovery.candidates;
+  const selectedDatasetId = discovery.selectedCandidate.id;
+  const verifiedDownloadUrl = discovery.verifiedDownloadUrl;
+  const agentTrace = discovery.agentTrace;
+  const llmAssisted = discovery.llmAssisted;
   warnings.push(...discovery.warnings);
 
   const parsed = parseCsvSummary(csvText);
@@ -261,10 +258,10 @@ async function searchWorkflow(
  * @param state 已检索完成的状态。
  * @returns 保存结果。
  */
-async function saveWorkflow(state: AutoFindWorkflowState): Promise<RunAutoFindResult> {
+async function saveWorkflow(state: AutoFindWorkflowState, signal?: AbortSignal): Promise<RunAutoFindResult> {
   if (!state.csvText || !state.fileName) {
-    const searched = await searchWorkflow(state);
-    return saveWorkflow(searched.state);
+    const searched = await searchWorkflow(state, undefined, undefined, signal);
+    return saveWorkflow(searched.state, signal);
   }
 
   await mkdir(OUTPUT_DIR, { recursive: true });
@@ -301,6 +298,7 @@ async function handleChatWorkflow(
   message: string,
   discoveryDeps?: AutoFindDiscoveryDeps,
   agentLlmDeps?: AutoFindAgentLlmDeps,
+  signal?: AbortSignal,
 ): Promise<RunAutoFindResult> {
   const text = message.trim();
   if (!text) {
@@ -312,14 +310,14 @@ async function handleChatWorkflow(
   }
 
   if (/开始|搜索|检索|查找|find|search/i.test(text)) {
-    return searchWorkflow(state, discoveryDeps, agentLlmDeps);
+    return searchWorkflow(state, discoveryDeps, agentLlmDeps, signal);
   }
   if (/保存|写入|导出|save/i.test(text)) {
-    return saveWorkflow(state);
+    return saveWorkflow(state, signal);
   }
   if (/应用|加载|导入|apply/i.test(text)) {
     if (!state.csvText) {
-      const searched = await searchWorkflow(state, discoveryDeps, agentLlmDeps);
+      const searched = await searchWorkflow(state, discoveryDeps, agentLlmDeps, signal);
       return {
         reply: `${searched.reply}\n\n已准备好数据，请再次回复 **应用** 或点击建议操作。`,
         state: searched.state,

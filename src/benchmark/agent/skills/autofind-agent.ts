@@ -4,7 +4,7 @@
  * 降级：任一 LLM 阶段失败时回退到规则模板 / 排序 / 关键词筛选，并写入 warnings。
  */
 
-import { parseJsonObjectFromLlmOutput, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
+import { parseJsonObjectFromLlmOutput, readZevalEnvValue, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
 import type { AutoFindRubricContext } from "./autofind-types";
 import {
   buildDiscoveryQueries,
@@ -200,6 +200,17 @@ export async function runAutoFindAgent(
         if (!csvCheck.ok) {
           warnings.push(`${candidate.title} (${payload.verifiedDownloadUrl}): ${csvCheck.reason}`);
           continue;
+        }
+
+        if (deps.indexBenchHubCandidates) {
+          const indexed = await deps.indexBenchHubCandidates(candidates, discoveryInput).catch((error) => ({
+            indexed: 0,
+            warnings: [`BenchHub 索引写入失败：${formatError(error)}`],
+          }));
+          if (indexed.indexed > 0) {
+            agentTrace.push(`BenchHub 索引：新增/更新 ${indexed.indexed} 个候选`);
+          }
+          warnings.push(...indexed.warnings);
         }
 
         return {
@@ -416,15 +427,26 @@ export async function curateAutoFindSessions(
 /**
  * 创建默认 LLM 依赖（SiliconFlow）。
  *
+ * @param signal Optional abort signal for cancelling an in-flight LLM call.
  * @returns 生产环境 LLM 调用封装。
  */
-export function createDefaultAutoFindAgentLlmDeps(): AutoFindAgentLlmDeps {
+export function createDefaultAutoFindAgentLlmDeps(signal?: AbortSignal): AutoFindAgentLlmDeps {
   return {
     complete: async (messages, stage) =>
       requestSiliconFlowChatCompletion(messages, {
         stage: `autofind_agent_${stage}`,
+        model: resolveAutoFindAgentModel(),
+        signal,
       }),
   };
+}
+
+/**
+ * Resolve the AutoFind controller model while leaving judge calls on judge defaults.
+ * @returns Agent model name when configured, otherwise undefined for client fallback.
+ */
+function resolveAutoFindAgentModel(): string | undefined {
+  return readZevalEnvValue(["ZEVAL_AGENT_MODEL", "ZEVAL_LLM_MODEL"])?.trim();
 }
 
 function mapPoolIdsToSessions(

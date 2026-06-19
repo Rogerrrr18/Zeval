@@ -46,6 +46,29 @@ export type BenchmarkProgressEvent = {
   evidence?: string[];
 };
 
+export type BenchmarkJudgeProgressMember = {
+  judgeId: string;
+  model?: BenchmarkModelId;
+  family?: string;
+  status: "pending" | "running" | "completed" | "failed";
+  score?: number;
+  error?: string;
+};
+
+export type BenchmarkJudgeProgressSnapshot = {
+  mode: "single" | "panel";
+  aggregation: string;
+  caseId: string;
+  submissionId: string;
+  metricKey: string;
+  metricName: string;
+  totalMembers: number;
+  completedMembers: number;
+  failedMembers: number;
+  activeJudgeId?: string;
+  members: BenchmarkJudgeProgressMember[];
+};
+
 export type BenchmarkDatasetProgressSummary = {
   fileName?: string;
   rows: number;
@@ -68,12 +91,14 @@ export type BenchmarkProgressSnapshot = {
   totalMetrics: number;
   /** Per-matrix-cell progress. */
   matrixProgress: MatrixProgressRow[];
-  /** Recently finished items (last 20). */
+  /** Submission history items retained for this run. */
   recentItems: SubmissionProgressItem[];
   /** White-box event timeline shown in the benchmark progress view. */
   events: BenchmarkProgressEvent[];
   /** Latest transparent analysis note for the active pipeline step. */
   activeAnalysis?: string;
+  /** Current LLM judge member progress while a metric is being scored. */
+  judgeProgress?: BenchmarkJudgeProgressSnapshot;
   datasetSummary?: BenchmarkDatasetProgressSummary;
   error?: string;
   result?: BenchmarkRunResult;
@@ -146,7 +171,8 @@ class BenchmarkProgressTracker {
   addItem(runId: string, item: SubmissionProgressItem): void {
     const current = this.snapshots.get(runId);
     if (!current) return;
-    const recentItems = [item, ...current.recentItems].slice(0, 20);
+    const historyLimit = Math.max(20, current.totalSubmissions);
+    const recentItems = [item, ...current.recentItems].slice(0, historyLimit);
     this.update(runId, { recentItems });
   }
 

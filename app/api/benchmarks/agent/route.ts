@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildKnowledgeContextForQuery } from "@/benchmark/agent/knowledge-store";
-import { runBenchmarkRubricAgent } from "@/benchmark/rubric-agent";
+import { runBenchmarkRubricAgent, type RubricAgentStreamEvent } from "@/benchmark/rubric-agent";
 import type { BenchmarkRubricSet } from "@/benchmark/types";
 
 type RequestBody = {
@@ -11,6 +11,7 @@ type RequestBody = {
   knowledgeFileIds?: string[];
   includeKnowledgeBase?: boolean;
   knowledgeQuery?: string;
+  stream?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -42,19 +43,81 @@ export async function POST(request: Request) {
       }),
     });
 
-    const result = await runBenchmarkRubricAgent({
+    const input = {
       messages,
       requirementText: typeof body.requirementText === "string" ? body.requirementText : "",
       rubric: body.rubric ?? null,
       knowledgeContext,
       signal: request.signal,
-    });
+    };
 
+    if (body.stream) {
+      return streamRubricAgentResponse(input, request.signal);
+    }
+
+    const result = await runBenchmarkRubricAgent(input);
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Rubric Agent 未知错误";
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+/**
+ * Stream Rubric Agent planning, tool progress and final result as SSE.
+ *
+ * @param input Rubric Agent input.
+ * @param signal Request abort signal.
+ * @returns SSE response.
+ */
+function streamRubricAgentResponse(
+  input: Parameters<typeof runBenchmarkRubricAgent>[0],
+  signal: AbortSignal,
+): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      let closed = false;
+      signal.addEventListener("abort", () => {
+        closed = true;
+      }, { once: true });
+
+      const send = (event: RubricAgentStreamEvent | { type: "error"; message: string }) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        } catch {
+          closed = true;
+        }
+      };
+
+      try {
+        await runBenchmarkRubricAgent({
+          ...input,
+          onEvent: send,
+        });
+      } catch (error) {
+        send({ type: "error", message: error instanceof Error ? error.message : "Rubric Agent 未知错误" });
+      } finally {
+        if (!closed) {
+          try {
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          } catch {
+            closed = true;
+          }
+        }
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache, no-transform",
+      "x-accel-buffering": "no",
+    },
+  });
 }
 
 /**

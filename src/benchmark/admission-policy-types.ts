@@ -16,6 +16,10 @@ export type AdmissionLabelRow = {
   qualityTier?: string;
   autoPassed: boolean;
   judgeVariance?: number;
+  reviewerRationale?: string;
+  evidenceUsed?: string[];
+  boundaryType?: "clear_accept" | "clear_reject" | "uncertain" | "human_override";
+  correctionType?: "agree_accept" | "agree_reject" | "false_positive" | "false_negative" | "needs_more_evidence";
 };
 
 export type AdmissionRule =
@@ -46,6 +50,29 @@ export type AdmissionPolicy = {
   generatedAt: string;
   labelCount: number;
   channels: Record<string, ChannelPolicy>;
+  humanSkill?: HumanJudgmentSkill;
+};
+
+export type HumanJudgmentSkill = {
+  skillId: string;
+  version: string;
+  generatedAt: string;
+  labelCount: number;
+  purpose: string;
+  channelGuides: Record<string, HumanJudgmentChannelGuide>;
+};
+
+export type HumanJudgmentChannelGuide = {
+  channel: string;
+  labelCount: number;
+  objective: string;
+  acceptBoundary: string;
+  rejectBoundary: string;
+  uncertaintyBoundary: string;
+  commonCorrections: Array<{ correctionType: string; count: number }>;
+  evidenceHeuristics: string[];
+  reviewerRationales: string[];
+  samplingGuidance: string;
 };
 
 export type AdmissionFeature = {

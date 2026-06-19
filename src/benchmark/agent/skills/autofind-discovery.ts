@@ -4,6 +4,7 @@
 
 import { createGitHubToolRegistry } from "@/benchmark/agent/github-tools";
 import { createNetworkToolRegistry } from "@/benchmark/agent/network-tools";
+import { createAgentState } from "@/benchmark/agent/state";
 import type { AgentExecutionContext, AgentToolResult } from "@/benchmark/agent/types";
 import {
   extractHuggingFaceDatasetId,
@@ -11,6 +12,10 @@ import {
   unwrapRedirectUrl,
 } from "@/benchmark/agent/url-utils";
 import type { AutoFindDatasetProfile } from "./autofind-types";
+import {
+  indexAutoFindCandidatesToBenchHub,
+  searchBenchHubCandidates,
+} from "./autofind-benchhub";
 import { extractSearchKeywords, normalizeDatasetToCsv } from "./autofind-normalizers";
 import {
   downloadResolvedUrl,
@@ -37,6 +42,11 @@ export type AutoFindDiscoveryInput = {
 };
 
 export type AutoFindDiscoveryDeps = {
+  searchBenchHub?: (queries: string[], input: AutoFindDiscoveryInput) => Promise<DatasetCandidate[]>;
+  indexBenchHubCandidates?: (
+    candidates: DatasetCandidate[],
+    input: AutoFindDiscoveryInput,
+  ) => Promise<{ indexed: number; warnings: string[] }>;
   searchHuggingFace: (query: string) => Promise<DatasetCandidate[]>;
   searchGitHub: (query: string) => Promise<DatasetCandidate[]>;
   webSearch: (query: string) => Promise<DatasetCandidate[]>;
@@ -52,20 +62,15 @@ export type AutoFindDiscoveryResult = {
   verifiedDownloadUrl: string;
 };
 
-const EMPTY_AGENT_CONTEXT = {
+const EMPTY_AGENT_CONTEXT: AgentExecutionContext = {
   runId: "autofind-discovery",
   metricResults: [],
   metadata: {},
   state: {
-    runId: "autofind-discovery",
-    status: "acting",
-    currentPhase: "acting",
-    turns: [],
-    messages: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    ...createAgentState("autofind-discovery"),
+    phase: "acting",
   },
-} as AgentExecutionContext;
+};
 
 /**
  * Build search queries for dataset discovery.
@@ -162,7 +167,7 @@ export async function runAutoFindDiscovery(
     );
   }
 
-  for (const candidate of candidates.slice(0, 8)) {
+  for (const candidate of candidates.slice(0, 12)) {
     const candidateCheck = validateCandidate(candidate);
     if (!candidateCheck.ok) {
       warnings.push(`${candidate.title}: ${candidateCheck.reason}`);
@@ -225,6 +230,10 @@ export async function discoverDatasetCandidates(
   deps: AutoFindDiscoveryDeps,
 ): Promise<DatasetCandidate[]> {
   const results: DatasetCandidate[] = [];
+  if (deps.searchBenchHub) {
+    const benchHubCandidates = await deps.searchBenchHub(queries, input).catch(() => []);
+    results.push(...benchHubCandidates);
+  }
   for (const query of queries.slice(0, 8)) {
     const [hf, gh, web] = await Promise.all([
       deps.searchHuggingFace(query).catch(() => []),
@@ -246,6 +255,8 @@ export function createDefaultAutoFindDiscoveryDeps(): AutoFindDiscoveryDeps {
   const githubTools = createGitHubToolRegistry();
 
   return {
+    searchBenchHub: searchBenchHubCandidates,
+    indexBenchHubCandidates: indexAutoFindCandidatesToBenchHub,
     searchHuggingFace: searchHuggingFaceDatasets,
     searchGitHub: async (query) => searchGitHubDatasets(query, githubTools),
     webSearch: async (query) => searchWebDatasets(query, networkTools),
@@ -347,6 +358,7 @@ export async function downloadDatasetPayload(
 }
 
 function sourcePriorityBonus(candidate: DatasetCandidate): number {
+  if (candidate.source === "benchhub") return 10;
   if (candidate.source === "huggingface") return 6;
   if (candidate.source === "github") return 0;
   return -2;
@@ -372,6 +384,7 @@ function scoreCandidateText(text: string, keywords: string[]): number {
  */
 export function describeToolingSources(): string[] {
   return [
+    "发现：BenchHub 索引",
     "发现：HuggingFace Datasets API",
     "发现：GitHub Search API (github_search_repos)",
     "发现：web_search",
@@ -502,9 +515,10 @@ function mapWebCandidates(result: AgentToolResult): DatasetCandidate[] {
  */
 export function prioritizeCandidates(candidates: DatasetCandidate[]): DatasetCandidate[] {
   const sourceRank: Record<DatasetCandidate["source"], number> = {
-    huggingface: 0,
-    github: 1,
-    web: 2,
+    benchhub: 0,
+    huggingface: 1,
+    github: 2,
+    web: 3,
   };
   return [...candidates].sort((left, right) => {
     const sourceDelta = sourceRank[left.source] - sourceRank[right.source];
@@ -518,7 +532,7 @@ async function downloadTextFromUrl(url: string): Promise<{ text: string; content
   if (!isFetchableUrl(resolved)) {
     throw new Error(`无效下载 URL: ${url}`);
   }
-  const response = await fetch(resolved, {
+  const response = await fetchTextWithRetry(encodeURI(resolved), {
     headers: { "User-Agent": "Mozilla/5.0 (compatible; ZevalAutoFind/1.0)" },
     signal: AbortSignal.timeout(120000),
   });
@@ -528,4 +542,23 @@ async function downloadTextFromUrl(url: string): Promise<{ text: string; content
   const contentType = response.headers.get("content-type") ?? undefined;
   const text = await response.text();
   return { text, contentType };
+}
+
+/**
+ * Fetch a dataset text URL with one retry for transient network failures.
+ *
+ * @param url Download URL.
+ * @param init Fetch options.
+ * @returns Fetch response.
+ */
+async function fetchTextWithRetry(url: string, init: RequestInit): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }

@@ -15,6 +15,7 @@ import { getBenchmarkCapabilityDefinition } from "@/benchmark/capabilities";
 import { buildRubricMetricCountWarnings } from "@/benchmark/rubric-guards";
 import { benchmarkReferencesForCapability, cloneMetricReferences } from "@/benchmark/reference-catalog";
 import { inferBenchmarkTaskType, renderEvalAnythingPhilosophyPrompt } from "@/benchmark/eval-anything-philosophy";
+import { adaptMetricForGenericTranscriptHarness } from "@/benchmark/evaluator-compat";
 import { ZEVAL_AGENT_CAPABILITY_CONTRACT, ZEVAL_AGENT_PERMISSION_SUMMARY } from "@/copilot/agent-contract";
 import { parseJsonObjectFromLlmOutput, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
 import type {
@@ -39,6 +40,7 @@ export type RunBenchmarkRubricAgentInput = {
   rubric?: BenchmarkRubricSet | null;
   knowledgeContext?: string;
   signal?: AbortSignal;
+  onEvent?: (event: RubricAgentStreamEvent) => void;
 };
 
 export type RunBenchmarkRubricAgentResult = {
@@ -49,6 +51,7 @@ export type RunBenchmarkRubricAgentResult = {
   toolTrace: RubricAgentToolTrace[];
   runSummary: RubricAgentRunSummary;
   warnings: string[];
+  advisories: string[];
 };
 
 export type RubricAgentToolTrace = {
@@ -74,6 +77,13 @@ export type RubricAgentRunSummary = {
   changedMetrics: string[];
   warnings: string[];
 };
+
+export type RubricAgentStreamEvent =
+  | { type: "phase"; phase: "planning" | "running"; message: string }
+  | { type: "plan"; tools: Array<{ name: string; label: string }>; message: string }
+  | { type: "tool_start"; name: string; label: string; index: number; total: number }
+  | { type: "tool_result"; trace: RubricAgentToolTrace; index: number; total: number }
+  | { type: "final"; result: RunBenchmarkRubricAgentResult };
 
 type AgentPayload = {
   reply?: string;
@@ -124,6 +134,7 @@ const ALLOWED_REFERENCE_SOURCE_TYPES: BenchmarkReferenceSourceType[] = [
 export async function runBenchmarkRubricAgent(
   input: RunBenchmarkRubricAgentInput,
 ): Promise<RunBenchmarkRubricAgentResult> {
+  const emit = input.onEvent ?? (() => undefined);
   const latestUserText = [...input.messages].reverse().find((message) => message.role === "user")?.content.trim() ?? "";
   const knowledgeContext = input.knowledgeContext?.trim() ?? "";
   const warnings: string[] = [];
@@ -134,6 +145,7 @@ export async function runBenchmarkRubricAgent(
   const toolTrace: RubricAgentToolTrace[] = [];
 
   let payload: AgentPayload | null = null;
+  emit({ type: "phase", phase: "planning", message: "正在理解需求并规划工具调用。" });
   try {
     const raw = await requestSiliconFlowChatCompletion(
       [
@@ -148,6 +160,7 @@ export async function runBenchmarkRubricAgent(
             "你的评测哲学必须与 Eval-Anything 对齐：先识别任务世界与被测目标，再设计 harness-aware、judge-panel-ready、证据可追溯的指标。",
             "用户可以在右侧助手中提出任何任务需求：生成评分标准、改领域、增加/删除/合并指标、调整权重、补充评分表单、确认指标、解释当前 rubric。",
             "如果用户要求诊断评测流程，你要指出当前缺少的数据、评分标准、运行结果或人工校验环节；如果超出当前工具能力，要说明需要接入对应工具。",
+            "如果用户说“开始评测 / 重新评测 / 运行评测 / 跑一遍 / 继续评测 / 停止评测”，这表示操作当前已确认的 benchmark run，不是重新设计 rubric；不要调用 draft_rubric、research_benchmark_references 或指标修改工具，应回复让前端运行/停止当前评测。",
             "你必须优先判断是否需要调用工具；只有纯解释问题才不调用工具。",
             "当用户要求生成 rubric、重新生成指标、增加指标、重写评分准则、让指标更 solid 或要求参考依据时，必须先调用 research_benchmark_references，再调用 draft_rubric/add_metric/update_metric。",
             "除非用户只是确认、拒绝、删除、改权重或解释当前 rubric，否则不要跳过 benchmark/reference 研究。",
@@ -163,13 +176,14 @@ export async function runBenchmarkRubricAgent(
             "- set_requirement: 更新任务需求。参数 {requirementText}",
             "- research_benchmark_references: 主动检索公开 benchmark、论文、标准或评测框架，为 rubric/metric 提供依据。参数 {requirementText?, focus?}",
             "- draft_rubric: 根据任务需求重新生成领域化评分标准。参数 {requirementText?}",
-            "- add_metric: 增加指标。参数 {capability, displayName, description, weight, evaluatorType, criteria, rubricForm?, references?}",
-            "- update_metric: 修改指标。参数 {metricKey? 或 displayName?, displayName?, description?, weight?, passThreshold?, evaluatorType?, criteria?, approvalStatus?, evidenceRequired?, humanApprovalRequired?, rubricForm?, references?}",
+            "- add_metric: 增加指标。参数 {capability, displayName, description, weight, evaluatorType, criteria, rubricForm?, references?, childMetricKeys?}；复杂/组合指标可用 childMetricKeys 引用已有二级指标。",
+            "- update_metric: 修改指标。参数 {metricKey? 或 displayName?, displayName?, description?, weight?, passThreshold?, evaluatorType?, criteria?, approvalStatus?, evidenceRequired?, humanApprovalRequired?, rubricForm?, references?, childMetricKeys?}",
             "- delete_metric: 删除指标。参数 {metricKey? 或 displayName?}",
             "- approve_metric: 确认指标。参数 {metricKey? 或 displayName?}",
             "- approve_all_metrics: 确认全部候选指标。参数 {}",
             "- reject_metric: 拒绝指标。参数 {metricKey? 或 displayName?}",
             "- explain_rubric: 解释当前评分标准。参数 {}",
+            "当前普通业务评测链路是 generic transcript harness。新增或修改指标时默认使用 llm_judge；不要在缺少结构化 expected/output schema 或外部 evaluator artifact 的情况下选择 exact_match、numeric_tolerance、f1_match、code_exec、unit_test、environment_state_test、hybrid。",
             "输出格式：",
             '{"reply":"给用户的中文回复","tools":[{"name":"工具名","arguments":{}}]}',
           ].join("\n"),
@@ -202,13 +216,28 @@ export async function runBenchmarkRubricAgent(
     if (input.signal?.aborted) {
       throw error;
     }
-    warnings.push(`Rubric Agent 调用失败，已使用本地规则兜底：${error instanceof Error ? error.message : String(error)}`);
+    warnings.push(`Rubric Agent 工具计划解析失败，已使用本地规则兜底：${error instanceof Error ? error.message : String(error)}`);
     payload = buildFallbackPayload(latestUserText, requirementText, rubric);
   }
   payload = repairAgentToolPlan(payload, { latestUserText, requirementText, rubric });
+  const plannedTools = payload.tools ?? [];
+  emit({
+    type: "plan",
+    tools: plannedTools.map((tool) => ({ name: tool.name ?? "unknown", label: toolLabel(tool.name) })),
+    message: plannedTools.length
+      ? `已规划 ${plannedTools.length} 个工具步骤。`
+      : "无需调用工具，将直接回复。",
+  });
 
-  for (const tool of payload?.tools ?? []) {
+  for (const [toolIndex, tool] of plannedTools.entries()) {
     const startedAt = Date.now();
+    emit({
+      type: "tool_start",
+      name: tool.name ?? "unknown",
+      label: toolLabel(tool.name),
+      index: toolIndex + 1,
+      total: plannedTools.length,
+    });
     try {
       const beforeRubric = rubric;
       const result = await applyToolCall({ tool, rubric, requirementText, latestUserText, researchBrief, knowledgeContext });
@@ -217,34 +246,38 @@ export async function runBenchmarkRubricAgent(
       if (result.researchBrief !== undefined) researchBrief = result.researchBrief;
       if (result.warning) warnings.push(result.warning);
       if (result.summary) toolCalls.push({ name: tool.name ?? "unknown", summary: result.summary });
-      toolTrace.push(buildToolTrace({
+      const trace = buildToolTrace({
         tool,
         result,
         beforeRubric,
         afterRubric: rubric,
         durationMs: Date.now() - startedAt,
-      }));
+      });
+      toolTrace.push(trace);
+      emit({ type: "tool_result", trace, index: toolIndex + 1, total: plannedTools.length });
     } catch (error) {
       if (input.signal?.aborted) {
         throw error;
       }
       const message = error instanceof Error ? error.message : String(error);
       warnings.push(`${tool.name ?? "unknown"} 执行失败：${message}`);
-      toolTrace.push({
+      const trace: RubricAgentToolTrace = {
         name: tool.name ?? "unknown",
         label: toolLabel(tool.name),
         status: "error",
         summary: "工具执行失败",
         detail: message,
         durationMs: Date.now() - startedAt,
-      });
+      };
+      toolTrace.push(trace);
+      emit({ type: "tool_result", trace, index: toolIndex + 1, total: plannedTools.length });
     }
   }
 
-  warnings.push(...buildRubricMetricCountWarnings(rubric));
+  const advisories = buildRubricMetricCountWarnings(rubric);
   const runSummary = buildRunSummary(rubric, toolTrace, warnings);
-  const reply = buildReply(payload?.reply, toolCalls, toolTrace, runSummary, rubric, requirementText, latestUserText);
-  return {
+  const reply = buildReply(payload?.reply, toolCalls, toolTrace, runSummary, advisories, rubric, requirementText, latestUserText);
+  const result = {
     reply,
     requirementText,
     rubric: rubric ? localizeRubric(rubric) : null,
@@ -252,7 +285,10 @@ export async function runBenchmarkRubricAgent(
     toolTrace,
     runSummary,
     warnings,
+    advisories,
   };
+  emit({ type: "final", result });
+  return result;
 }
 
 /**
@@ -269,9 +305,31 @@ function repairAgentToolPlan(
   const tools = [...(payload?.tools ?? [])];
   const names = new Set(tools.map((tool) => tool.name).filter(Boolean));
   const requestText = [context.latestUserText, context.requirementText].filter(Boolean).join("\n");
+  if (isBenchmarkRunOperationRequest(context.latestUserText)) {
+    return {
+      reply: payload?.reply ?? "我理解你是要操作当前评测运行，不会重新设计评分标准。请使用页面的开始、继续或停止评测操作。",
+      tools: [],
+    };
+  }
   const shouldGenerate = shouldGenerateOrRewriteRubric(requestText, context.rubric);
+  const shouldRewriteWholeRubric = shouldGenerateWholeRubric(requestText, context.rubric);
+  const isIncrementalEdit = shouldPreserveExistingRubric(requestText, context.rubric);
+  const shouldResearch = shouldRewriteWholeRubric || shouldAddMetric(requestText) || shouldResearchForIncrementalEdit(requestText);
 
-  if (shouldGenerate && !names.has("set_requirement")) {
+  if (isIncrementalEdit && !shouldRewriteWholeRubric) {
+    for (let index = tools.length - 1; index >= 0; index -= 1) {
+      if (tools[index].name === "draft_rubric") {
+        tools.splice(index, 1);
+      }
+      if (!shouldResearch && tools[index]?.name === "research_benchmark_references") {
+        tools.splice(index, 1);
+      }
+    }
+    names.delete("draft_rubric");
+    if (!shouldResearch) names.delete("research_benchmark_references");
+  }
+
+  if ((shouldRewriteWholeRubric || !context.rubric) && shouldGenerate && !names.has("set_requirement")) {
     tools.unshift({
       name: "set_requirement",
       arguments: { requirementText: context.latestUserText || context.requirementText },
@@ -279,7 +337,7 @@ function repairAgentToolPlan(
     names.add("set_requirement");
   }
 
-  if (shouldGenerate && !names.has("research_benchmark_references")) {
+  if (shouldResearch && shouldGenerate && !names.has("research_benchmark_references")) {
     tools.push({
       name: "research_benchmark_references",
       arguments: { requirementText: context.latestUserText || context.requirementText },
@@ -287,7 +345,7 @@ function repairAgentToolPlan(
     names.add("research_benchmark_references");
   }
 
-  const hasRubricMutation = tools.some((tool) =>
+  let hasRubricMutation = tools.some((tool) =>
     tool.name === "draft_rubric" ||
     tool.name === "add_metric" ||
     tool.name === "update_metric" ||
@@ -297,7 +355,15 @@ function repairAgentToolPlan(
     tool.name === "reject_metric"
   );
 
-  if (shouldGenerate && !hasRubricMutation) {
+  if (isIncrementalEdit && !hasRubricMutation && shouldAddMetric(requestText)) {
+    tools.push({
+      name: "add_metric",
+      arguments: buildFallbackAddMetricArgs(requestText),
+    });
+    hasRubricMutation = true;
+  }
+
+  if (shouldRewriteWholeRubric && !hasRubricMutation) {
     tools.push({
       name: "draft_rubric",
       arguments: { requirementText: context.latestUserText || context.requirementText },
@@ -320,9 +386,109 @@ function repairAgentToolPlan(
 function shouldGenerateOrRewriteRubric(text: string, rubric: BenchmarkRubricSet | null): boolean {
   const normalized = text.trim();
   if (!normalized) return false;
+  if (isBenchmarkRunOperationRequest(normalized)) return false;
   if (!rubric) return !/(解释|说明|为什么|怎么看|确认|通过|删除)/.test(normalized);
   return /(生成|重新|重做|改|调整|优化|完善|补充|更合理|不合理|二级指标|评分标准|rubric|指标体系|指标)/i.test(normalized)
     && !/(解释|说明|为什么|确认全部|全部确认|通过全部)/.test(normalized);
+}
+
+/**
+ * Detect benchmark run operations that should never mutate the rubric.
+ *
+ * @param text Latest user request.
+ * @returns Whether the request is about running, resuming, rerunning or stopping evaluation.
+ */
+function isBenchmarkRunOperationRequest(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  if (/(为什么|为何|怎么|如何|检查|排查|看下|看看|无效|失败|不能|bug|问题)/i.test(normalized)) return false;
+  if (/(评分标准|rubric|指标|指标体系|维度|权重|准则|rubricForm|criteria)/i.test(normalized)) return false;
+  return /(开始|启动|运行|执行|重新|继续|恢复|停止|取消|中断|终止|跑|重跑).{0,8}(评测|benchmark)/i.test(normalized)
+    || /(重新评测|再评测|跑一遍|run\s+benchmark|rerun\s+benchmark|start\s+benchmark|resume\s+benchmark|stop\s+benchmark)/i.test(normalized);
+}
+
+/**
+ * Decide whether the user is asking to replace the whole rubric rather than edit it incrementally.
+ *
+ * @param text Combined latest user request and current requirement.
+ * @param rubric Current rubric.
+ * @returns Whether a full draft_rubric replacement is allowed.
+ */
+function shouldGenerateWholeRubric(text: string, rubric: BenchmarkRubricSet | null): boolean {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  if (!rubric) return !/(解释|说明|为什么|怎么看|确认|通过|删除)/.test(normalized);
+  return /(重新生成|重做|重写|从头|整套|完整|全新|换一套).{0,12}(评分标准|rubric|指标体系|指标)/i.test(normalized)
+    || /(评分标准|rubric|指标体系).{0,12}(重新生成|重做|重写|从头|整套|完整|全新|换一套)/i.test(normalized)
+    || /(改成|切换到|换成).{0,20}(领域|场景|行业)/.test(normalized);
+}
+
+/**
+ * Decide whether the user's request should preserve the existing graph and apply only targeted edits.
+ *
+ * @param text Combined latest user request and current requirement.
+ * @param rubric Current rubric.
+ * @returns Whether existing modules and metrics should be preserved.
+ */
+function shouldPreserveExistingRubric(text: string, rubric: BenchmarkRubricSet | null): boolean {
+  if (!rubric) return false;
+  return /(新增|增加|添加|补充|删除|删掉|移除|更新|修改|调整|改|优化|确认|拒绝).{0,20}(指标|二级指标|维度|权重|阈值|名称|描述|评分档|rubricForm|criteria|参考|依据)/i.test(text)
+    || /(指标|二级指标|维度|权重|阈值|名称|描述|评分档|rubricForm|criteria|参考|依据).{0,20}(新增|增加|添加|补充|删除|删掉|移除|更新|修改|调整|改|优化|确认|拒绝)/i.test(text);
+}
+
+/**
+ * Decide whether an incremental request is asking to add a metric.
+ * @param text User request text.
+ * @returns Whether to add a fallback metric when the model omitted add_metric.
+ */
+function shouldAddMetric(text: string): boolean {
+  return /(新增|增加|添加|补充).{0,20}(指标|二级指标)/.test(text)
+    || /(指标|二级指标).{0,20}(新增|增加|添加|补充)/.test(text);
+}
+
+/**
+ * Decide whether an incremental edit needs reference research.
+ * @param text User request text.
+ * @returns Whether benchmark/reference research is useful for this edit.
+ */
+function shouldResearchForIncrementalEdit(text: string): boolean {
+  if (/(权重|阈值|确认|通过|拒绝|删除|删掉|移除).{0,12}(指标|二级指标)?/.test(text)) return false;
+  return /(依据|参考|论文|benchmark|标准|评分准则|criteria|评分档|rubricForm|描述|定义|合理性|风险边界)/i.test(text);
+}
+
+/**
+ * Build conservative add_metric arguments from a user request.
+ * @param text User request text.
+ * @returns add_metric arguments.
+ */
+function buildFallbackAddMetricArgs(text: string): Record<string, unknown> {
+  const displayName = inferFallbackMetricDisplayName(text);
+  const capability = inferCapabilityFromText(displayName);
+  return {
+    capability,
+    displayName,
+    description: `评估被测 Agent 是否满足「${displayName}」相关业务要求。`,
+    weight: 3,
+    evaluatorType: "llm_judge",
+    criteria: `按照「${displayName}」进行 0 到 5 分评分：5 分表示风险识别、证据和建议充分；3 分表示覆盖主要要求但证据或行动建议不足；1 分表示遗漏关键风险或缺少可复核依据。`,
+    evidenceRequired: true,
+    humanApprovalRequired: false,
+  };
+}
+
+/**
+ * Infer a concise Chinese metric name for fallback add_metric.
+ * @param text User request text.
+ * @returns Metric display name.
+ */
+function inferFallbackMetricDisplayName(text: string): string {
+  if (/风险/.test(text)) return "风险识别与控制";
+  if (/合规|安全/.test(text)) return "安全合规风险";
+  if (/证据|引用|来源/.test(text)) return "证据可追溯性";
+  if (/工具|检索|调用/.test(text)) return "工具调用有效性";
+  if (/成本|效率|延迟/.test(text)) return "成本与效率控制";
+  if (/业务|收益|盈利|转化/.test(text)) return "业务价值判断";
+  return "补充质量指标";
 }
 
 async function applyToolCall(input: {
@@ -395,7 +561,11 @@ async function applyToolCall(input: {
       requirementText,
       researchBrief: research,
       rubric: localizeRubric(result.rubric),
-      summary: `已基于 ${research.references.length} 个参考来源生成 ${result.rubric.modules.length} 个能力维度的评分标准`,
+      summary: buildDraftRubricToolSummary({
+        source: result.source,
+        researchReferenceCount: research.references.length,
+        rubric: result.rubric,
+      }),
       warning: result.warnings.join("；") || undefined,
     };
   }
@@ -435,16 +605,24 @@ async function applyToolCall(input: {
   }
 
   if (name === "approve_all_metrics") {
+    let adaptedCount = 0;
+    const modules = input.rubric.modules.map((module) => ({
+      ...module,
+      metrics: module.metrics.map((metric) => {
+        const adapted = adaptMetricForGenericTranscriptHarness({ ...metric, approvalStatus: "approved" });
+        if (adapted.adaptation) adaptedCount += 1;
+        return adapted.metric;
+      }),
+    }));
     return {
       rubric: touchRubric({
         ...input.rubric,
         approvalStatus: "approved",
-        modules: input.rubric.modules.map((module) => ({
-          ...module,
-          metrics: module.metrics.map((metric) => ({ ...metric, approvalStatus: "approved" })),
-        })),
+        modules,
       }),
-      summary: "已确认全部指标",
+      summary: adaptedCount > 0
+        ? `已确认全部指标，并适配 ${adaptedCount} 个指标为模型评审`
+        : "已确认全部指标",
     };
   }
 
@@ -528,6 +706,7 @@ function modifiesMetricBasis(args: Record<string, unknown>): boolean {
     typeof args.criteria === "string" ||
     typeof args.evaluatorType === "string" ||
     Array.isArray(args.rubricForm) ||
+    args.childMetricKeys !== undefined ||
     Array.isArray(args.references)
   );
 }
@@ -551,8 +730,12 @@ function addMetric(
   const metricKey = uniqueMetricKey(slug(stringArg(args.metricKey) || displayName) || `${capability}_metric`, rubric);
   const evaluatorType = evaluatorArg(args.evaluatorType) ?? "llm_judge";
   const weight = normalizeWeight(numberArg(args.weight), 3);
-  const criteria = ensureChineseText(stringArg(args.criteria), `按照「${displayName}」的业务要求进行 0 到 5 分评分，并给出证据。`);
-  const metric: BenchmarkRubricMetric = {
+  const childMetricKeys = normalizeChildMetricKeys(args.childMetricKeys);
+  const criteria = buildCriteriaWithChildMetricNote(
+    ensureChineseText(stringArg(args.criteria), `按照「${displayName}」的业务要求进行 0 到 5 分评分，并给出证据。`),
+    childMetricKeys,
+  );
+  const rawMetric: BenchmarkRubricMetric = {
     metricKey,
     capability,
     displayName,
@@ -568,8 +751,10 @@ function addMetric(
       criteria,
       rubricForm: rubricFormArg(args.rubricForm, displayName),
       references: referencesArg(args.references, capability, researchBrief),
+      childMetricKeys: childMetricKeys.length ? childMetricKeys : undefined,
     },
   };
+  const { metric, adaptation } = adaptMetricForGenericTranscriptHarness(rawMetric);
 
   const existingModule = rubric.modules.find((module) => module.capability === capability);
   const modules = existingModule
@@ -587,7 +772,9 @@ function addMetric(
 
   return {
     rubric: touchRubric({ ...rubric, modules }),
-    summary: `已新增指标「${displayName}」`,
+    summary: adaptation
+      ? `已新增指标「${displayName}」，并适配为模型评审以兼容普通业务 transcript 数据。`
+      : `已新增指标「${displayName}」`,
   };
 }
 
@@ -611,6 +798,14 @@ function updateMetric(
   const config = { ...(target.config ?? {}) };
   if (typeof args.criteria === "string") config.criteria = ensureChineseText(args.criteria, config.criteria ?? target.description);
   if (Array.isArray(args.rubricForm)) config.rubricForm = rubricFormArg(args.rubricForm, patch.displayName ?? target.displayName);
+  if (args.childMetricKeys !== undefined) {
+    const childMetricKeys = normalizeChildMetricKeys(args.childMetricKeys);
+    config.childMetricKeys = childMetricKeys.length ? childMetricKeys : undefined;
+    config.criteria = buildCriteriaWithChildMetricNote(
+      ensureChineseText(config.criteria, patch.description ?? target.description),
+      childMetricKeys,
+    );
+  }
   if (Array.isArray(args.references) || modifiesMetricBasis(args)) config.references = referencesArg(args.references, target.capability, researchBrief);
   if (Object.keys(config).length > 0) patch.config = config;
 
@@ -618,15 +813,21 @@ function updateMetric(
     patch.scale = { ...target.scale, passThreshold: normalizePassThreshold(args.passThreshold) };
   }
 
+  const adaptedTarget = adaptMetricForGenericTranscriptHarness({ ...target, ...patch });
+  const nextTarget = adaptedTarget.metric;
+  const adaptation = adaptedTarget.adaptation;
+
   return {
     rubric: touchRubric({
       ...rubric,
       modules: rubric.modules.map((module) => ({
         ...module,
-        metrics: module.metrics.map((metric) => metric.metricKey === target.metricKey ? { ...metric, ...patch } : metric),
+        metrics: module.metrics.map((metric) => metric.metricKey === target.metricKey ? nextTarget : metric),
       })),
     }),
-    summary: `已更新指标「${patch.displayName ?? target.displayName}」`,
+    summary: adaptation
+      ? `已更新指标「${patch.displayName ?? target.displayName}」，并适配为模型评审以兼容普通业务 transcript 数据。`
+      : `已更新指标「${patch.displayName ?? target.displayName}」`,
   };
 }
 
@@ -694,6 +895,24 @@ function buildFallbackPayload(
 }
 
 /**
+ * Build a truthful user-facing summary for the rubric draft tool.
+ *
+ * @param input Draft source, research count and generated rubric.
+ * @returns Concise tool summary that distinguishes LLM success from template fallback.
+ */
+function buildDraftRubricToolSummary(input: {
+  source: "llm" | "template";
+  researchReferenceCount: number;
+  rubric: BenchmarkRubricSet;
+}): string {
+  const stats = buildRubricStats(input.rubric);
+  if (input.source === "llm") {
+    return `已基于 ${input.researchReferenceCount} 个检索来源生成 ${stats.modules} 个能力维度、${stats.metrics} 个二级指标`;
+  }
+  return `模型生成未成功，已使用内置模板生成 ${stats.modules} 个能力维度、${stats.metrics} 个二级指标`;
+}
+
+/**
  * Build a user-visible trace row for one Rubric Agent tool execution.
  *
  * @param input Tool call, result and before/after rubric snapshots.
@@ -745,19 +964,21 @@ function buildToolTraceDetail(input: {
   beforeRubric: BenchmarkRubricSet | null;
   afterRubric: BenchmarkRubricSet | null;
 }): string {
+  if (input.name === "draft_rubric" && input.afterRubric) {
+    const stats = buildRubricStats(input.afterRubric);
+    const changed = summarizeChangedMetrics(input.beforeRubric, input.afterRubric);
+    const detail = [
+      input.result.warning ?? "",
+      `当前评分标准包含 ${stats.modules} 个能力维度、${stats.metrics} 个二级指标、${stats.references} 个去重参考来源。`,
+      changed.length ? `本次生成/更新：${changed.slice(0, 6).join("、")}。` : "",
+    ].filter(Boolean).join("");
+    return detail;
+  }
   if (input.result.warning) return input.result.warning;
   if (input.name === "research_benchmark_references" && input.result.researchBrief) {
     return input.result.researchBrief.source === "catalog"
       ? "DeepSearch 不可用时使用内置公开 benchmark / 论文 catalog，后续指标仍会绑定参考来源，但置信度应标记为兜底。"
       : input.result.researchBrief.summary;
-  }
-  if (input.name === "draft_rubric" && input.afterRubric) {
-    const stats = buildRubricStats(input.afterRubric);
-    const changed = summarizeChangedMetrics(input.beforeRubric, input.afterRubric);
-    return [
-      `当前评分标准包含 ${stats.modules} 个能力维度、${stats.metrics} 个二级指标、${stats.references} 个去重参考来源。`,
-      changed.length ? `本次生成/更新：${changed.slice(0, 6).join("、")}。` : "",
-    ].filter(Boolean).join("");
   }
   if (input.afterRubric && input.beforeRubric !== input.afterRubric) {
     const changed = summarizeChangedMetrics(input.beforeRubric, input.afterRubric);
@@ -868,6 +1089,7 @@ function buildReply(
   toolCalls: Array<{ name: string; summary: string }>,
   toolTrace: RubricAgentToolTrace[],
   runSummary: RubricAgentRunSummary,
+  advisories: string[],
   rubric: BenchmarkRubricSet | null,
   requirementText: string,
   latestUserText: string,
@@ -886,6 +1108,9 @@ function buildReply(
         ? "- 注意：本次有部分阶段进入兜底，结果可以继续编辑，但建议补充真实业务资料或稍后重试模型生成。"
         : "- 状态：工具执行完成，评分标准已按结果更新。",
     ].join("\n"));
+  }
+  if (advisories.length > 0) {
+    parts.push(`建议：${advisories.join("；")}`);
   }
   if (!rubric && !requirementText && latestUserText) {
     parts.push("你可以直接告诉我完整评测任务，我会生成并调整评分标准。");
@@ -978,6 +1203,42 @@ function rubricFormArg(value: unknown, displayName: string): BenchmarkRubricScor
         { score: 3, label: "合格", description: `基本满足「${displayName}」要求，但存在轻微遗漏或表达不够充分。` },
         { score: 1, label: "不合格", description: `未能满足「${displayName}」核心要求，存在关键错误、缺失或无证据支撑。` },
       ];
+}
+
+/**
+ * Normalize child metric keys for complex or composite metric definitions.
+ *
+ * @param value Raw tool argument from the Rubric Agent plan.
+ * @returns Deduplicated metric keys suitable for BenchmarkEvaluatorConfig.
+ */
+function normalizeChildMetricKeys(value: unknown): string[] {
+  const rawItems = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? value.split(/[,\n，、]+/)
+      : [];
+  const keys = rawItems
+    .map((item) => String(item).trim())
+    .map((item) => item.replace(/[^a-zA-Z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, ""))
+    .filter(Boolean);
+  return [...new Set(keys)].slice(0, 12);
+}
+
+/**
+ * Preserve composite-metric structure in the natural-language judge criteria.
+ *
+ * @param criteria Base scoring criteria.
+ * @param childMetricKeys Child metric keys referenced by this metric.
+ * @returns Criteria with a compact composite note, or the original criteria when no child metrics exist.
+ */
+function buildCriteriaWithChildMetricNote(criteria: string, childMetricKeys: string[]): string {
+  if (childMetricKeys.length === 0) return criteria;
+  const existing = criteria.includes("组合指标") && childMetricKeys.some((key) => criteria.includes(key));
+  if (existing) return criteria;
+  return [
+    criteria,
+    `组合指标说明：该指标需要综合参考子指标 ${childMetricKeys.join("、")} 的证据与评分信号，但最终仍需独立给出 0-5 分、reason、evidence 和 confidence。`,
+  ].join("\n\n");
 }
 
 function referencesArg(

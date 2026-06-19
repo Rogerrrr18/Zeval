@@ -917,6 +917,318 @@
   color: #be123c;
   border-bottom-left-radius: 4px;
 }
+
+.agentTracePanel {
+  align-self: flex-start;
+  width: min(94%, 430px);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--nl-border);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.82);
+}
+
+.agentTraceHeader {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+
+.agentTraceHeader > div {
+  min-width: 0;
+}
+
+.agentTraceHeader strong {
+  display: block;
+  color: var(--nl-text-primary);
+  font-size: 12px;
+  font-weight: 820;
+}
+
+.agentTraceHeader p {
+  margin: 2px 0 0;
+  color: var(--nl-text-secondary);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.agentTraceIcon {
+  position: relative;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  border: 1.7px solid var(--nl-text-muted);
+  border-radius: 5px;
+}
+
+.agentTraceIcon::before {
+  content: "›";
+  position: absolute;
+  top: -2px;
+  left: 4px;
+  color: var(--nl-text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 17px;
+}
+
+.agentTraceList {
+  display: grid;
+  gap: 8px;
+}
+
+.agentTraceItem {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px;
+  border: 1px solid var(--nl-border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--nl-bg-2);
+}
+
+.agentTraceItem_running {
+  border-left-color: var(--nl-accent);
+}
+
+.agentTraceItem_running .agentTraceItemHeader span::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--nl-accent);
+  animation: statusPulse 1.4s ease-in-out infinite;
+}
+
+.agentTraceItem_success {
+  border-left-color: #14b8a6;
+}
+
+.agentTraceItem_warning {
+  border-left-color: #f59e0b;
+}
+
+.agentTraceItem_fallback {
+  border-left-color: #8b5cf6;
+}
+
+.agentTraceItem_error {
+  border-left-color: #ef4444;
+}
+
+.agentTraceItemHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--nl-text-primary);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.agentTraceItemHeader em {
+  color: var(--nl-text-muted);
+  font-size: 10.5px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.agentTraceItem p {
+  margin: 0;
+  color: var(--nl-text-secondary);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.agentTraceItem small {
+  color: var(--nl-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.agentTraceStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.agentTraceStats b {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--nl-surface);
+  color: var(--nl-text-secondary);
+  font-size: 10.5px;
+  font-weight: 760;
+}
+
+.agentTraceSummary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-top: 2px;
+  color: var(--nl-text-secondary);
+  font-size: 11.5px;
+}
+
+.agentTraceSummary b {
+  color: var(--nl-accent);
+  font-size: 11.5px;
+}
+
+.agentTraceWarnings {
+  display: grid;
+  gap: 5px;
+}
+
+.agentTraceWarnings span {
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #92400e;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@keyframes statusPulse {
+  0%, 100% {
+    transform: scale(0.86);
+    opacity: 0.68;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.agentStatusSnapshot {
+  align-self: flex-start;
+  width: min(92%, 360px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 2px 0 0;
+}
+
+.agentStatusActivity {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.agentStatusActivityItem {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.agentStatusActivityItemActive .agentStatusActionHeader {
+  color: var(--nl-text-muted);
+}
+
+.agentStatusActionHeader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: var(--nl-text-muted);
+  font-size: 13px;
+  font-weight: 520;
+  line-height: 1.2;
+}
+
+.agentStatusActionHeader > span:last-of-type {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentStatusActionHeader em {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--nl-surface);
+  color: var(--nl-text-muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 10.5px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.agentStatusActionIcon {
+  position: relative;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  border: 1.7px solid currentColor;
+  border-radius: 5px;
+}
+
+.agentStatusActionIcon::before {
+  content: "›";
+  position: absolute;
+  top: -2px;
+  left: 4px;
+  color: currentColor;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 17px;
+}
+
+.agentStatusActionIcon::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 5px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.agentStatusActivityItem p {
+  margin: 0 0 0 26px;
+  color: var(--nl-text-primary);
+  font-size: 12.5px;
+  font-weight: 680;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.agentStatusThinking {
+  width: fit-content;
+  color: var(--nl-text-muted);
+  background:
+    linear-gradient(
+      100deg,
+      var(--nl-text-muted) 0%,
+      var(--nl-text-muted) 34%,
+      #f8fafc 48%,
+      var(--nl-text-secondary) 56%,
+      var(--nl-text-muted) 70%,
+      var(--nl-text-muted) 100%
+    );
+  background-size: 240% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1.3;
+  -webkit-text-fill-color: transparent;
+  animation: agentStatusThinkingShine 1.7s ease-in-out infinite;
+}
+
+@keyframes agentStatusThinkingShine {
+  0% {
+    background-position: 140% 50%;
+  }
+  100% {
+    background-position: -80% 50%;
+  }
+}
 .chatInputArea {
   display: flex;
   flex-wrap: wrap;
@@ -982,6 +1294,16 @@
 .chatSendButton:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.chatStopButton {
+  background: #dc2626;
+  font-size: 12px;
+}
+
+.chatStopButton:hover:not(:disabled) {
+  background: #b91c1c;
+  opacity: 1;
 }
 
 /* Typing indicator */
@@ -1299,12 +1621,23 @@
   display: grid;
   grid-template-columns: minmax(340px, 0.95fr) minmax(360px, 1.25fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
+  height: clamp(540px, calc(100vh - 184px), 760px);
+}
+
+@supports (height: 100dvh) {
+  .rubricEditorLayout {
+    height: clamp(540px, calc(100dvh - 184px), 760px);
+  }
 }
 
 .rubricModulesPanel,
 .metricInspectorPanel {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
   border: 1px solid var(--nl-border);
   border-radius: 10px;
   background: var(--nl-bg-2);
@@ -1316,8 +1649,6 @@
 }
 
 .metricInspectorPanel {
-  position: sticky;
-  top: 16px;
   overflow: hidden;
 }
 
@@ -1347,6 +1678,14 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scroll-padding: 10px;
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+  scrollbar-width: thin;
 }
 
 .rubricModule {
@@ -1413,13 +1752,14 @@
   border-radius: 8px;
   background: var(--nl-surface);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
   border: 1px solid transparent;
 }
 
 .metricCard:hover {
   background: var(--nl-surface-hover);
   border-color: var(--nl-border-hover);
+  transform: translateY(-1px);
 }
 
 .metricApproved {
@@ -1530,7 +1870,16 @@
 .metricInspector {
   display: grid;
   gap: 12px;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 14px;
+  scroll-behavior: smooth;
+  scroll-padding: 14px;
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+  scrollbar-width: thin;
 }
 
 .metricInspectorHeader {
@@ -2244,6 +2593,7 @@ button.datasetUploadButton:disabled {
 }
 
 .progressRow {
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2254,13 +2604,132 @@ button.datasetUploadButton:disabled {
 }
 
 .progressRow span:first-child {
+  min-width: 0;
+  overflow: hidden;
   color: var(--nl-text-secondary);
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .progressRow span:last-child {
+  flex-shrink: 0;
   color: var(--nl-text-muted);
   font-size: 11px;
+}
+
+.progressJudgePanel {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--nl-border-hover);
+  border-radius: 8px;
+  background: var(--nl-surface);
+}
+
+.progressJudgeHeader {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.progressJudgeHeader div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.progressJudgeHeader strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--nl-text-primary);
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressJudgeHeader span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--nl-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressJudgeHeader b {
+  flex-shrink: 0;
+  color: var(--nl-accent);
+  font-size: 12px;
+}
+
+.progressJudgeBar {
+  min-width: 0;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--nl-bg-2);
+}
+
+.progressJudgeFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #059669, var(--nl-accent));
+  transition: width 0.25s ease;
+}
+
+.progressJudgeMembers {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.progressJudgeMember {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: var(--nl-bg-2);
+  color: var(--nl-text-secondary);
+  font-size: 11px;
+}
+
+.progressJudgeMember span {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressJudgeMember strong {
+  flex-shrink: 0;
+  color: var(--nl-text-muted);
+  font-size: 10px;
+}
+
+.progressJudgeMember_running strong {
+  color: var(--nl-accent);
+}
+
+.progressJudgeMember_completed strong {
+  color: #059669;
+}
+
+.progressJudgeMember_failed strong {
+  color: #dc2626;
 }
 
 .progressAnalysis {
@@ -2287,13 +2756,14 @@ button.datasetUploadButton:disabled {
 
 .progressGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.8fr);
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.8fr);
   gap: 14px;
   align-items: start;
 }
 
 .progressTimeline,
 .progressSidePanel {
+  min-width: 0;
   display: grid;
   gap: 8px;
   padding: 12px;
@@ -2303,9 +2773,29 @@ button.datasetUploadButton:disabled {
 }
 
 .progressSectionTitle {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   color: var(--nl-text-primary);
   font-size: 12px;
   font-weight: 850;
+}
+
+.progressSectionTitle span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressSectionTitle b {
+  flex-shrink: 0;
+  color: var(--nl-text-muted);
+  font-size: 11px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
 }
 
 .progressEvent {
@@ -2394,7 +2884,17 @@ button.datasetUploadButton:disabled {
   line-height: 1.45;
 }
 
+.progressRecentList {
+  min-width: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+  padding-right: 2px;
+}
+
 .progressRecentItem {
+  min-width: 0;
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -2408,6 +2908,7 @@ button.datasetUploadButton:disabled {
 .progressRecentItem span {
   min-width: 0;
   overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2556,6 +3057,75 @@ button.datasetUploadButton:disabled {
   background: var(--nl-surface);
   font-size: 12px;
   color: var(--nl-text-secondary);
+}
+
+.reportPanel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--nl-border);
+  border-radius: 8px;
+  background: var(--nl-bg-2);
+}
+
+.reportHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.reportHeader h3 {
+  margin: 0;
+  color: var(--nl-text-primary);
+  font-size: 15px;
+}
+
+.reportHeader p {
+  margin: 4px 0 0;
+  color: var(--nl-text-muted);
+  font-size: 12px;
+}
+
+.reportActions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.reportActions button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--nl-border);
+  border-radius: 7px;
+  background: var(--nl-surface);
+  color: var(--nl-text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reportActions button:hover {
+  border-color: var(--nl-border-hover);
+  background: var(--nl-surface-hover);
+  color: var(--nl-text-primary);
+}
+
+.reportDownloadButton {
+  border-color: var(--nl-accent) !important;
+  background: var(--nl-accent) !important;
+  color: #ffffff !important;
+}
+
+.reportPreview {
+  width: 100%;
+  height: 520px;
+  border: 1px solid var(--nl-border);
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .resultSection {
@@ -4062,10 +4632,21 @@ button.datasetUploadButton:disabled {
 
   .rubricEditorLayout {
     grid-template-columns: 1fr;
+    height: auto;
   }
 
   .metricInspectorPanel {
     position: static;
+  }
+
+  .rubricModulesPanel,
+  .metricInspectorPanel {
+    min-height: auto;
+  }
+
+  .rubricModules,
+  .metricInspector {
+    overflow: visible;
   }
 }
 
@@ -4122,6 +4703,7 @@ button.datasetUploadButton:disabled {
 
   .focusToolbar,
   .caseFocusHeader,
+  .reportHeader,
   .transcriptDrawer summary,
   .sessionOverviewHeader,
   .metricFocusHeader,
@@ -4183,6 +4765,15 @@ button.datasetUploadButton:disabled {
   .reviewField {
     grid-column: auto;
   }
+
+  .reportActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .reportPreview {
+    height: 420px;
+  }
 }
 
 /* Spinner */
@@ -4204,19 +4795,25 @@ button.datasetUploadButton:disabled {
 /* Scrollbar */
 .sourceList::-webkit-scrollbar,
 .chatMessages::-webkit-scrollbar,
-.centerContent::-webkit-scrollbar {
+.centerContent::-webkit-scrollbar,
+.rubricModules::-webkit-scrollbar,
+.metricInspector::-webkit-scrollbar {
   width: 4px;
 }
 
 .sourceList::-webkit-scrollbar-track,
 .chatMessages::-webkit-scrollbar-track,
-.centerContent::-webkit-scrollbar-track {
+.centerContent::-webkit-scrollbar-track,
+.rubricModules::-webkit-scrollbar-track,
+.metricInspector::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .sourceList::-webkit-scrollbar-thumb,
 .chatMessages::-webkit-scrollbar-thumb,
-.centerContent::-webkit-scrollbar-thumb {
+.centerContent::-webkit-scrollbar-thumb,
+.rubricModules::-webkit-scrollbar-thumb,
+.metricInspector::-webkit-scrollbar-thumb {
   background: rgba(100, 116, 139, 0.28);
   border-radius: 999px;
 }

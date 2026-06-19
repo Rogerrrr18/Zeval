@@ -45,6 +45,10 @@ export type BenchmarkHumanReviewInput = {
   channel?: string;
   reviewer?: string;
   note?: string;
+  reviewerRationale?: string;
+  evidenceUsed?: string[];
+  boundaryType?: "clear_accept" | "clear_reject" | "uncertain" | "human_override";
+  correctionType?: "agree_accept" | "agree_reject" | "false_positive" | "false_negative" | "needs_more_evidence";
   reviewedAt?: string;
 };
 
@@ -98,13 +102,13 @@ export function attachPolicySuggestionsToCandidates(
 
   return candidates.map((candidate) => {
     const feature = featureByKey.get(`${candidate.caseId}::${candidate.metricKey}`);
-    const channel = capabilityToAdmissionChannel(candidate.capability);
+    const channel = resolveCandidateAdmissionChannel(candidate);
     const channelPolicy = policy.channels[channel];
     if (!feature || !channelPolicy) {
       return candidate;
     }
 
-    const suggestion = scoreAdmission(feature, channelPolicy);
+    const suggestion = scoreAdmission({ ...feature, channel }, channelPolicy);
     return {
       ...candidate,
       metadata: {
@@ -119,6 +123,22 @@ export function attachPolicySuggestionsToCandidates(
       },
     };
   });
+}
+
+/**
+ * Resolve the admission channel for policy scoring.
+ *
+ * Human review channel is authoritative; capability mapping is only a fallback
+ * for auto-captured candidates that have not been reviewed yet.
+ *
+ * @param candidate Dataset candidate.
+ * @returns Channel id compatible with the admission policy taxonomy.
+ */
+function resolveCandidateAdmissionChannel(candidate: BenchmarkDatasetCaseCandidate): string {
+  const humanChannel = candidate.metadata.humanReviewChannel;
+  return typeof humanChannel === "string" && humanChannel.trim()
+    ? humanChannel.trim()
+    : capabilityToAdmissionChannel(candidate.capability);
 }
 
 export function buildBenchmarkDatasetCaseCandidates(
@@ -192,6 +212,12 @@ export function buildBenchmarkDatasetCaseCandidatesFromReviews(
         humanReviewDecision: review.decision,
         humanReviewChannel: review.channel,
         humanReviewNote: review.note?.trim(),
+        humanJudgmentSkillTrace: {
+          reviewerRationale: review.reviewerRationale?.trim() || review.note?.trim(),
+          evidenceUsed: review.evidenceUsed?.slice(0, 8),
+          boundaryType: review.boundaryType,
+          correctionType: review.correctionType,
+        },
         humanReviewedAt: reviewedAt,
         humanReviewer: review.reviewer?.trim() || "benchmark-reviewer",
         humanReviewRequired: review.decision === "needs_evidence",
@@ -400,17 +426,17 @@ function resolveHumanReviewAdmission(
   if (decision === "accepted") {
     return result.passed
       ? { caseSetType: "goodcase", source: "manual_gold", reviewStatus: "gold_candidate" }
-      : { caseSetType: "badcase", source: "auto_tp", humanVerdict: "valid_bad_case", reviewStatus: "human_reviewed" };
+      : { caseSetType: "goodcase", source: "manual_fp", humanVerdict: "false_positive", reviewStatus: "human_reviewed" };
   }
 
   return result.passed
     ? { caseSetType: "badcase", source: "auto_disagreement", humanVerdict: "valid_bad_case", reviewStatus: "human_reviewed" }
-    : { caseSetType: "goodcase", source: "manual_fp", humanVerdict: "false_positive", reviewStatus: "human_reviewed" };
+    : { caseSetType: "badcase", source: "auto_tp", humanVerdict: "valid_bad_case", reviewStatus: "human_reviewed" };
 }
 
 function inferHumanPassed(result: BenchmarkMetricEvaluationResult, decision: BenchmarkHumanReviewDecision): boolean {
-  if (decision === "accepted") return result.passed;
-  if (decision === "rejected") return !result.passed;
+  if (decision === "accepted") return true;
+  if (decision === "rejected") return false;
   return result.passed;
 }
 
@@ -418,8 +444,8 @@ function humanReviewDecisionReason(
   decision: BenchmarkHumanReviewDecision,
   result: BenchmarkMetricEvaluationResult,
 ): string {
-  if (decision === "accepted") return `Human reviewer accepted the evaluator verdict: ${result.reason}`;
-  if (decision === "rejected") return `Human reviewer rejected the evaluator verdict: ${result.reason}`;
+  if (decision === "accepted") return `Human reviewer confirmed the metric passes: ${result.reason}`;
+  if (decision === "rejected") return `Human reviewer confirmed the metric fails: ${result.reason}`;
   return `Human reviewer requested more evidence before activation: ${result.reason}`;
 }
 

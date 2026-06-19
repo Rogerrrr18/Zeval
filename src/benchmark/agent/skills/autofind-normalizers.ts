@@ -53,12 +53,37 @@ export type InputOutputItem = {
   input?: string;
   instruction?: string;
   question?: string;
+  problem?: string;
+  stem?: string;
   prompt?: string;
   query?: string;
   output?: string;
   response?: string;
   answer?: string;
+  correct_answer?: string;
+  reference_answer?: string;
+  gold?: string;
+  label?: string;
+  target?: string;
+  explanation?: string;
+  analysis?: string;
   category?: string;
+};
+
+export type NestedQaItem = {
+  id?: string;
+  uid?: string;
+  pre_text?: unknown;
+  post_text?: unknown;
+  table?: unknown;
+  qa?: {
+    question?: unknown;
+    answer?: unknown;
+    exe_ans?: unknown;
+    program?: unknown;
+    gold_inds?: unknown;
+  };
+  annotation?: unknown;
 };
 
 export type ConversationTextItem = {
@@ -250,6 +275,9 @@ function extractJsonSessionPool(parsed: unknown, input: ExtractSessionPoolInput)
   if (looksLikeInputOutput(parsed[0])) {
     return buildPoolFromInputOutput(parsed as InputOutputItem[], input);
   }
+  if (looksLikeNestedQa(parsed[0])) {
+    return buildPoolFromNestedQa(parsed as NestedQaItem[], input);
+  }
   if (looksLikeGenericDialogue(parsed[0])) {
     return buildPoolFromGenericDialogue(parsed as GenericDialogueItem[], input);
   }
@@ -278,9 +306,11 @@ function parseCsvDialogueSessions(
 
   const diaIdx = findIdx(/^dia$|dialogue|conversation|dialog$|chat$/);
   const sessionIdx = findIdx(/dia_no|session_id|sessionid|conversation_id|dialog_id/);
-  const userIdx = findIdx(/^user$|question|customer|instruction|query|prompt|input$/);
-  const assistantIdx = findIdx(/^assistant$|answer|response|reply|agent|output$/);
+  const userIdx = findIdx(/^user$|question|problem|stem|customer|instruction|query|prompt|input$/);
+  const assistantIdx = findIdx(/^assistant$|answer|correct_answer|reference_answer|gold|label|target|response|reply|agent|output$/);
   const contextIdx = findIdx(/^context$/);
+  const explanationIdx = findIdx(/^explanation$|analysis|rationale|reason/);
+  const optionIndexes = resolveOptionColumnIndexes(header);
 
   if (diaIdx >= 0 || findIdx(/^conversation$/) >= 0) {
     const textIdx = diaIdx >= 0 ? diaIdx : findIdx(/^conversation$/);
@@ -317,8 +347,8 @@ function parseCsvDialogueSessions(
     const sessions: Array<{ sessionId: string; messages: Array<{ role: "user" | "assistant"; content: string }> }> = [];
     for (let index = 1; index < records.length; index += 1) {
       const cells = splitCsvLine(records[index]);
-      const user = unquoteCsvCell(cells[userIdx]);
-      const assistant = unquoteCsvCell(cells[assistantIdx]);
+      const user = buildQuestionPrompt(cells, userIdx, optionIndexes);
+      const assistant = buildReferenceAnswer(cells, assistantIdx, explanationIdx);
       if (!user && !assistant) continue;
       sessions.push({
         sessionId: `row_${index}`,
@@ -340,14 +370,14 @@ function parseCsvDialogueSessions(
     }));
   }
 
-  const inputIdx = findIdx(/^input$|instruction|question|query|prompt$/);
-  const outputIdx = findIdx(/^output$|response|answer|reply$/);
+  const inputIdx = findIdx(/^input$|instruction|question|problem|stem|query|prompt$/);
+  const outputIdx = findIdx(/^output$|response|answer|correct_answer|reference_answer|gold|label|target|reply$/);
   if (inputIdx >= 0 && outputIdx >= 0) {
     const sessions: Array<{ sessionId: string; messages: Array<{ role: "user" | "assistant"; content: string }> }> = [];
     for (let index = 1; index < records.length; index += 1) {
       const cells = splitCsvLine(records[index]);
-      const user = unquoteCsvCell(cells[inputIdx]);
-      const assistant = unquoteCsvCell(cells[outputIdx]);
+      const user = buildQuestionPrompt(cells, inputIdx, optionIndexes);
+      const assistant = buildReferenceAnswer(cells, outputIdx, explanationIdx);
       if (!user && !assistant) continue;
       sessions.push({
         sessionId: `row_${index}`,
@@ -395,7 +425,7 @@ function parseZevalCsvPool(
   }
 
   return [...grouped.entries()]
-    .map(([sessionId, messages], index) => ({
+    .map(([, messages], index) => ({
       poolId: `pool_${String(index + 1).padStart(3, "0")}`,
       messages,
       relevanceScore: scoreByProfile(messages.map((message) => message.content).join(" "), searchProfile),
@@ -544,6 +574,9 @@ function normalizeJsonDataset(parsed: unknown, input: NormalizeCsvInput): string
   if (looksLikeInputOutput(parsed[0])) {
     return buildCsvFromSessionPool(buildPoolFromInputOutput(parsed as InputOutputItem[], input), input);
   }
+  if (looksLikeNestedQa(parsed[0])) {
+    return buildCsvFromSessionPool(buildPoolFromNestedQa(parsed as NestedQaItem[], input), input);
+  }
   if (looksLikeGenericDialogue(parsed[0])) {
     return buildCsvFromGenericDialogue(parsed as GenericDialogueItem[], input);
   }
@@ -606,11 +639,31 @@ function looksLikeInputOutput(value: unknown): value is InputOutputItem {
     record.input?.trim() ||
       record.instruction?.trim() ||
       record.question?.trim() ||
+      record.problem?.trim() ||
+      record.stem?.trim() ||
       record.prompt?.trim() ||
       record.query?.trim(),
   );
-  const hasAssistant = Boolean(record.output?.trim() || record.response?.trim() || record.answer?.trim());
+  const hasAssistant = Boolean(
+    record.output?.trim() ||
+      record.response?.trim() ||
+      record.answer?.trim() ||
+      record.correct_answer?.trim() ||
+      record.reference_answer?.trim() ||
+      record.gold?.trim() ||
+      record.label?.trim() ||
+      record.target?.trim(),
+  );
   return hasUser && hasAssistant;
+}
+
+function looksLikeNestedQa(value: unknown): value is NestedQaItem {
+  if (!value || typeof value !== "object") return false;
+  const record = value as NestedQaItem;
+  if (!record.qa || typeof record.qa !== "object") return false;
+  const question = stringifyScalar(record.qa.question);
+  const answer = stringifyScalar(record.qa.answer ?? record.qa.exe_ans);
+  return Boolean(question && answer);
 }
 
 function looksLikeJsonl(rawText: string): boolean {
@@ -642,13 +695,144 @@ function parseJsonlRecords(rawText: string): unknown[] {
 
 function flattenInputOutput(item: InputOutputItem): Array<{ role: "user" | "assistant"; content: string }> {
   const user = String(
-    item.input ?? item.instruction ?? item.question ?? item.prompt ?? item.query ?? "",
+    item.input ?? item.instruction ?? item.question ?? item.problem ?? item.stem ?? item.prompt ?? item.query ?? "",
   ).trim();
-  const assistant = String(item.output ?? item.response ?? item.answer ?? "").trim();
+  const answer = String(
+    item.output ?? item.response ?? item.answer ?? item.correct_answer ?? item.reference_answer ?? item.gold ?? item.label ?? item.target ?? "",
+  ).trim();
+  const explanation = String(item.explanation ?? item.analysis ?? "").trim();
+  const assistant = [answer, explanation ? `解析：${explanation}` : ""].filter(Boolean).join("\n");
   return [
     ...(user ? [{ role: "user" as const, content: user }] : []),
     ...(assistant ? [{ role: "assistant" as const, content: assistant }] : []),
   ];
+}
+
+function buildPoolFromNestedQa(
+  data: NestedQaItem[],
+  input: ExtractSessionPoolInput,
+): DialogueSessionPoolItem[] {
+  const grouped = groupSingleTurnRows(
+    data.map((item, index) => ({
+      session_id: String(item.id ?? item.uid ?? `row_${index + 1}`),
+      messages: flattenNestedQa(item),
+    })),
+  );
+  return buildPoolFromGenericDialogue(grouped, input);
+}
+
+function flattenNestedQa(item: NestedQaItem): Array<{ role: "user" | "assistant"; content: string }> {
+  const question = stringifyScalar(item.qa?.question);
+  const answer = stringifyScalar(item.qa?.answer ?? item.qa?.exe_ans);
+  if (!question && !answer) return [];
+
+  const context = [
+    ...stringifyTextList(item.pre_text).slice(0, 8),
+    ...stringifyTextList(item.post_text).slice(0, 5),
+  ].join(" ");
+  const table = stringifyTable(item.table);
+  const program = stringifyScalar(item.qa?.program);
+  const annotation = stringifyScalar(item.annotation);
+
+  const prompt = [
+    context ? `上下文：${context}` : "",
+    table ? `表格：${table}` : "",
+    question ? `问题：${question}` : "",
+  ].filter(Boolean).join("\n");
+
+  const assistant = [
+    answer,
+    program ? `计算程序：${program}` : "",
+    annotation ? `标注：${annotation}` : "",
+  ].filter(Boolean).join("\n");
+
+  return [
+    ...(prompt ? [{ role: "user" as const, content: prompt }] : []),
+    ...(assistant ? [{ role: "assistant" as const, content: assistant }] : []),
+  ];
+}
+
+function stringifyScalar(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    return value.map(stringifyScalar).filter(Boolean).join(" ");
+  }
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return "";
+}
+
+function stringifyTextList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(stringifyScalar).filter(Boolean);
+  const scalar = stringifyScalar(value);
+  return scalar ? [scalar] : [];
+}
+
+function stringifyTable(value: unknown): string {
+  if (!Array.isArray(value)) return stringifyScalar(value);
+  return value
+    .slice(0, 8)
+    .map((row) => (Array.isArray(row) ? row.map(stringifyScalar).join(" | ") : stringifyScalar(row)))
+    .filter(Boolean)
+    .join(" ; ");
+}
+
+/**
+ * Resolve multiple-choice option columns such as A/B/C/D or option_a.
+ *
+ * @param header Lower-cased CSV header cells.
+ * @returns Column indexes with option labels.
+ */
+function resolveOptionColumnIndexes(header: string[]): Array<{ label: string; index: number }> {
+  const optionIndexes: Array<{ label: string; index: number }> = [];
+  header.forEach((cell, index) => {
+    const normalized = cell.replace(/[\s_-]+/g, "").toLowerCase();
+    const optionMatch = normalized.match(/^(?:option|choice)?([a-h])$/);
+    if (optionMatch?.[1]) {
+      optionIndexes.push({ label: optionMatch[1].toUpperCase(), index });
+    }
+  });
+  return optionIndexes;
+}
+
+/**
+ * Build a user prompt from a question cell plus optional multiple-choice columns.
+ *
+ * @param cells CSV row cells.
+ * @param questionIdx Question column index.
+ * @param optionIndexes Optional answer-choice columns.
+ * @returns Prompt text suitable for Zeval CSV.
+ */
+function buildQuestionPrompt(
+  cells: string[],
+  questionIdx: number,
+  optionIndexes: Array<{ label: string; index: number }>,
+): string {
+  const question = unquoteCsvCell(cells[questionIdx]);
+  const options = optionIndexes
+    .map((option) => {
+      const value = unquoteCsvCell(cells[option.index]);
+      return value ? `${option.label}. ${value}` : "";
+    })
+    .filter(Boolean);
+  return [question, ...options].filter(Boolean).join("\n");
+}
+
+/**
+ * Build an assistant reference answer from answer and explanation columns.
+ *
+ * @param cells CSV row cells.
+ * @param answerIdx Answer column index.
+ * @param explanationIdx Optional explanation column index.
+ * @returns Reference answer text.
+ */
+function buildReferenceAnswer(cells: string[], answerIdx: number, explanationIdx: number): string {
+  const answer = unquoteCsvCell(cells[answerIdx]);
+  const explanation = explanationIdx >= 0 ? unquoteCsvCell(cells[explanationIdx]) : "";
+  return [answer, explanation ? `解析：${explanation}` : ""].filter(Boolean).join("\n");
 }
 
 function unquoteCsvCell(value?: string): string {
@@ -682,7 +866,7 @@ function buildCsvFromCpsy(data: CpsyItem[], input: NormalizeCsvInput): string {
       })),
     ],
     input.positiveCount + input.negativeCount,
-  );
+  ) ?? "";
 }
 
 function buildCsvFromEsconv(data: EsconvItem[], input: NormalizeCsvInput): string {
@@ -711,7 +895,7 @@ function buildCsvFromEsconv(data: EsconvItem[], input: NormalizeCsvInput): strin
       })),
     ],
     input.positiveCount + input.negativeCount,
-  );
+  ) ?? "";
 }
 
 function buildCsvFromGenericDialogue(data: GenericDialogueItem[], input: NormalizeCsvInput): string {
@@ -741,7 +925,7 @@ function buildCsvFromGenericDialogue(data: GenericDialogueItem[], input: Normali
       })),
     ],
     input.positiveCount + input.negativeCount,
-  );
+  ) ?? "";
 }
 
 function normalizeLooseCsv(rawText: string, input: NormalizeCsvInput): string | null {

@@ -81,7 +81,7 @@ export function looksLikeHtmlPayload(text: string): boolean {
 }
 
 /**
- * Detect dialogue-shaped JSON or Zeval CSV payloads.
+ * Detect dialogue-shaped or benchmark QA-shaped JSON/CSV payloads.
  *
  * @param text Downloaded body text.
  * @returns True when payload may contain multi-turn dialogue data.
@@ -93,8 +93,20 @@ export function looksLikeDialoguePayload(text: string): boolean {
 
   const header = trimmed.split(/\r?\n/, 1)[0]?.toLowerCase() ?? "";
   if (
-    (header.includes("instruction") || header.includes("question") || header.includes("user") || header.includes("input")) &&
-    (header.includes("response") || header.includes("answer") || header.includes("assistant") || header.includes("output"))
+    (header.includes("instruction") ||
+      header.includes("question") ||
+      header.includes("problem") ||
+      header.includes("stem") ||
+      header.includes("user") ||
+      header.includes("input")) &&
+    (header.includes("response") ||
+      header.includes("answer") ||
+      header.includes("correct_answer") ||
+      header.includes("reference_answer") ||
+      header.includes("assistant") ||
+      header.includes("output") ||
+      header.includes("label") ||
+      header.includes("target"))
   ) {
     return true;
   }
@@ -134,12 +146,32 @@ export function looksLikeDialoguePayload(text: string): boolean {
       typeof record.conversation === "string" ||
       typeof record.dialogue === "string" ||
       typeof record.dia === "string" ||
-      ((typeof record.input === "string" || typeof record.instruction === "string") &&
-        (typeof record.output === "string" || typeof record.response === "string"))
+      looksLikeNestedQaRecord(record) ||
+      ((typeof record.input === "string" ||
+        typeof record.instruction === "string" ||
+        typeof record.question === "string" ||
+        typeof record.problem === "string" ||
+        typeof record.stem === "string") &&
+        (typeof record.output === "string" ||
+          typeof record.response === "string" ||
+          typeof record.answer === "string" ||
+          typeof record.correct_answer === "string" ||
+          typeof record.reference_answer === "string" ||
+          typeof record.label === "string" ||
+          typeof record.target === "string"))
     );
   } catch {
     return false;
   }
+}
+
+function looksLikeNestedQaRecord(record: Record<string, unknown>): boolean {
+  const qa = record.qa;
+  if (!qa || typeof qa !== "object") return false;
+  const qaRecord = qa as Record<string, unknown>;
+  const question = qaRecord.question;
+  const answer = qaRecord.answer ?? qaRecord.exe_ans;
+  return typeof question === "string" && question.trim().length > 0 && answer !== undefined && answer !== null;
 }
 
 /**
@@ -157,7 +189,7 @@ export function validateDownloadedPayload(text: string, contentType?: string): V
     return { ok: false, reason: "下载内容是 HTML 页面而非数据集文件" };
   }
   if (!looksLikeDialoguePayload(text)) {
-    return { ok: false, reason: "下载内容不是可识别的多轮对话 JSON/CSV" };
+    return { ok: false, reason: "下载内容不是可识别的对话/题库 JSON/CSV" };
   }
   return { ok: true };
 }

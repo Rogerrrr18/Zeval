@@ -157,6 +157,31 @@ describe("validateDownloadedPayload", () => {
     assert.equal(looksLikeDialoguePayload(raw), true);
     assert.equal(looksLikeHtmlPayload(raw), false);
   });
+
+  it("accepts benchmark QA CSV files", () => {
+    const raw = "question,A,B,C,D,answer\n金融指标如何计算？,资产/负债,收入-成本,现金/利润,以上都不是,B\n";
+    const result = validateDownloadedPayload(raw, "text/csv");
+    assert.equal(result.ok, true);
+    assert.equal(looksLikeDialoguePayload(raw), true);
+  });
+
+  it("accepts nested financial QA JSON files", () => {
+    const raw = JSON.stringify([
+      {
+        pre_text: ["annual report context"],
+        post_text: ["more context"],
+        table: [["year", "2008", "2009"]],
+        qa: {
+          question: "What changed?",
+          answer: "cash flow",
+          program: "subtract(2,1)",
+        },
+      },
+    ]);
+    const result = validateDownloadedPayload(raw, "application/json");
+    assert.equal(result.ok, true);
+    assert.equal(looksLikeDialoguePayload(raw), true);
+  });
 });
 
 describe("validateNormalizedCsv", () => {

@@ -25,16 +25,22 @@ import {
   buildTranscriptSubmission,
   getMaxDatasetCases,
 } from "@/benchmark/transcript-benchmark";
+import {
+  adaptRubricForGenericTranscriptHarness,
+  summarizeGenericTranscriptEvaluatorAdaptations,
+} from "@/benchmark/evaluator-compat";
 import { parseJsonObjectFromLlmOutput, readZevalEnvValue, requestSiliconFlowChatCompletion } from "@/lib/siliconflow";
 import type {
   BenchmarkAgentSubmission,
   BenchmarkCase,
   BenchmarkJudgeAggregationMode,
   BenchmarkLlmJudge,
+  BenchmarkLlmJudgeResult,
   BenchmarkLlmJudgeMemberResult,
   BenchmarkMetricEvaluationResult,
   BenchmarkMatrixCell,
   BenchmarkModelId,
+  BenchmarkRubricMetric,
   BenchmarkRubricScoreLevel,
   BenchmarkRubricSet,
   BenchmarkScoringScale,
@@ -83,7 +89,8 @@ async function runGenericBenchmarkStreamingInternal(input: RunGenericBenchmarkIn
     throw new Error("至少确认一个指标后才能运行评测。");
   }
 
-  const rubric = approveRubricMetrics(input.rubric, approvedMetricKeys);
+  const approvedRubric = approveRubricMetrics(input.rubric, approvedMetricKeys);
+  const { rubric, adaptations: evaluatorAdaptations } = adaptRubricForGenericTranscriptHarness(approvedRubric);
   const matrix = DEFAULT_MATRIX;
   const task = buildTaskPackage(input.requirementText, rubric, matrix);
   const cases = buildCasesFromDataset(task, input.dataset);
@@ -112,6 +119,14 @@ async function runGenericBenchmarkStreamingInternal(input: RunGenericBenchmarkIn
       status: "completed",
       title: "Eval-Anything 对齐设计",
       detail: renderEvalAnythingDesignSummary(task.evalDesign),
+    });
+  }
+  if (evaluatorAdaptations.length > 0) {
+    benchmarkProgress.addEvent(input.runId, {
+      phase: "preparing",
+      status: "warning",
+      title: "评估方式自动适配",
+      detail: summarizeGenericTranscriptEvaluatorAdaptations(evaluatorAdaptations),
     });
   }
   benchmarkProgress.update(input.runId, {
@@ -190,6 +205,7 @@ async function runGenericBenchmarkStreamingInternal(input: RunGenericBenchmarkIn
   };
 
   const llmJudge = createLlmJudge({ runId: input.runId });
+  const llmJudgeBatch = createBatchLlmJudge({ runId: input.runId });
   const metricConcurrency = resolveBenchmarkMetricConcurrency();
 
   const syncEvaluatedMetrics = () => {
@@ -213,7 +229,7 @@ async function runGenericBenchmarkStreamingInternal(input: RunGenericBenchmarkIn
       task,
       taskCase,
       submission,
-      evaluatorContext: { llmJudge },
+      evaluatorContext: { llmJudge, llmJudgeBatch },
       existingMetricByKey,
       metricResults: metricResultsForArtifact,
       shouldCancel: () => benchmarkProgress.isCancelled(input.runId),
@@ -656,6 +672,19 @@ function updateJudgeProgress(
 }
 
 /**
+ * Build a concise failure summary for failed judge panel members.
+ *
+ * @param members Judge progress members after a failed panel attempt.
+ * @returns Human-readable member failure summary.
+ */
+function summarizeJudgeMemberFailures(members: BenchmarkJudgeProgressMember[]): string {
+  const messages = members
+    .filter((member) => member.status === "failed")
+    .map((member) => `${member.judgeId}: ${member.error ?? "unknown error"}`);
+  return messages.length > 0 ? messages.join("；") : "没有可用 Judge 成员";
+}
+
+/**
  * Extract short evidence snippets from a generated submission.
  *
  * @param parsedOutput Parsed model output.
@@ -794,6 +823,9 @@ function createLlmJudge(input: { runId?: string } = {}): BenchmarkLlmJudge {
           activeJudgeId: panelMembers[index + 1]?.judgeId,
         });
       } catch (error) {
+        if (error instanceof BenchmarkRunCancelledError) {
+          throw error;
+        }
         const message = error instanceof Error ? error.message : String(error);
         progressMembers[index] = { ...progressMembers[index], status: "failed", error: message };
         updateJudgeProgress(input.runId, {
@@ -806,11 +838,14 @@ function createLlmJudge(input: { runId?: string } = {}): BenchmarkLlmJudge {
           members: progressMembers,
           activeJudgeId: undefined,
         });
-        throw error;
       }
     });
 
     const completedMembers = members.filter((member): member is BenchmarkLlmJudgeMemberResult => Boolean(member));
+    const failedMembers = progressMembers.filter((member) => member.status === "failed");
+    if (completedMembers.length === 0) {
+      throw new Error(`Judge Panel 全部成员失败：${summarizeJudgeMemberFailures(failedMembers)}`);
+    }
 
     const aggregated = aggregateJudgeMembers({
       members: completedMembers,
@@ -825,7 +860,7 @@ function createLlmJudge(input: { runId?: string } = {}): BenchmarkLlmJudge {
       reason: aggregated.reason,
       evidence: aggregated.evidence,
       confidence: aggregated.confidence,
-      labels: aggregated.labels,
+      labels: failedMembers.length > 0 ? dedupeStrings([...aggregated.labels, "panel_partial_failure"]) : aggregated.labels,
       dimensions: aggregated.dimensions,
       judge: {
         mode: panelMode,
@@ -837,6 +872,175 @@ function createLlmJudge(input: { runId?: string } = {}): BenchmarkLlmJudge {
         members: completedMembers,
       },
     };
+  };
+}
+
+/**
+ * Create a session-level batch judge that scores all requested LLM metrics in one call per judge member.
+ * The caller still rechecks missing or low-confidence results with the per-metric judge.
+ *
+ * @param input Optional streaming run context.
+ * @returns Batch judge function keyed by metricKey.
+ */
+function createBatchLlmJudge(input: { runId?: string } = {}) {
+  const panelMode = readJudgePanelMode();
+  const panelMembers = readJudgePanelMembers(panelMode);
+  const aggregation = readJudgeAggregationMode();
+  const disagreementThreshold = readJudgeDisagreementThreshold();
+  const panelConcurrency = resolveJudgePanelConcurrency(panelMode, panelMembers.length);
+
+  return async ({
+    metrics,
+    taskCase,
+    submission,
+  }: {
+    metrics: BenchmarkRubricMetric[];
+    taskCase: BenchmarkCase;
+    submission: BenchmarkAgentSubmission;
+  }): Promise<Map<string, BenchmarkLlmJudgeResult>> => {
+    if (input.runId) assertBenchmarkRunActive(input.runId);
+    const progressMembers: BenchmarkJudgeProgressMember[] = panelMembers.map((member) => ({
+      judgeId: member.judgeId,
+      model: member.model,
+      family: member.family,
+      status: "pending",
+    }));
+    const metricName = `session batch: ${metrics.length} 个指标`;
+    updateJudgeProgress(input.runId, {
+      mode: panelMode,
+      aggregation,
+      caseId: taskCase.caseId,
+      submissionId: submission.submissionId,
+      metricKey: "__session_batch__",
+      metricName,
+      members: progressMembers,
+      activeJudgeId: panelMembers[0]?.judgeId,
+    });
+
+    const memberMaps = await mapWithConcurrency(panelMembers, panelConcurrency, async (member, index) => {
+      if (input.runId) assertBenchmarkRunActive(input.runId);
+      progressMembers[index] = { ...progressMembers[index], status: "running" };
+      updateJudgeProgress(input.runId, {
+        mode: panelMode,
+        aggregation,
+        caseId: taskCase.caseId,
+        submissionId: submission.submissionId,
+        metricKey: "__session_batch__",
+        metricName,
+        members: progressMembers,
+        activeJudgeId: member.judgeId,
+      });
+      try {
+        const raw = await requestSiliconFlowChatCompletion(
+          [
+            {
+              role: "system",
+              content: [
+                "你是 Zeval benchmark 的 session-level batch judge。",
+                "请对同一个评测案例中的多个二级指标分别独立评分，不要因为前一个指标的判断影响后一个指标。",
+                "每个 metric 都必须只依据自己的 criteria、rubricForm、references、caseInput、expected 和 submission 评分。",
+                "若证据不足，要降低 score 和 confidence；若给最高分，evidence 必须引用 transcript 或输出中的具体片段。",
+                "必须覆盖用户提供的每个 metricKey；只返回 JSON，不要输出 Markdown。",
+                '输出格式：{"metrics":[{"metricKey":"...","score":离散档位,"passed":true,"labels":[],"comment":"中文理由","evidence":["证据1"],"dimensions":{"criteria_fit":0-5,"evidence_grounding":0-5},"confidence":0-1}]}',
+              ].join("\n"),
+            },
+            {
+              role: "user",
+              content: JSON.stringify({
+                judgeMember: member,
+                evalDesign: taskCase.metadata?.evalDesign,
+                metrics: metrics.map((metric) => ({
+                  key: metric.metricKey,
+                  name: metric.displayName,
+                  capability: metric.capability,
+                  description: metric.description,
+                  criteria: metric.config?.criteria,
+                  rubricForm: metric.config?.rubricForm,
+                  references: metric.config?.references ?? [],
+                  scale: metric.scale,
+                })),
+                caseInput: taskCase.input,
+                expected: taskCase.expected,
+                submission: submission.parsedOutput ?? submission.rawOutput,
+              }, null, 2),
+            },
+          ],
+          {
+            stage: panelMode === "panel" ? "benchmark_generic_llm_judge_batch_panel" : "benchmark_generic_llm_judge_batch",
+            model: member.model,
+            temperature: 0.1,
+            seed: 1000 + index,
+          },
+        );
+        if (input.runId) assertBenchmarkRunActive(input.runId);
+        const parsed = parseBatchJudgeMemberResults(raw, member, metrics);
+        progressMembers[index] = { ...progressMembers[index], status: "completed" };
+        updateJudgeProgress(input.runId, {
+          mode: panelMode,
+          aggregation,
+          caseId: taskCase.caseId,
+          submissionId: submission.submissionId,
+          metricKey: "__session_batch__",
+          metricName,
+          members: progressMembers,
+          activeJudgeId: panelMembers[index + 1]?.judgeId,
+        });
+        return parsed;
+      } catch (error) {
+        if (error instanceof BenchmarkRunCancelledError) {
+          throw error;
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        progressMembers[index] = { ...progressMembers[index], status: "failed", error: message };
+        updateJudgeProgress(input.runId, {
+          mode: panelMode,
+          aggregation,
+          caseId: taskCase.caseId,
+          submissionId: submission.submissionId,
+          metricKey: "__session_batch__",
+          metricName,
+          members: progressMembers,
+          activeJudgeId: undefined,
+        });
+        return null;
+      }
+    });
+
+    const result = new Map<string, BenchmarkLlmJudgeResult>();
+    for (const metric of metrics) {
+      const members = memberMaps
+        .filter((memberMap): memberMap is Map<string, BenchmarkLlmJudgeMemberResult> => Boolean(memberMap))
+        .map((memberMap) => memberMap.get(metric.metricKey))
+        .filter((member): member is BenchmarkLlmJudgeMemberResult => Boolean(member));
+      if (members.length === 0) continue;
+      const failedMembers = progressMembers.filter((member) => member.status === "failed");
+      const aggregated = aggregateJudgeMembers({
+        members,
+        aggregation,
+        disagreementThreshold,
+        passThreshold: metric.scale.passThreshold,
+        mode: panelMode,
+      });
+      result.set(metric.metricKey, {
+        score: aggregated.score,
+        passed: aggregated.passed,
+        reason: aggregated.reason,
+        evidence: aggregated.evidence,
+        confidence: aggregated.confidence,
+        labels: failedMembers.length > 0 ? dedupeStrings([...aggregated.labels, "panel_partial_failure"]) : aggregated.labels,
+        dimensions: aggregated.dimensions,
+        judge: {
+          mode: panelMode,
+          aggregation,
+          memberCount: members.length,
+          disagreement: aggregated.disagreement,
+          disagreementThreshold,
+          panelDisagree: aggregated.panelDisagree,
+          members,
+        },
+      });
+    }
+    return result;
   };
 }
 
@@ -994,6 +1198,55 @@ function parseJudgeMemberResult(
     dimensions: readNumberRecord(parsed.dimensions),
     confidence: readNumber(parsed.confidence, 0.6),
   };
+}
+
+/**
+ * Parse one judge member's batch response into per-metric member verdicts.
+ * Missing metrics are intentionally omitted so the runner can recheck them per metric.
+ *
+ * @param raw Raw model JSON output.
+ * @param member Judge member metadata.
+ * @param metrics Metrics requested in the batch call.
+ * @returns Map of parsed member verdicts keyed by metricKey.
+ */
+function parseBatchJudgeMemberResults(
+  raw: string,
+  member: JudgePanelMemberConfig,
+  metrics: BenchmarkRubricMetric[],
+): Map<string, BenchmarkLlmJudgeMemberResult> {
+  const parsed = parseRecord(raw);
+  const rows = Array.isArray(parsed.metrics)
+    ? parsed.metrics
+    : Array.isArray(parsed.results)
+      ? parsed.results
+      : [];
+  const rowByMetricKey = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    if (!isRecord(row)) continue;
+    const metricKey = typeof row.metricKey === "string"
+      ? row.metricKey
+      : typeof row.key === "string"
+        ? row.key
+        : "";
+    if (metricKey) rowByMetricKey.set(metricKey, row);
+  }
+
+  const result = new Map<string, BenchmarkLlmJudgeMemberResult>();
+  for (const metric of metrics) {
+    const row = rowByMetricKey.get(metric.metricKey);
+    if (!row) continue;
+    result.set(
+      metric.metricKey,
+      parseJudgeMemberResult(
+        JSON.stringify(row),
+        member,
+        metric.scale.passThreshold,
+        metric.config?.rubricForm,
+        metric.scale,
+      ),
+    );
+  }
+  return result;
 }
 
 function aggregateJudgeMembers(input: {

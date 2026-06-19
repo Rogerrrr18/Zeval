@@ -14,7 +14,38 @@ import type { StructuredTaskMetrics } from "@/types/rich-conversation";
 export type BenchmarkChatTurn =
   | { kind: "user"; text: string }
   | { kind: "ai"; text: string }
+  | {
+      kind: "agent_trace";
+      text: string;
+      trace: BenchmarkAgentToolTrace[];
+      summary?: BenchmarkAgentRunSummary;
+      warnings?: string[];
+    }
   | { kind: "error"; text: string };
+
+export type BenchmarkAgentToolTrace = {
+  name: string;
+  label: string;
+  status: "running" | "success" | "warning" | "fallback" | "error";
+  summary: string;
+  detail?: string;
+  durationMs: number;
+  stats?: {
+    references?: number;
+    modules?: number;
+    metrics?: number;
+  };
+};
+
+export type BenchmarkAgentRunSummary = {
+  usedFallback: boolean;
+  modules: number;
+  metrics: number;
+  references: number;
+  generatedBy?: string;
+  changedMetrics: string[];
+  warnings: string[];
+};
 
 export type BenchmarkWorkspaceViewMode = "rubric" | "progress" | "result";
 
@@ -62,6 +93,10 @@ export type BenchmarkHumanReviewRecord = {
   channel?: string;
   reviewer?: string;
   note?: string;
+  reviewerRationale?: string;
+  evidenceUsed?: string[];
+  boundaryType?: "clear_accept" | "clear_reject" | "uncertain" | "human_override";
+  correctionType?: "agree_accept" | "agree_reject" | "false_positive" | "false_negative" | "needs_more_evidence";
   reviewedAt?: string;
   savedAt?: string;
   admission?: {

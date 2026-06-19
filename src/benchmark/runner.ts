@@ -2,7 +2,7 @@
  * @fileoverview Benchmark Mode scoring runner.
  */
 
-import { type BenchmarkEvaluatorContext } from "@/benchmark/evaluators";
+import { buildLlmJudgeMetricResult, type BenchmarkEvaluatorContext } from "@/benchmark/evaluators";
 import { evaluateBenchmarkMetricWithRetry } from "@/benchmark/metric-eval-retry";
 import { BenchmarkRunCancelledError } from "@/benchmark/run-cancellation";
 import { assignQualityTiers, type RerankCaseInput } from "@/benchmark/rerank";
@@ -21,6 +21,7 @@ import type {
   BenchmarkMetricEvaluationResult,
   BenchmarkModelId,
   BenchmarkRunResult,
+  BenchmarkRubricMetric,
   BenchmarkTaskPackage,
 } from "@/benchmark/types";
 
@@ -69,8 +70,9 @@ export type EvaluateSubmissionMetricsInput = {
  */
 export async function evaluateSubmissionMetrics(input: EvaluateSubmissionMetricsInput): Promise<void> {
   const approvedMetrics = getApprovedRubricMetrics(input.task.rubric);
-  const metricConcurrency = Math.max(1, Math.floor(input.metricConcurrency ?? 1));
-  await mapWithConcurrency(approvedMetrics, metricConcurrency, async (metric) => {
+  const metricsToEvaluate: BenchmarkRubricMetric[] = [];
+
+  for (const metric of approvedMetrics) {
     if (input.shouldCancel?.()) {
       throw new BenchmarkRunCancelledError(input.runId);
     }
@@ -81,8 +83,23 @@ export async function evaluateSubmissionMetrics(input: EvaluateSubmissionMetrics
         input.metricResults.push(existingMetricResult);
       }
       input.onMetricReused?.(existingMetricResult);
-      return;
+      continue;
     }
+    metricsToEvaluate.push(metric);
+  }
+
+  const fallbackMetricKeys = await evaluateBatchJudgeMetrics(input, metricsToEvaluate);
+  const metricConcurrency = Math.max(1, Math.floor(input.metricConcurrency ?? 1));
+  const perMetricWork = metricsToEvaluate.filter(
+    (metric) => !isBatchJudgeCandidate(input, metric) || fallbackMetricKeys.has(metric.metricKey),
+  );
+
+  await mapWithConcurrency(perMetricWork, metricConcurrency, async (metric) => {
+    if (input.shouldCancel?.()) {
+      throw new BenchmarkRunCancelledError(input.runId);
+    }
+    const cacheKey = metricCacheKey(input.submission.submissionId, metric.metricKey);
+    if (input.existingMetricByKey.has(cacheKey) && !fallbackMetricKeys.has(metric.metricKey)) return;
     const metricResult = await evaluateBenchmarkMetricWithRetry(
       metric,
       input.taskCase,
@@ -92,10 +109,121 @@ export async function evaluateSubmissionMetrics(input: EvaluateSubmissionMetrics
     if (input.shouldCancel?.()) {
       throw new BenchmarkRunCancelledError(input.runId);
     }
-    input.metricResults.push(metricResult);
-    input.existingMetricByKey.set(cacheKey, metricResult);
-    input.onMetricEvaluated?.(metricResult);
+    recordMetricResult(input, metricResult);
   });
+}
+
+/**
+ * Evaluate batch-eligible LLM metrics in one session-level judge call.
+ * Missing or risky batch results are returned as fallback metric keys for per-metric recheck.
+ *
+ * @param input Per-submission evaluation context.
+ * @param metrics Metrics not already satisfied by checkpoint cache.
+ * @returns Metric keys that should be re-evaluated with the single-metric judge.
+ */
+async function evaluateBatchJudgeMetrics(
+  input: EvaluateSubmissionMetricsInput,
+  metrics: BenchmarkRubricMetric[],
+): Promise<Set<string>> {
+  const fallbackMetricKeys = new Set<string>();
+  const batchMetrics = metrics.filter((metric) => isBatchJudgeCandidate(input, metric));
+  if (batchMetrics.length <= 1) {
+    for (const metric of batchMetrics) fallbackMetricKeys.add(metric.metricKey);
+    return fallbackMetricKeys;
+  }
+
+  try {
+    const verdictByMetric = await input.evaluatorContext!.llmJudgeBatch!({
+      metrics: batchMetrics,
+      taskCase: input.taskCase,
+      submission: input.submission,
+    });
+    for (const metric of batchMetrics) {
+      if (input.shouldCancel?.()) {
+        throw new BenchmarkRunCancelledError(input.runId);
+      }
+      const judged = verdictByMetric.get(metric.metricKey);
+      if (!judged) {
+        fallbackMetricKeys.add(metric.metricKey);
+        continue;
+      }
+      const result = buildLlmJudgeMetricResult(metric, input.taskCase, input.submission, judged);
+      if (shouldRecheckBatchResult(result)) {
+        fallbackMetricKeys.add(metric.metricKey);
+        continue;
+      }
+      recordMetricResult(input, result);
+    }
+  } catch (error) {
+    if (error instanceof BenchmarkRunCancelledError) throw error;
+    for (const metric of batchMetrics) fallbackMetricKeys.add(metric.metricKey);
+  }
+
+  return fallbackMetricKeys;
+}
+
+/**
+ * Decide whether one metric can use the session-level batch judge.
+ * Batch mode is opt-in so high-stakes runs can keep the old per-metric path.
+ *
+ * @param input Per-submission evaluation context.
+ * @param metric Candidate metric.
+ * @returns True when the metric should be attempted in the batch call.
+ */
+function isBatchJudgeCandidate(input: EvaluateSubmissionMetricsInput, metric: BenchmarkRubricMetric): boolean {
+  return (
+    readBenchmarkJudgeMode() === "session_batch" &&
+    metric.evaluatorType === "llm_judge" &&
+    Boolean(input.evaluatorContext?.llmJudgeBatch)
+  );
+}
+
+/**
+ * Store one metric result and update the checkpoint cache.
+ *
+ * @param input Per-submission evaluation context.
+ * @param metricResult Newly evaluated metric result.
+ */
+function recordMetricResult(
+  input: EvaluateSubmissionMetricsInput,
+  metricResult: BenchmarkMetricEvaluationResult,
+): void {
+  input.metricResults.push(metricResult);
+  input.existingMetricByKey.set(metricCacheKey(metricResult.submissionId, metricResult.metricKey), metricResult);
+  input.onMetricEvaluated?.(metricResult);
+}
+
+/**
+ * Decide whether a fast batch verdict needs a precise single-metric recheck.
+ *
+ * @param result Batch-generated metric result.
+ * @returns True when per-metric fallback should replace the batch verdict.
+ */
+function shouldRecheckBatchResult(result: BenchmarkMetricEvaluationResult): boolean {
+  return (
+    result.status !== "scored" ||
+    result.confidence < readBatchRecheckConfidenceThreshold() ||
+    Boolean(result.judge?.panelDisagree)
+  );
+}
+
+/**
+ * Resolve the benchmark judge mode.
+ *
+ * @returns Per-metric default mode or session-level batch mode.
+ */
+function readBenchmarkJudgeMode(): "per_metric" | "session_batch" {
+  return process.env.ZEVAL_BENCHMARK_JUDGE_MODE === "session_batch" ? "session_batch" : "per_metric";
+}
+
+/**
+ * Resolve the minimum batch confidence accepted without per-metric recheck.
+ *
+ * @returns Confidence threshold in [0, 1].
+ */
+function readBatchRecheckConfidenceThreshold(): number {
+  const parsed = Number.parseFloat(process.env.ZEVAL_BENCHMARK_BATCH_RECHECK_CONFIDENCE ?? "");
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : 0.65;
 }
 
 /**

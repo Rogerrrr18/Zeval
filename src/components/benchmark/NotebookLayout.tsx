@@ -18,6 +18,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -40,6 +41,8 @@ import type { BenchmarkProgressSnapshot } from "@/benchmark/progress";
 import { approveRubricMetrics, cloneRubric, toggleMetricApproval } from "@/benchmark/rubric";
 import type {
   BenchmarkDatasetSnapshot,
+  BenchmarkAgentRunSummary,
+  BenchmarkAgentToolTrace,
   BenchmarkChatTurn,
   BenchmarkHumanReviewRecord,
   BenchmarkRunHistoryItem,
@@ -71,6 +74,7 @@ import type { IngestResponse, UploadFormat } from "@/types/pipeline";
 import { useProject } from "@/components/shell/ProjectContext";
 import { DEFAULT_PROJECT } from "@/lib/projectStore";
 import { MarkdownMessage } from "@/components/shared/MarkdownMessage";
+import { ModelSettingsButton } from "@/components/settings/ModelSettingsButton";
 import { RubricGraphView } from "./RubricGraphView";
 import styles from "./notebookLayout.module.css";
 
@@ -109,9 +113,20 @@ type BenchmarkRubricAgentResponse = {
   requirementText?: string;
   rubric?: BenchmarkRubricSet | null;
   toolCalls?: Array<{ name: string; summary: string }>;
+  toolTrace?: BenchmarkAgentToolTrace[];
+  runSummary?: BenchmarkAgentRunSummary;
   warnings?: string[];
+  advisories?: string[];
   error?: string;
 };
+
+type BenchmarkRubricAgentStreamEvent =
+  | { type: "phase"; phase: "planning" | "running"; message: string }
+  | { type: "plan"; tools: Array<{ name: string; label: string }>; message: string }
+  | { type: "tool_start"; name: string; label: string; index: number; total: number }
+  | { type: "tool_result"; trace: BenchmarkAgentToolTrace; index: number; total: number }
+  | { type: "final"; result: BenchmarkRubricAgentResponse }
+  | { type: "error"; message: string };
 
 type BenchmarkAutoFindResponse = {
   reply?: string;
@@ -123,6 +138,8 @@ type BenchmarkAutoFindResponse = {
 type CopilotTabId = "rubric" | "autofind";
 
 type BenchmarkDataUploadState = "idle" | "uploading" | "ready" | "error";
+
+type BenchmarkCopilotCommand = "run_benchmark" | "resume_benchmark" | "cancel_benchmark";
 
 type BenchmarkAdmitCasesResponse = {
   savedCount?: number;
@@ -208,6 +225,80 @@ const EVALUATOR_OPTIONS: Array<{ value: BenchmarkRubricMetric["evaluatorType"]; 
   { value: "environment_state_test", label: "环境状态检测" },
   { value: "hybrid", label: "混合评估" },
 ];
+
+/**
+ * Classify short Benchmark Workbench chat commands that should bypass Rubric Agent.
+ *
+ * @param text Latest user message.
+ * @returns Direct benchmark command, or null when the Rubric Agent should handle the message.
+ */
+function resolveBenchmarkCopilotCommand(text: string): BenchmarkCopilotCommand | null {
+  const normalized = text.trim();
+  if (!normalized) return null;
+  if (isBenchmarkTroubleshootingQuestion(normalized) || isRubricDesignIntent(normalized)) return null;
+  if (/(停止|取消|中断|终止).{0,8}(评测|benchmark)|stop\s+benchmark/i.test(normalized)) {
+    return "cancel_benchmark";
+  }
+  if (/(继续|恢复).{0,8}(评测|benchmark)|resume\s+benchmark/i.test(normalized)) {
+    return "resume_benchmark";
+  }
+  if (
+    /(重新评测|再评测|重跑|重新跑|重新执行|跑一遍|开始评测|启动评测|运行评测|执行评测|run\s+benchmark|rerun\s+benchmark|start\s+benchmark)/i.test(normalized)
+  ) {
+    return "run_benchmark";
+  }
+  return null;
+}
+
+/**
+ * Detect rubric editing requests so words like "重新生成评分标准" are not treated as benchmark runs.
+ *
+ * @param text Latest user message.
+ * @returns Whether the message should stay in the Rubric Agent flow.
+ */
+function isRubricDesignIntent(text: string): boolean {
+  return /(重新生成|重做|重写|重设|设计|修改|调整|优化|完善|补充|增加|新增|删除|合并).{0,16}(评分标准|rubric|指标|指标体系|维度|权重|准则|rubricForm|criteria)/i.test(text)
+    || /(评分标准|rubric|指标|指标体系|维度|权重|准则|rubricForm|criteria).{0,16}(重新生成|重做|重写|重设|设计|修改|调整|优化|完善|补充|增加|新增|删除|合并)/i.test(text);
+}
+
+/**
+ * Keep diagnostic questions in chat instead of accidentally starting a run.
+ *
+ * @param text Latest user message.
+ * @returns Whether the user is asking why/how something behaves.
+ */
+function isBenchmarkTroubleshootingQuestion(text: string): boolean {
+  if (/^(开始|启动|运行|执行|重新评测|继续评测|恢复评测|停止评测|取消评测)/.test(text)) return false;
+  return /(为什么|为何|怎么|如何|检查|排查|看下|看看|无效|失败|不能|bug|问题)/i.test(text);
+}
+
+/**
+ * Build a clear chat message when a direct benchmark run command cannot execute yet.
+ *
+ * @param input Current workbench state.
+ * @returns User-facing blocker message, or null when a run can start.
+ */
+function buildBenchmarkRunBlockerMessage(input: {
+  rubric: BenchmarkRubricSet | null;
+  dataset: BenchmarkDatasetSnapshot | null;
+  running: boolean;
+}): string | null {
+  if (input.running) {
+    return "我理解你是要运行评测，不会重设评分标准。当前已有评测在运行中，可以先等待完成，或点击停止后再重新评测。";
+  }
+  const blockers: string[] = [];
+  if (!input.rubric) {
+    blockers.push("还没有评分标准");
+  } else {
+    const approvedMetricCount = input.rubric.modules
+      .flatMap((module) => module.metrics)
+      .filter((metric) => metric.approvalStatus === "approved").length;
+    if (approvedMetricCount === 0) blockers.push("还没有确认指标");
+  }
+  if (!input.dataset?.rawRows.length) blockers.push("还没有应用/上传评测数据集");
+  if (blockers.length === 0) return null;
+  return `我理解你是要运行评测，不会重新设计评分标准。不过现在还缺：${blockers.join("、")}。补齐后再说「重新评测」就会直接启动。`;
+}
 
 function hasChineseText(value: string): boolean {
   return /[\u3400-\u9fff]/.test(value);
@@ -354,6 +445,124 @@ function localizeRubricForDisplay(rubric: BenchmarkRubricSet): BenchmarkRubricSe
   };
 }
 
+/**
+ * Safely merge Copilot rubric updates into the graph source without letting
+ * fallback or partial responses wipe existing modules and metrics.
+ *
+ * @param current Current UI rubric.
+ * @param incoming Raw rubric returned by Copilot.
+ * @param response Full Copilot response with trace metadata.
+ * @returns Rubric safe for graph rendering.
+ */
+function mergeCopilotRubricUpdateForGraph(
+  current: BenchmarkRubricSet | null,
+  incoming: BenchmarkRubricSet | null | undefined,
+  response: Pick<BenchmarkRubricAgentResponse, "toolTrace" | "runSummary" | "warnings">,
+): BenchmarkRubricSet | null {
+  if (!incoming) return current;
+  const localized = localizeRubricForDisplay(incoming);
+  if (!current) return countRubricMetrics(localized) > 0 ? localized : null;
+
+  const currentMetricCount = countRubricMetrics(current);
+  const incomingMetricCount = countRubricMetrics(localized);
+  const currentModuleCount = current.modules.length;
+  const incomingModuleCount = localized.modules.length;
+  const toolNames = new Set((response.toolTrace ?? []).map((trace) => trace.name));
+  const allowsWholeReplacement = toolNames.has("draft_rubric") && !isLikelyFallbackRubric(localized, response);
+  const isTargetedDelete = toolNames.has("delete_metric");
+  const isTargetedMutation =
+    toolNames.has("add_metric") ||
+    toolNames.has("update_metric") ||
+    toolNames.has("approve_metric") ||
+    toolNames.has("approve_all_metrics") ||
+    toolNames.has("reject_metric") ||
+    isTargetedDelete;
+
+  if (incomingMetricCount === 0 && currentMetricCount > 0) return current;
+  if (!allowsWholeReplacement && !isTargetedMutation && incomingMetricCount < currentMetricCount) return current;
+  if (!allowsWholeReplacement && incomingModuleCount < currentModuleCount && !isTargetedDelete) {
+    return mergeRubricModulesByMetricKey(current, localized);
+  }
+  if (isTargetedMutation && incomingMetricCount < currentMetricCount - (isTargetedDelete ? 1 : 0)) {
+    return mergeRubricModulesByMetricKey(current, localized);
+  }
+  if (isLikelyFallbackRubric(localized, response) && incomingMetricCount < currentMetricCount) return current;
+
+  return localized;
+}
+
+/**
+ * Merge incoming module/metric patches into current rubric by metric key.
+ * @param current Current full rubric.
+ * @param incoming Incoming partial rubric.
+ * @returns Merged rubric preserving existing graph nodes where possible.
+ */
+function mergeRubricModulesByMetricKey(
+  current: BenchmarkRubricSet,
+  incoming: BenchmarkRubricSet,
+): BenchmarkRubricSet {
+  const incomingByKey = new Map(
+    incoming.modules.flatMap((module) =>
+      module.metrics.map((metric) => [metric.metricKey, { module, metric }] as const),
+    ),
+  );
+  const incomingKeys = new Set(incomingByKey.keys());
+  const shouldReflectDeletion = countRubricMetrics(incoming) === countRubricMetrics(current) - 1;
+  const mergedModules = current.modules
+    .map((module) => ({
+      ...module,
+      ...(incoming.modules.find((incomingModule) => incomingModule.capability === module.capability) ?? {}),
+      metrics: module.metrics
+        .filter((metric) => !shouldReflectDeletion || incomingKeys.has(metric.metricKey))
+        .map((metric) => incomingByKey.get(metric.metricKey)?.metric ?? metric),
+    }))
+    .filter((module) => module.metrics.length > 0);
+
+  const existingKeys = new Set(mergedModules.flatMap((module) => module.metrics.map((metric) => metric.metricKey)));
+  for (const incomingModule of incoming.modules) {
+    const newMetrics = incomingModule.metrics.filter((metric) => !existingKeys.has(metric.metricKey));
+    if (newMetrics.length === 0) continue;
+    const targetModule = mergedModules.find((module) => module.capability === incomingModule.capability);
+    if (targetModule) {
+      targetModule.metrics = [...targetModule.metrics, ...newMetrics];
+    } else {
+      mergedModules.push({ ...incomingModule, metrics: newMetrics });
+    }
+  }
+
+  return localizeRubricForDisplay({
+    ...current,
+    ...incoming,
+    modules: mergedModules,
+    updatedAt: incoming.updatedAt ?? new Date().toISOString(),
+  });
+}
+
+/**
+ * Count metrics in a rubric.
+ * @param rubric Rubric to inspect.
+ * @returns Metric count.
+ */
+function countRubricMetrics(rubric: BenchmarkRubricSet): number {
+  return rubric.modules.reduce((sum, module) => sum + module.metrics.length, 0);
+}
+
+/**
+ * Detect a fallback rubric that should not replace a richer current graph.
+ * @param rubric Incoming rubric.
+ * @param response Copilot response metadata.
+ * @returns Whether the incoming rubric looks like fallback/partial output.
+ */
+function isLikelyFallbackRubric(
+  rubric: BenchmarkRubricSet,
+  response: Pick<BenchmarkRubricAgentResponse, "runSummary" | "warnings">,
+): boolean {
+  const warnings = response.warnings ?? response.runSummary?.warnings ?? [];
+  return rubric.generatedBy === "template" ||
+    Boolean(response.runSummary?.usedFallback) ||
+    warnings.some((warning) => /兜底|fallback|template|模型没有返回|LLM|DeepSearch/i.test(warning));
+}
+
 function clampMetricWeight(value: number): number {
   if (!Number.isFinite(value)) return 3;
   return Math.max(1, Math.min(10, Math.round(value)));
@@ -456,7 +665,7 @@ function shouldRecoverBenchmarkRunOnHydrate(
   if (progress.phase === "completed") return true;
   const metricsDone =
     progress.totalMetrics > 0 && progress.evaluatedMetrics >= progress.totalMetrics;
-  return metricsDone && progress.phase !== "completed";
+  return metricsDone;
 }
 
 function isActiveBenchmarkProgressPhase(phase: BenchmarkProgressSnapshot["phase"]): boolean {
@@ -642,10 +851,6 @@ function SessionTitleField(props: {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(props.title);
 
-  useEffect(() => {
-    if (!editing) setDraft(props.title);
-  }, [editing, props.title]);
-
   function commitRename() {
     const trimmed = draft.trim();
     if (trimmed) props.onRename(trimmed);
@@ -684,6 +889,7 @@ function SessionTitleField(props: {
       title="点击重命名评测任务"
       onClick={(event) => {
         event.stopPropagation();
+        setDraft(props.title);
         setEditing(true);
       }}
     >
@@ -723,13 +929,17 @@ export function NotebookLayout() {
   const [copilotInput, setCopilotInput] = useState("");
   const [copilotTurns, setCopilotTurns] = useState<ChatTurn[]>(DEFAULT_COPILOT_TURNS);
   const [copilotRunning, setCopilotRunning] = useState(false);
+  const [copilotRunStartedAt, setCopilotRunStartedAt] = useState<number | null>(null);
   const [autofindInput, setAutofindInput] = useState("");
   const [autofindTurns, setAutofindTurns] = useState<ChatTurn[]>(DEFAULT_AUTOFIND_TURNS);
   const [autofindState, setAutofindState] = useState<AutoFindWorkflowState | null>(null);
   const [autofindRunning, setAutofindRunning] = useState(false);
+  const [autofindRunStartedAt, setAutofindRunStartedAt] = useState<number | null>(null);
   const copilotInputRef = useRef<HTMLTextAreaElement>(null);
   const autofindInputRef = useRef<HTMLTextAreaElement>(null);
   const copilotScrollRef = useRef<HTMLDivElement>(null);
+  const copilotAbortRef = useRef<AbortController | null>(null);
+  const autofindAbortRef = useRef<AbortController | null>(null);
 
   // ── Benchmark state ─
   const [sessions, setSessions] = useState<BenchmarkSession[]>(() => [fallbackSessionRef.current!]);
@@ -804,6 +1014,8 @@ export function NotebookLayout() {
   useEffect(() => {
     return () => {
       runStreamRef.current?.close();
+      copilotAbortRef.current?.abort();
+      autofindAbortRef.current?.abort();
       if (recoverDebounceRef.current) {
         clearTimeout(recoverDebounceRef.current);
       }
@@ -1146,7 +1358,7 @@ export function NotebookLayout() {
    * @param csvText CSV 正文。
    * @param fileName 展示用文件名。
    */
-  async function applyDatasetFromCsv(csvText: string, fileName: string) {
+  const applyDatasetFromCsv = useCallback(async (csvText: string, fileName: string) => {
     setDataUploadState("uploading");
     setDataUploadError("");
     setRunResult(null);
@@ -1180,7 +1392,47 @@ export function NotebookLayout() {
       setDataUploadError(error instanceof Error ? error.message : "AutoFind 数据加载失败");
       throw error;
     }
-  }
+  }, []);
+
+  /**
+   * 直接把 AutoFind 已整理出的 CSV 加载到当前评测数据区。
+   *
+   * @returns Promise resolved after the local ingest flow finishes or a user-visible warning is shown.
+   */
+  const applyCurrentAutoFindDataset = useCallback(async () => {
+    const currentAutoFindState = autofindState;
+    const csvText = currentAutoFindState?.csvText;
+    if (!currentAutoFindState || !csvText?.trim()) {
+      setAutofindTurns((prev) => [
+        ...prev,
+        {
+          kind: "ai",
+          text: autofindRunning
+            ? "当前还在检索/整理数据，暂时没有可应用的 CSV。等检索完成后再点 **应用**，或先点击停止。"
+            : "当前还没有可应用的数据集。请先点击 **开始搜索**，等系统整理出 CSV 后再应用。",
+        },
+      ]);
+      return;
+    }
+
+    const fileName = currentAutoFindState.fileName ?? "companion-autofind-50sessions.csv";
+    setAutofindTurns((prev) => [...prev, { kind: "user", text: "应用" }]);
+    try {
+      await applyDatasetFromCsv(csvText, fileName);
+      setAutofindTurns((prev) => [
+        ...prev,
+        {
+          kind: "ai",
+          text: `已应用数据集 \`${fileName}\`。\n\n已加载到评测数据区，可直接开始评测。`,
+        },
+      ]);
+    } catch (error) {
+      setAutofindTurns((prev) => [
+        ...prev,
+        { kind: "error", text: error instanceof Error ? error.message : "AutoFind 数据加载失败" },
+      ]);
+    }
+  }, [applyDatasetFromCsv, autofindRunning, autofindState]);
 
   /**
    * 组装 AutoFind 所需的 rubric 参考上下文。
@@ -1269,9 +1521,17 @@ export function NotebookLayout() {
       const text = (message ?? autofindInput).trim();
       if (!text || autofindRunning) return;
 
+      if (/应用|加载|导入|apply/i.test(text)) {
+        await applyCurrentAutoFindDataset();
+        return;
+      }
+
       setAutofindTurns((prev) => [...prev, { kind: "user", text }]);
       setAutofindInput("");
       setAutofindRunning(true);
+      setAutofindRunStartedAt(Date.now());
+      const controller = new AbortController();
+      autofindAbortRef.current = controller;
 
       try {
         const action =
@@ -1282,6 +1542,7 @@ export function NotebookLayout() {
         const response = await fetch("/api/benchmarks/autofind", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             action,
             message: text,
@@ -1296,37 +1557,23 @@ export function NotebookLayout() {
         }
         if (data.state) setAutofindState(data.state);
 
-        if (/应用|加载|导入|apply/i.test(text) && data.state?.csvText) {
-          const fileName = data.state.fileName ?? "companion-autofind-50sessions.csv";
-          if (data.state.phase !== "saved") {
-            await fetch("/api/benchmarks/autofind", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "save", state: data.state }),
-            });
-          }
-          await applyDatasetFromCsv(data.state.csvText, fileName);
-          setAutofindTurns((prev) => [
-            ...prev,
-            {
-              kind: "ai",
-              text: `${data.reply ?? "已应用数据集。"}\n\n已加载到评测数据区，可直接开始评测。`,
-            },
-          ]);
-          return;
-        }
-
         setAutofindTurns((prev) => [...prev, { kind: "ai", text: data.reply ?? "已处理。" }]);
       } catch (error) {
         setAutofindTurns((prev) => [
           ...prev,
-          { kind: "error", text: error instanceof Error ? error.message : "AutoFind 请求失败" },
+          isAbortLikeError(error)
+            ? { kind: "ai", text: "已停止本次 AutoFind 运行。" }
+            : { kind: "error", text: error instanceof Error ? error.message : "AutoFind 请求失败" },
         ]);
       } finally {
+        if (autofindAbortRef.current === controller) {
+          autofindAbortRef.current = null;
+        }
         setAutofindRunning(false);
+        setAutofindRunStartedAt(null);
       }
     },
-    [autofindInput, autofindRunning, autofindState, buildAutoFindRubricContext, requirement],
+    [applyCurrentAutoFindDataset, autofindInput, autofindRunning, autofindState, buildAutoFindRubricContext, requirement],
   );
 
   function attachBenchmarkRunStream(runId: string) {
@@ -1513,25 +1760,66 @@ export function NotebookLayout() {
   }
 
   // ── Copilot send ─
-  const sendCopilot = useCallback(async () => {
+  async function sendCopilot() {
     const text = copilotInput.trim();
     if (!text || copilotRunning) return;
 
     const nextTurns: ChatTurn[] = [...copilotTurns, { kind: "user", text }];
     setCopilotTurns(nextTurns);
     setCopilotInput("");
+
+    const directCommand = resolveBenchmarkCopilotCommand(text);
+    if (directCommand) {
+      if (directCommand === "cancel_benchmark") {
+        setCopilotTurns((prev) => [
+          ...prev,
+          {
+            kind: "ai",
+            text: progress?.runId
+              ? "收到，这是停止当前评测，不会改动评分标准。我正在请求后端中断本次运行。"
+              : "我理解你想停止评测，但当前没有正在跟踪的运行。",
+          },
+        ]);
+        await handleCancelBenchmark();
+        return;
+      }
+
+      const blockerMessage = buildBenchmarkRunBlockerMessage({ rubric, dataset, running });
+      if (blockerMessage) {
+        setCopilotTurns((prev) => [...prev, { kind: "ai", text: blockerMessage }]);
+        return;
+      }
+
+      setCopilotTurns((prev) => [
+        ...prev,
+        {
+          kind: "ai",
+          text:
+            directCommand === "resume_benchmark"
+              ? "收到，这是继续当前评测，不会重新设计评分标准。我已切到进度页并尝试从断点恢复。"
+              : "收到，这是重新运行评测，不会重新设计评分标准。我已切到进度页并开始新的评测运行。",
+        },
+      ]);
+      await handleRunBenchmark(directCommand === "resume_benchmark" ? progress?.runId : undefined);
+      return;
+    }
+
     setCopilotRunning(true);
+    setCopilotRunStartedAt(Date.now());
+    const controller = new AbortController();
+    copilotAbortRef.current = controller;
 
     try {
-      const messages = nextTurns.map((t) => ({
-        role: (t.kind === "user" ? "user" : "assistant") as "user" | "assistant",
-        content: t.text,
-      }));
+      const messages = nextTurns
+        .map(formatCopilotTurnForModel)
+        .filter((message): message is { role: "user" | "assistant"; content: string } => Boolean(message));
 
       const response = await fetch("/api/benchmarks/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
+          stream: true,
           messages,
           requirementText: requirement,
           rubric,
@@ -1543,22 +1831,101 @@ export function NotebookLayout() {
             : knowledgeFiles.map((file) => file.fileId),
         }),
       });
-      const data = (await response.json()) as BenchmarkRubricAgentResponse;
 
-      if (!response.ok || data.error) {
+      if (!response.ok || !response.body) {
+        const data = await response.json().catch(() => ({})) as BenchmarkRubricAgentResponse;
         setCopilotTurns((prev) => [...prev, { kind: "error", text: data.error ?? "助手调用失败" }]);
       } else {
-        if (typeof data.requirementText === "string") setRequirement(data.requirementText);
-        if (data.rubric !== undefined) setRubric(data.rubric ? localizeRubricForDisplay(data.rubric) : null);
-        setViewMode("rubric");
-        setCopilotTurns((prev) => [...prev, { kind: "ai", text: data.reply ?? "已处理。" }]);
+        let latestTrace: BenchmarkAgentToolTrace[] = [];
+        let latestWarnings: string[] = [];
+        let latestSummary: BenchmarkAgentRunSummary | undefined;
+        const finalBox: { value?: BenchmarkRubricAgentResponse } = {};
+        const updateTrace = (text: string) => {
+          setCopilotTurns((prev) => upsertAgentTraceTurn(prev, {
+            kind: "agent_trace",
+            text,
+            trace: latestTrace,
+            summary: latestSummary,
+            warnings: latestWarnings,
+          }));
+        };
+
+        await readBenchmarkAgentStream(response.body, (event) => {
+          if (event.type === "phase") {
+            updateTrace(event.message);
+            return;
+          }
+          if (event.type === "plan") {
+            updateTrace(event.message);
+            return;
+          }
+          if (event.type === "tool_start") {
+            latestTrace = upsertToolTrace(latestTrace, {
+              name: event.name,
+              label: event.label,
+              status: "running",
+              summary: `正在执行第 ${event.index}/${event.total} 步。`,
+              durationMs: 0,
+            });
+            updateTrace(`正在执行工具：${event.label}`);
+            return;
+          }
+          if (event.type === "tool_result") {
+            latestTrace = upsertToolTrace(latestTrace, event.trace);
+            updateTrace(`已完成 ${event.index}/${event.total} 个工具步骤。`);
+            return;
+          }
+          if (event.type === "error") {
+            latestWarnings = [...latestWarnings, event.message];
+            updateTrace("运行遇到错误。");
+            return;
+          }
+          if (event.type === "final") {
+            finalBox.value = event.result;
+            latestTrace = event.result.toolTrace ?? latestTrace;
+            latestSummary = event.result.runSummary;
+            latestWarnings = event.result.warnings ?? latestWarnings;
+            updateTrace(buildAgentTraceText(event.result));
+          }
+        });
+
+        const finalData = finalBox.value;
+        if (finalData?.error) {
+          setCopilotTurns((prev) => [...prev, { kind: "error", text: finalData.error ?? "助手调用失败" }]);
+        } else if (finalData) {
+          if (typeof finalData.requirementText === "string") setRequirement(finalData.requirementText);
+          if (finalData.rubric !== undefined) {
+            setRubric((prevRubric) =>
+              mergeCopilotRubricUpdateForGraph(prevRubric, finalData.rubric, finalData),
+            );
+          }
+          setViewMode("rubric");
+          setCopilotTurns((prev) => [...prev, { kind: "ai", text: finalData.reply ?? "已处理。" }]);
+        }
       }
-    } catch {
-      setCopilotTurns((prev) => [...prev, { kind: "error", text: "请求失败" }]);
+    } catch (error) {
+      setCopilotTurns((prev) => [
+        ...prev,
+        isAbortLikeError(error)
+          ? { kind: "ai", text: "已停止本次助手运行。" }
+          : { kind: "error", text: "请求失败" },
+      ]);
     } finally {
+      if (copilotAbortRef.current === controller) {
+        copilotAbortRef.current = null;
+      }
       setCopilotRunning(false);
+      setCopilotRunStartedAt(null);
     }
-  }, [copilotInput, copilotRunning, copilotTurns, requirement, rubric]);
+  }
+
+  const stopCopilot = useCallback(() => {
+    copilotAbortRef.current?.abort();
+  }, []);
+
+  const stopAutoFind = useCallback(() => {
+    autofindAbortRef.current?.abort();
+  }, []);
 
   // ── Format bytes ─
   function formatBytes(bytes: number): string {
@@ -1605,6 +1972,7 @@ export function NotebookLayout() {
           <span className={styles.headerSubtitle}>{description}</span>
         </div>
         <div className={styles.headerRight}>
+          <ModelSettingsButton />
           <ProjectMenu />
           <button
             className={`${styles.headerToggle} ${rightOpen ? styles.headerToggleActive : ""}`}
@@ -1855,27 +2223,29 @@ export function NotebookLayout() {
                   </div>
                 ) : null}
                 {copilotTurns.map((turn, i) => (
-                  <div
-                    key={`rubric-${i}`}
-                    className={`${styles.chatBubble} ${
-                      turn.kind === "user"
-                        ? styles.chatBubbleUser
-                        : turn.kind === "error"
-                          ? styles.chatBubbleError
-                          : styles.chatBubbleAi
-                    }`}
-                  >
-                    {turn.kind === "user" ? turn.text : <MarkdownMessage text={turn.text} />}
-                  </div>
+                  turn.kind === "agent_trace" ? (
+                    <AgentTraceTurnView key={`rubric-${i}`} turn={turn} />
+                  ) : (
+                    <div
+                      key={`rubric-${i}`}
+                      className={`${styles.chatBubble} ${
+                        turn.kind === "user"
+                          ? styles.chatBubbleUser
+                          : turn.kind === "error"
+                            ? styles.chatBubbleError
+                            : styles.chatBubbleAi
+                      }`}
+                    >
+                      {turn.kind === "user" ? turn.text : <MarkdownMessage text={turn.text} />}
+                    </div>
+                  )
                 ))}
                 {copilotRunning && (
-                  <div className={styles.chatBubbleAi}>
-                    <div className={styles.typingIndicator}>
-                      <span />
-                      <span />
-                      <span />
-                    </div>
-                  </div>
+                  <WorkbenchAgentStatusSnapshot
+                    mode="rubric"
+                    startedAt={copilotRunStartedAt}
+                    lastMessage={copilotTurns.at(-1)?.text}
+                  />
                 )}
               </>
             ) : (
@@ -1899,13 +2269,11 @@ export function NotebookLayout() {
                   </div>
                 ))}
                 {autofindRunning && (
-                  <div className={styles.chatBubbleAi}>
-                    <div className={styles.typingIndicator}>
-                      <span />
-                      <span />
-                      <span />
-                    </div>
-                  </div>
+                  <WorkbenchAgentStatusSnapshot
+                    mode="autofind"
+                    startedAt={autofindRunStartedAt}
+                    phase={autofindState?.phase}
+                  />
                 )}
               </>
             )}
@@ -1920,8 +2288,15 @@ export function NotebookLayout() {
                       key={action}
                       type="button"
                       className={styles.autofindQuickAction}
-                      disabled={autofindRunning}
-                      onClick={() => void sendAutoFind(action)}
+                      disabled={action !== "应用" && autofindRunning}
+                      title={action === "应用" && !autofindState?.csvText ? "需要先完成数据检索并生成 CSV" : undefined}
+                      onClick={() => {
+                        if (action === "应用") {
+                          void applyCurrentAutoFindDataset();
+                          return;
+                        }
+                        void sendAutoFind(action);
+                      }}
                     >
                       {action}
                     </button>
@@ -1940,13 +2315,25 @@ export function NotebookLayout() {
                   rows={1}
                   placeholder="输入指令或补充检索条件…"
                 />
-                <button
-                  onClick={() => void sendAutoFind()}
-                  disabled={!autofindInput.trim() || autofindRunning}
-                  className={styles.chatSendButton}
-                >
-                  ➤
-                </button>
+                {autofindRunning ? (
+                  <button
+                    onClick={stopAutoFind}
+                    className={`${styles.chatSendButton} ${styles.chatStopButton}`}
+                    type="button"
+                    title="停止 AutoFind"
+                  >
+                    ■
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => void sendAutoFind()}
+                    disabled={!autofindInput.trim()}
+                    className={styles.chatSendButton}
+                    type="button"
+                  >
+                    ➤
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -1962,13 +2349,25 @@ export function NotebookLayout() {
                   }}
                   rows={1}
                 />
-                <button
-                  onClick={sendCopilot}
-                  disabled={!copilotInput.trim() || copilotRunning}
-                  className={styles.chatSendButton}
-                >
-                  ➤
-                </button>
+                {copilotRunning ? (
+                  <button
+                    onClick={stopCopilot}
+                    className={`${styles.chatSendButton} ${styles.chatStopButton}`}
+                    type="button"
+                    title="停止助手"
+                  >
+                    ■
+                  </button>
+                ) : (
+                  <button
+                    onClick={sendCopilot}
+                    disabled={!copilotInput.trim()}
+                    className={styles.chatSendButton}
+                    type="button"
+                  >
+                    ➤
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -2136,6 +2535,7 @@ function RubricWorkspace(props: {
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState("");
   const [highlightedMetricKey, setHighlightedMetricKey] = useState<string | null>(null);
+  const metricCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   async function draftRubric() {
     setDrafting(true);
@@ -2190,6 +2590,32 @@ function RubricWorkspace(props: {
   const referenceCount = countUniqueMetricReferences(metrics);
   const reviewedMetricKeys = new Set(approvedMetricKeys);
   const activeMetric = metrics.find((metric) => metric.metricKey === highlightedMetricKey) ?? metrics[0] ?? null;
+
+  /**
+   * Track metric card DOM nodes so selecting a graph node can keep the matching list item visible.
+   *
+   * @param metricKey Stable metric key from the active rubric.
+   * @param node Card element, or null when React unmounts it.
+   */
+  const registerMetricCard = useCallback((metricKey: string, node: HTMLDivElement | null) => {
+    if (node) {
+      metricCardRefs.current.set(metricKey, node);
+      return;
+    }
+    metricCardRefs.current.delete(metricKey);
+  }, []);
+
+  useEffect(() => {
+    const metricKey = activeMetric?.metricKey;
+    if (!metricKey) return;
+    const node = metricCardRefs.current.get(metricKey);
+    if (!node) return;
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({
+      block: "nearest",
+      behavior: prefersReducedMotion ? "auto" : "smooth",
+    });
+  }, [activeMetric?.metricKey]);
 
   function toggleMetric(metricKey: string) {
     if (!props.rubric) return;
@@ -2322,6 +2748,7 @@ function RubricWorkspace(props: {
                           metric={metric}
                           selected={activeMetric?.metricKey === metric.metricKey}
                           highlighted={highlightedMetricKey === metric.metricKey}
+                          onCardNodeChange={registerMetricCard}
                           onSelect={() => setHighlightedMetricKey(metric.metricKey)}
                           onToggle={() => toggleMetric(metric.metricKey)}
                           onWeightChange={(weight) => changeMetricWeight(metric.metricKey, weight)}
@@ -2493,27 +2920,35 @@ function MetricCard(props: {
   metric: BenchmarkRubricMetric;
   selected: boolean;
   highlighted: boolean;
+  onCardNodeChange: (metricKey: string, node: HTMLDivElement | null) => void;
   onSelect: () => void;
   onToggle: () => void;
   onWeightChange: (weight: number) => void;
 }) {
   const [editingWeight, setEditingWeight] = useState(false);
   const [weightDraft, setWeightDraft] = useState(String(props.metric.weight));
-  const { metric } = props;
+  const cardNodeRef = useRef<HTMLDivElement | null>(null);
+  const { highlighted, metric, onCardNodeChange, onSelect, onToggle, onWeightChange, selected } = props;
   const approved = metric.approvalStatus === "approved";
   const references = metricReferences(metric);
 
+  useEffect(() => {
+    onCardNodeChange(metric.metricKey, cardNodeRef.current);
+    return () => onCardNodeChange(metric.metricKey, null);
+  }, [metric.metricKey, onCardNodeChange]);
+
   function commitWeight() {
     const next = clampMetricWeight(Number(weightDraft));
-    props.onWeightChange(next);
+    onWeightChange(next);
     setWeightDraft(String(next));
     setEditingWeight(false);
   }
 
   return (
     <div
-      className={`${styles.metricCard} ${approved ? styles.metricApproved : ""} ${props.selected ? styles.metricSelected : ""} ${props.highlighted ? styles.metricHighlighted : ""}`}
-      onClick={props.onSelect}
+      ref={cardNodeRef}
+      className={`${styles.metricCard} ${approved ? styles.metricApproved : ""} ${selected ? styles.metricSelected : ""} ${highlighted ? styles.metricHighlighted : ""}`}
+      onClick={onSelect}
     >
       <div className={styles.metricCardContent}>
         <div className={styles.metricCardHeader}>
@@ -2567,7 +3002,7 @@ function MetricCard(props: {
         <button
           className={approved ? styles.metricConfirmSecondary : styles.metricConfirmButton}
           type="button"
-          onClick={props.onToggle}
+          onClick={onToggle}
         >
           {approved ? "取消确认" : "确认指标"}
         </button>
@@ -3041,16 +3476,59 @@ function ProgressWorkspace(props: {
             </div>
           ))}
 
-          <div className={styles.progressSectionTitle}>最近案例</div>
+          {props.progress.judgeProgress && (
+            <>
+              <div className={styles.progressSectionTitle}>
+                {props.progress.judgeProgress.mode === "panel" ? "Judge Panel" : "Judge"}
+              </div>
+              <div className={styles.progressJudgePanel}>
+                <div className={styles.progressJudgeHeader}>
+                  <div>
+                    <strong>{metricDisplayNameFromEvent(props.progress.judgeProgress.metricName)}</strong>
+                    <span>{props.progress.judgeProgress.caseId}</span>
+                  </div>
+                  <b>
+                    {props.progress.judgeProgress.completedMembers}/{props.progress.judgeProgress.totalMembers}
+                  </b>
+                </div>
+                <div className={styles.progressJudgeBar}>
+                  <div
+                    className={styles.progressJudgeFill}
+                    style={{
+                      width: `${Math.round((props.progress.judgeProgress.completedMembers / Math.max(1, props.progress.judgeProgress.totalMembers)) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <div className={styles.progressJudgeMembers}>
+                  {props.progress.judgeProgress.members.map((member) => (
+                    <div
+                      key={`${props.progress?.runId}-${props.progress?.judgeProgress?.submissionId}-${member.judgeId}`}
+                      className={`${styles.progressJudgeMember} ${styles[`progressJudgeMember_${member.status}`]}`}
+                    >
+                      <span>{member.judgeId}</span>
+                      <strong>{formatJudgeProgressStatus(member.status, member.score)}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className={styles.progressSectionTitle}>
+            <span>案例历史</span>
+            <b>{props.progress.recentItems.length}/{props.progress.totalSubmissions}</b>
+          </div>
           {props.progress.recentItems.length === 0 ? (
             <div className={styles.progressEmptyLine}>暂无案例状态。</div>
           ) : (
-            props.progress.recentItems.slice(0, 6).map((item, index) => (
-              <div key={`${item.caseId}-${item.status}-${index}`} className={styles.progressRecentItem}>
-                <span>{item.caseId}</span>
-                <strong>{item.status === "completed" ? "完成" : item.status === "failed" ? "失败" : item.status === "running" ? "运行中" : "等待"}</strong>
-              </div>
-            ))
+            <div className={styles.progressRecentList}>
+              {props.progress.recentItems.map((item, index) => (
+                <div key={`${item.caseId}-${item.status}-${index}`} className={styles.progressRecentItem}>
+                  <span title={item.caseId}>{item.caseId}</span>
+                  <strong>{item.status === "completed" ? "完成" : item.status === "failed" ? "失败" : item.status === "running" ? "运行中" : "等待"}</strong>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -3058,11 +3536,228 @@ function ProgressWorkspace(props: {
   );
 }
 
+/**
+ * Build a UI-only chat turn that exposes Rubric Agent tool execution results.
+ * @param data Rubric Agent response.
+ * @returns Agent trace chat turn, or null when no trace is available.
+ */
+function buildAgentTraceTurn(data: BenchmarkRubricAgentResponse): ChatTurn | null {
+  const trace = Array.isArray(data.toolTrace) ? data.toolTrace : [];
+  if (trace.length === 0 && !data.runSummary && !data.warnings?.length) return null;
+  return {
+    kind: "agent_trace",
+    text: buildAgentTraceText(data),
+    trace,
+    summary: data.runSummary,
+    warnings: data.warnings ?? [],
+  };
+}
+
+/**
+ * Convert a UI chat turn into compact model context for multi-turn Rubric Agent conversations.
+ * @param turn UI chat turn.
+ * @returns Model message, or null for turns that should not affect model context.
+ */
+function formatCopilotTurnForModel(turn: ChatTurn): { role: "user" | "assistant"; content: string } | null {
+  if (turn.kind === "user") return { role: "user", content: turn.text };
+  if (turn.kind === "ai") return { role: "assistant", content: turn.text };
+  if (turn.kind === "error") return { role: "assistant", content: `上一轮助手错误：${turn.text}` };
+  if (turn.kind === "agent_trace") {
+    return {
+      role: "assistant",
+      content: buildAgentTraceMemory(turn),
+    };
+  }
+  return null;
+}
+
+/**
+ * Build a compact, model-readable memory line from a UI tool trace.
+ * @param turn Agent trace turn.
+ * @returns Concise assistant memory.
+ */
+function buildAgentTraceMemory(turn: Extract<ChatTurn, { kind: "agent_trace" }>): string {
+  const toolLines = turn.trace
+    .filter((trace) => trace.status !== "running")
+    .map((trace) => {
+      const detail = trace.detail && trace.detail !== trace.summary ? `；结果：${trace.detail}` : "";
+      return `${trace.label}(${trace.status})：${trace.summary}${detail}`;
+    })
+    .slice(-6);
+  const summary = turn.summary
+    ? `当前评分标准：${turn.summary.modules} 个能力维度 / ${turn.summary.metrics} 个二级指标 / ${turn.summary.references} 个参考来源。`
+    : turn.text;
+  const changedMetrics = turn.summary?.changedMetrics?.length
+    ? `涉及指标：${turn.summary.changedMetrics.slice(0, 8).join("、")}。`
+    : "";
+  return [
+    "[上一轮 Rubric Agent 工具结果摘要]",
+    summary,
+    changedMetrics,
+    toolLines.length ? `工具结果：${toolLines.join(" | ")}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+/**
+ * Build compact text for the Agent trace panel header.
+ * @param data Rubric Agent response-like payload.
+ * @returns Header text.
+ */
+function buildAgentTraceText(data: Pick<BenchmarkRubricAgentResponse, "toolTrace" | "runSummary">): string {
+  const trace = Array.isArray(data.toolTrace) ? data.toolTrace : [];
+  const summary = data.runSummary;
+  return summary
+    ? `工具步骤 ${trace.length} 个；指标体系 ${summary.modules} 个能力维度 / ${summary.metrics} 个二级指标 / ${summary.references} 个参考来源。`
+    : `工具步骤 ${trace.length} 个。`;
+}
+
+/**
+ * Insert or replace the latest Agent trace turn while a stream is running.
+ * @param turns Existing chat turns.
+ * @param traceTurn Next trace turn.
+ * @returns Updated chat turns.
+ */
+function upsertAgentTraceTurn(turns: ChatTurn[], traceTurn: Extract<ChatTurn, { kind: "agent_trace" }>): ChatTurn[] {
+  const last = turns.at(-1);
+  if (last?.kind === "agent_trace") {
+    return [...turns.slice(0, -1), traceTurn];
+  }
+  return [...turns, traceTurn];
+}
+
+/**
+ * Insert or replace one tool trace by tool name.
+ * @param traces Existing tool traces.
+ * @param next Next tool trace.
+ * @returns Updated traces.
+ */
+function upsertToolTrace(
+  traces: BenchmarkAgentToolTrace[],
+  next: BenchmarkAgentToolTrace,
+): BenchmarkAgentToolTrace[] {
+  const index = traces.findIndex((trace) => trace.name === next.name);
+  if (index === -1) return [...traces, next];
+  return traces.map((trace, traceIndex) => traceIndex === index ? next : trace);
+}
+
+/**
+ * Read Rubric Agent SSE events from a response body.
+ * @param body Fetch response body.
+ * @param onEvent Event handler.
+ */
+async function readBenchmarkAgentStream(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (event: BenchmarkRubricAgentStreamEvent) => void,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const payload = line.slice(6);
+      if (payload === "[DONE]") return;
+      try {
+        onEvent(JSON.parse(payload) as BenchmarkRubricAgentStreamEvent);
+      } catch {
+        // Ignore malformed SSE lines so one bad frame does not kill the run.
+      }
+    }
+  }
+}
+
+/**
+ * Render one Rubric Agent tool trace turn in the side chat.
+ * @param props Agent trace turn.
+ * @returns Trace result panel.
+ */
+function AgentTraceTurnView(props: { turn: Extract<ChatTurn, { kind: "agent_trace" }> }) {
+  return (
+    <div className={styles.agentTracePanel}>
+      <div className={styles.agentTraceHeader}>
+        <span className={styles.agentTraceIcon} />
+        <div>
+          <strong>Agent 运行轨迹</strong>
+          <p>{props.turn.text}</p>
+        </div>
+      </div>
+      {props.turn.trace.length > 0 ? (
+        <div className={styles.agentTraceList}>
+          {props.turn.trace.map((trace, index) => (
+            <div
+              key={`${trace.name}-${index}`}
+              className={`${styles.agentTraceItem} ${styles[`agentTraceItem_${trace.status}`]}`}
+            >
+              <div className={styles.agentTraceItemHeader}>
+                <span>{trace.label}</span>
+                <em>{formatTraceDuration(trace.durationMs)}</em>
+              </div>
+              <p>{trace.summary}</p>
+              {trace.detail && trace.detail !== trace.summary ? <small>{trace.detail}</small> : null}
+              {trace.stats ? (
+                <div className={styles.agentTraceStats}>
+                  {typeof trace.stats.modules === "number" ? <b>{trace.stats.modules} 维度</b> : null}
+                  {typeof trace.stats.metrics === "number" ? <b>{trace.stats.metrics} 指标</b> : null}
+                  {typeof trace.stats.references === "number" ? <b>{trace.stats.references} 来源</b> : null}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {props.turn.summary ? (
+        <div className={styles.agentTraceSummary}>
+          <b>{props.turn.summary.usedFallback ? "含兜底" : "已完成"}</b>
+          <span>
+            {props.turn.summary.modules} 个能力维度，{props.turn.summary.metrics} 个二级指标，{props.turn.summary.references} 个参考来源
+          </span>
+        </div>
+      ) : null}
+      {props.turn.warnings?.length ? (
+        <div className={styles.agentTraceWarnings}>
+          {props.turn.warnings.slice(0, 3).map((warning, index) => (
+            <span key={`${warning}-${index}`}>{warning}</span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Format trace duration for compact UI display.
+ * @param durationMs Duration in milliseconds.
+ * @returns Compact duration label.
+ */
+function formatTraceDuration(durationMs: number): string {
+  if (!Number.isFinite(durationMs) || durationMs < 1000) return `${Math.max(0, Math.round(durationMs))}ms`;
+  return `${(durationMs / 1000).toFixed(1)}s`;
+}
+
 function metricDisplayNameFromEvent(metricName: string, metricNameMap?: Map<string, string>): string {
   const mappedName = metricNameMap?.get(metricName);
   if (mappedName) return mappedName;
   if (hasChineseText(metricName)) return metricName;
   return METRIC_NAME_ZH[metricName] ?? humanizeMetricKey(metricName);
+}
+
+/**
+ * Format one judge member's in-flight progress state for the progress panel.
+ *
+ * @param status Judge member status from the streaming progress snapshot.
+ * @param score Optional completed score.
+ * @returns Short Chinese status label.
+ */
+function formatJudgeProgressStatus(status: string, score?: number): string {
+  if (status === "completed") return typeof score === "number" ? `${score.toFixed(1)} 分` : "完成";
+  if (status === "running") return "评审中";
+  if (status === "failed") return "失败";
+  return "等待";
 }
 
 function agentFrameworkDisplayName(value: string): string {
@@ -3298,6 +3993,10 @@ function ResultWorkspace(props: {
       note?: string;
       reviewedAt?: string;
       confirmedScore?: number;
+      reviewerRationale?: string;
+      evidenceUsed?: string[];
+      boundaryType?: "clear_accept" | "clear_reject" | "uncertain" | "human_override";
+      correctionType?: "agree_accept" | "agree_reject" | "false_positive" | "false_negative" | "needs_more_evidence";
     }>,
     emptyMessage: string,
   ) {
@@ -3332,6 +4031,10 @@ function ResultWorkspace(props: {
             confirmedScore: record.confirmedScore,
             reviewer: record.reviewer?.trim() || "benchmark-reviewer",
             note: record.note?.trim(),
+            reviewerRationale: record.reviewerRationale?.trim() || record.note?.trim(),
+            evidenceUsed: record.evidenceUsed,
+            boundaryType: record.boundaryType,
+            correctionType: record.correctionType,
             reviewedAt: record.reviewedAt ?? new Date().toISOString(),
           })),
         }),
@@ -3407,14 +4110,20 @@ function ResultWorkspace(props: {
       });
       const payload = (await response.json()) as {
         error?: string;
-        policy?: { policyId: string; labelCount: number; channels: Record<string, unknown> };
+        policy?: {
+          policyId: string;
+          labelCount: number;
+          channels: Record<string, unknown>;
+          humanSkill?: { channelGuides?: Record<string, unknown> };
+        };
       };
       if (!response.ok || !payload.policy) {
         throw new Error(payload.error ?? "生成入池策略失败。");
       }
       const channelCount = Object.keys(payload.policy.channels ?? {}).length;
+      const skillChannelCount = Object.keys(payload.policy.humanSkill?.channelGuides ?? {}).length;
       setPolicyMessage(
-        `已生成 ${payload.policy.policyId}：基于 ${payload.policy.labelCount} 条标定、${channelCount} 个 channel 的二级指标特征。`,
+        `已生成 ${payload.policy.policyId}：基于 ${payload.policy.labelCount} 条标定、${channelCount} 个 channel 的二级指标特征，并沉淀 ${skillChannelCount} 个 human judgment skill。`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -3470,6 +4179,15 @@ function ResultWorkspace(props: {
         <div>问题案例: {props.result.summary.badcaseCandidateCount}</div>
         <div>需人工复核: {props.result.summary.needsHumanReviewCount}</div>
       </div>
+
+      <BenchmarkHtmlReportPanel
+        result={props.result}
+        rubric={props.rubric}
+        metricNameMap={metricNameMap}
+        capabilityGaps={capabilityGaps}
+        weakestMetrics={weakestMetrics}
+        reviewQueue={reviewQueue}
+      />
 
       <section className={styles.resultSection}>
         <div className={styles.resultSectionHeader}>
@@ -3781,6 +4499,273 @@ function ResultWorkspace(props: {
   );
 }
 
+/**
+ * Render the HTML report preview and browser-side download action.
+ *
+ * @param props Current benchmark run plus diagnostics to include in the report.
+ * @returns A preview panel; when report data is sparse it still renders downloadable empty states.
+ */
+function BenchmarkHtmlReportPanel(props: {
+  result: BenchmarkRunResult;
+  rubric: BenchmarkRubricSet | null;
+  metricNameMap: Map<string, string>;
+  capabilityGaps: Array<{ capability: string; score: number }>;
+  weakestMetrics: BenchmarkMetricEvaluationResult[];
+  reviewQueue: BenchmarkMetricEvaluationResult[];
+}) {
+  const [previewOpen, setPreviewOpen] = useState(true);
+  const reportHtml = useMemo(
+    () => buildBenchmarkReportHtml({
+      result: props.result,
+      rubric: props.rubric,
+      metricNameMap: props.metricNameMap,
+      capabilityGaps: props.capabilityGaps,
+      weakestMetrics: props.weakestMetrics,
+      reviewQueue: props.reviewQueue,
+    }),
+    [
+      props.capabilityGaps,
+      props.metricNameMap,
+      props.result,
+      props.reviewQueue,
+      props.rubric,
+      props.weakestMetrics,
+    ],
+  );
+
+  /**
+   * Download the currently previewed report as a standalone HTML file.
+   *
+   * @returns Nothing; when Blob creation fails the browser surfaces the error.
+   */
+  function downloadReport() {
+    const blob = new Blob([reportHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `zeval-benchmark-report-${safeFileSegment(props.result.runId)}.html`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <section className={styles.reportPanel}>
+      <div className={styles.reportHeader}>
+        <div>
+          <h3>评测报告 HTML</h3>
+          <p>把当前评测结果整理成一份可直接发给团队预览的静态报告。</p>
+        </div>
+        <div className={styles.reportActions}>
+          <button type="button" onClick={() => setPreviewOpen((open) => !open)}>
+            {previewOpen ? "收起预览" : "展开预览"}
+          </button>
+          <button type="button" className={styles.reportDownloadButton} onClick={downloadReport}>
+            下载 HTML
+          </button>
+        </div>
+      </div>
+      {previewOpen ? (
+        <iframe
+          className={styles.reportPreview}
+          srcDoc={reportHtml}
+          title={`Zeval report ${props.result.runId}`}
+          sandbox=""
+        />
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * Build a standalone HTML report from one benchmark run.
+ *
+ * @param input Benchmark result and precomputed diagnostic rows.
+ * @returns Escaped, self-contained HTML. If optional rows are empty, the report renders explicit empty states.
+ */
+function buildBenchmarkReportHtml(input: {
+  result: BenchmarkRunResult;
+  rubric: BenchmarkRubricSet | null;
+  metricNameMap: Map<string, string>;
+  capabilityGaps: Array<{ capability: string; score: number }>;
+  weakestMetrics: BenchmarkMetricEvaluationResult[];
+  reviewQueue: BenchmarkMetricEvaluationResult[];
+}): string {
+  const { result, rubric, metricNameMap, capabilityGaps, weakestMetrics, reviewQueue } = input;
+  const title = rubric?.title ?? "Zeval 评测报告";
+  const topLeaderboard = result.leaderboard.slice(0, 6);
+  const topReviewRows = reviewQueue.slice(0, 8);
+  const riskLevel = result.summary.needsHumanReviewCount > 0 || result.summary.badcaseCandidateCount > 0
+    ? "需要复核"
+    : "整体稳定";
+  const leaderboardRows = topLeaderboard.map((row, index) => `
+    <tr>
+      <td>#${index + 1}</td>
+      <td>${escapeHtml(row.agentFramework)}</td>
+      <td>${escapeHtml(row.model)}</td>
+      <td>${formatReportPercent(row.averageScore)}</td>
+      <td>${formatReportPercent(row.passRate * 100)}</td>
+    </tr>
+  `).join("");
+  const capabilityRows = capabilityGaps.length
+    ? capabilityGaps.map((gap) => `
+      <li>
+        <span>${escapeHtml(capabilityDisplayName(gap.capability, gap.capability))}</span>
+        <strong>${formatReportPercent(gap.score)}</strong>
+      </li>
+    `).join("")
+    : `<li><span>暂无明显能力短板</span><strong>OK</strong></li>`;
+  const weakestRows = weakestMetrics.length
+    ? weakestMetrics.map((metric) => `
+      <article>
+        <div>
+          <b>${escapeHtml(metricDisplayNameFromEvent(metric.metricKey, metricNameMap))}</b>
+          <span>${escapeHtml(metric.caseId)} · ${escapeHtml(metric.agentFramework)} / ${escapeHtml(metric.model)}</span>
+        </div>
+        <strong>${formatReportPercent(metric.normalizedScore)}</strong>
+        <p>${escapeHtml(metric.reason || "暂无原因说明。")}</p>
+      </article>
+    `).join("")
+    : `<p class="empty">所有指标均已通过当前阈值。</p>`;
+  const reviewRows = topReviewRows.length
+    ? topReviewRows.map((metric) => `
+      <tr>
+        <td>${escapeHtml(metric.caseId)}</td>
+        <td>${escapeHtml(metricDisplayNameFromEvent(metric.metricKey, metricNameMap))}</td>
+        <td>${formatReportPercent(metric.normalizedScore)}</td>
+        <td>${escapeHtml(metric.status)}</td>
+        <td>${escapeHtml(metric.failureTags.join(", ") || "无")}</td>
+      </tr>
+    `).join("")
+    : `<tr><td colspan="5">暂无人工复核队列。</td></tr>`;
+
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)} · ${escapeHtml(result.runId)}</title>
+  <style>
+    :root { color-scheme: light; --ink: #111827; --muted: #64748b; --line: #d9e2ec; --soft: #f7fafc; --accent: #0e7490; --bad: #dc2626; --good: #0f9f6e; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eef3f8; color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif; line-height: 1.55; }
+    main { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 40px; }
+    header { display: grid; gap: 14px; padding: 26px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 28px; line-height: 1.2; }
+    h2 { font-size: 18px; }
+    section { margin-top: 14px; padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: 12px; }
+    .pill { width: fit-content; padding: 5px 10px; border-radius: 999px; background: rgb(14 116 144 / 0.1); color: var(--accent); font-weight: 700; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+    .stat { padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+    .stat span { display: block; color: var(--muted); font-size: 12px; }
+    .stat strong { display: block; margin-top: 8px; font-size: 24px; line-height: 1; }
+    table { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+    ul { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+    li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+    article { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+    article span { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+    article p { grid-column: 1 / -1; color: #334155; font-size: 13px; }
+    .empty { margin-top: 12px; color: var(--muted); font-size: 13px; }
+    footer { margin-top: 18px; color: var(--muted); font-size: 12px; text-align: center; }
+    @media (max-width: 760px) { main { width: min(100% - 20px, 1120px); padding-top: 16px; } .grid { grid-template-columns: 1fr 1fr; } article { grid-template-columns: 1fr; } table { display: block; overflow-x: auto; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <span class="pill">${escapeHtml(riskLevel)}</span>
+      <div>
+        <h1>${escapeHtml(title)}</h1>
+        <p class="meta">Run ID: ${escapeHtml(result.runId)} · 生成时间: ${escapeHtml(formatReportDate(result.generatedAt))} · Rubric: ${escapeHtml(result.rubricId)}</p>
+      </div>
+      <div class="grid">
+        <div class="stat"><span>平均分</span><strong>${formatReportPercent(result.summary.averageScore)}</strong></div>
+        <div class="stat"><span>案例数</span><strong>${result.summary.caseCount}</strong></div>
+        <div class="stat"><span>问题案例</span><strong>${result.summary.badcaseCandidateCount}</strong></div>
+        <div class="stat"><span>需人工复核</span><strong>${result.summary.needsHumanReviewCount}</strong></div>
+      </div>
+    </header>
+    <section>
+      <h2>排行榜</h2>
+      <table>
+        <thead><tr><th>Rank</th><th>Agent</th><th>Model</th><th>均分</th><th>通过率</th></tr></thead>
+        <tbody>${leaderboardRows || `<tr><td colspan="5">暂无排行榜数据。</td></tr>`}</tbody>
+      </table>
+    </section>
+    <section>
+      <h2>主要能力短板</h2>
+      <ul>${capabilityRows}</ul>
+    </section>
+    <section>
+      <h2>最需关注指标</h2>
+      ${weakestRows}
+    </section>
+    <section>
+      <h2>人工复核队列预览</h2>
+      <table>
+        <thead><tr><th>Case</th><th>指标</th><th>分数</th><th>状态</th><th>标签</th></tr></thead>
+        <tbody>${reviewRows}</tbody>
+      </table>
+    </section>
+    <footer>Zeval static report · 可离线打开与归档</footer>
+  </main>
+</body>
+</html>`;
+}
+
+/**
+ * Escape text before embedding it into the downloadable report HTML.
+ *
+ * @param value Any primitive-ish display value.
+ * @returns HTML-safe string. Nullish values degrade to an empty string.
+ */
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+/**
+ * Format report percentage values without changing the source score scale.
+ *
+ * @param value Percent value on a 0-100 scale.
+ * @returns Human-readable percent label.
+ */
+function formatReportPercent(value: number): string {
+  if (!Number.isFinite(value)) return "0.0%";
+  return `${value.toFixed(1)}%`;
+}
+
+/**
+ * Format a timestamp for report display.
+ *
+ * @param value ISO-ish timestamp from the run result.
+ * @returns Compact local display string, falling back to the original value.
+ */
+function formatReportDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("zh-CN", { hour12: false });
+}
+
+/**
+ * Convert a run id into a conservative file-name segment.
+ *
+ * @param value Run id or user-provided identifier.
+ * @returns ASCII-ish segment safe for browser downloads.
+ */
+function safeFileSegment(value: string): string {
+  return value.trim().replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "report";
+}
+
 type HumanReviewDecision = "accepted" | "rejected" | "needs_evidence";
 type CasePickerFilter = "all" | "pending" | "attention" | "saved";
 type CasePickerSort = "risk" | "pending" | "score_asc" | "original";
@@ -4005,6 +4990,10 @@ type AdmissionLabelRow = {
   qualityTier?: string;
   autoPassed: boolean;
   judgeVariance?: number;
+  reviewerRationale?: string;
+  evidenceUsed?: string[];
+  boundaryType?: "clear_accept" | "clear_reject" | "uncertain" | "human_override";
+  correctionType?: "agree_accept" | "agree_reject" | "false_positive" | "false_negative" | "needs_more_evidence";
 };
 
 /**
@@ -4068,9 +5057,49 @@ function buildAdmissionLabelRows(
       qualityTier: rerank?.qualityTier,
       autoPassed: metricResult.passed,
       judgeVariance: metricResult.judgeVariance,
+      reviewerRationale: record.reviewerRationale ?? record.note,
+      evidenceUsed: record.evidenceUsed ?? metricResult.evidence.slice(0, 4),
+      boundaryType: record.boundaryType ?? inferHumanJudgmentBoundary(decision, metricResult, confirmedScore),
+      correctionType: record.correctionType ?? inferHumanCorrectionType(decision, metricResult.passed),
     });
   }
   return rows;
+}
+
+/**
+ * Infer a human judgment boundary bucket for policy skill learning.
+ *
+ * @param decision Human decision derived from confirmed score.
+ * @param result Automatic metric result.
+ * @param confirmedScore Human-confirmed rubric score.
+ * @returns Boundary bucket describing how hard the review decision was.
+ */
+function inferHumanJudgmentBoundary(
+  decision: HumanReviewDecision,
+  result: BenchmarkMetricEvaluationResult,
+  confirmedScore: number,
+): "clear_accept" | "clear_reject" | "uncertain" | "human_override" {
+  if (decision === "needs_evidence" || result.confidence < 0.65 || result.needsHumanReview) return "uncertain";
+  if (decision === "accepted" && result.passed) return "clear_accept";
+  if (decision === "rejected" && !result.passed) return "clear_reject";
+  if (Math.abs(confirmedScore - result.score) >= 1) return "human_override";
+  return "human_override";
+}
+
+/**
+ * Infer how a human review corrects or agrees with the automatic verdict.
+ *
+ * @param decision Human review decision.
+ * @param autoPassed Automatic pass/fail result.
+ * @returns Correction type used by the learned human judgment skill.
+ */
+function inferHumanCorrectionType(
+  decision: HumanReviewDecision,
+  autoPassed: boolean,
+): "agree_accept" | "agree_reject" | "false_positive" | "false_negative" | "needs_more_evidence" {
+  if (decision === "needs_evidence") return "needs_more_evidence";
+  if (decision === "accepted") return autoPassed ? "agree_accept" : "false_positive";
+  return autoPassed ? "false_negative" : "agree_reject";
 }
 
 function reviewDecisionChannel(
@@ -4490,6 +5519,192 @@ function formatJsonForDisplay(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+/**
+ * Render a compact live status snapshot for the workbench side agents.
+ * @param props Snapshot props.
+ * @returns Running status card.
+ */
+function WorkbenchAgentStatusSnapshot(props: {
+  mode: "rubric" | "autofind";
+  startedAt: number | null;
+  phase?: AutoFindWorkflowState["phase"];
+  lastMessage?: string;
+}) {
+  const elapsedMs = useWorkbenchElapsedMs(props.startedAt);
+  const snapshot = buildWorkbenchAgentSnapshot({ ...props, elapsedMs });
+  return (
+    <div className={styles.agentStatusSnapshot} aria-live="polite">
+      <WorkbenchCodexLoopTrace snapshot={snapshot} elapsedMs={elapsedMs} />
+      <div className={styles.agentStatusThinking}>正在思考</div>
+    </div>
+  );
+}
+
+/**
+ * Build display copy for a workbench agent status snapshot.
+ * @param input Current workbench agent state.
+ * @returns Snapshot title, detail and active step.
+ */
+function buildWorkbenchAgentSnapshot(input: {
+  mode: "rubric" | "autofind";
+  phase?: AutoFindWorkflowState["phase"];
+  lastMessage?: string;
+  elapsedMs?: number;
+}): { title: string; detail: string; activeStep: "plan" | "search" | "observe" | "reply" } {
+  if (input.mode === "autofind") {
+    const phaseLabel: Record<AutoFindWorkflowState["phase"], string> = {
+      intro: "准备",
+      planned: "规划",
+      searched: "整理",
+      saved: "保存",
+    };
+    const activeStep: Record<AutoFindWorkflowState["phase"], "plan" | "search" | "observe" | "reply"> = {
+      intro: "plan",
+      planned: "search",
+      searched: "observe",
+      saved: "reply",
+    };
+    return {
+      title: `Loop · ${phaseLabel[input.phase ?? "intro"]}`,
+      detail: "检索数据集，整理正负样本。",
+      activeStep: activeStep[input.phase ?? "intro"] ?? "search",
+    };
+  }
+  const elapsedMs = input.elapsedMs ?? 0;
+  if (elapsedMs > 90000) {
+    return {
+      title: "Loop · Update",
+      detail: "正在应用评分标准更新，完成后展示工具结果。",
+      activeStep: "reply",
+    };
+  }
+  if (elapsedMs > 25000) {
+    return {
+      title: "Loop · Draft",
+      detail: "正在生成可复核的能力维度和二级指标。",
+      activeStep: "observe",
+    };
+  }
+  if (elapsedMs > 4000) {
+    return {
+      title: "Loop · Research",
+      detail: "正在检索 benchmark / 论文 / 标准依据。",
+      activeStep: "search",
+    };
+  }
+  return {
+    title: "Loop · Rubric",
+    detail: input.lastMessage?.trim() || "理解需求，更新评分标准。",
+    activeStep: "plan",
+  };
+}
+
+/**
+ * Render a Codex-like live activity trace for workbench side agents.
+ * @param props Current workbench snapshot and elapsed time.
+ * @returns Compact activity trace.
+ */
+function WorkbenchCodexLoopTrace(props: {
+  snapshot: { title: string; detail: string; activeStep: "plan" | "search" | "observe" | "reply" };
+  elapsedMs: number;
+}) {
+  const steps = buildWorkbenchCodexActivityRows(props.snapshot, props.elapsedMs);
+  return (
+    <div className={styles.agentStatusActivity} aria-label="Agent loop status">
+      {steps.map((step) => (
+        <div
+          key={step.key}
+          className={`${styles.agentStatusActivityItem} ${
+            step.state === "active" ? styles.agentStatusActivityItemActive : ""
+          }`}
+        >
+          <div className={styles.agentStatusActionHeader}>
+            <span className={styles.agentStatusActionIcon} />
+            <span>{step.label}</span>
+            {step.state === "active" ? <em>{formatWorkbenchElapsedMs(props.elapsedMs)}</em> : null}
+          </div>
+          <p>{step.detail}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Build Codex-style workbench activity rows with completed and active states.
+ * @param snapshot Current workbench snapshot.
+ * @param elapsedMs Current run elapsed milliseconds.
+ * @returns Ordered loop steps.
+ */
+function buildWorkbenchCodexActivityRows(
+  snapshot: {
+    activeStep: "plan" | "search" | "observe" | "reply";
+    detail: string;
+  },
+  elapsedMs: number,
+): Array<{
+  key: "plan" | "search" | "observe" | "reply";
+  label: string;
+  detail: string;
+  state: "done" | "active";
+}> {
+  const steps: Array<{ key: "plan" | "search" | "observe" | "reply"; label: string; detail: string }> = [
+    { key: "plan", label: "Start agent run", detail: "输入已就绪，开始触发运行。" },
+    { key: "search", label: "Run search", detail: "检索数据集，整理候选样本。" },
+    { key: "observe", label: "Inspect result", detail: "读取结果，提取正负样本证据。" },
+    { key: "reply", label: "Draft response", detail: "收束结论，准备生成回复。" },
+  ];
+  const activeIndex = Math.max(0, steps.findIndex((step) => step.key === snapshot.activeStep));
+  const visibleSteps = steps.slice(0, activeIndex + 1);
+  return visibleSteps.map((step, index) => {
+    const isActive = index === visibleSteps.length - 1;
+    return {
+      ...step,
+      detail: isActive ? snapshot.detail : step.detail,
+      state: isActive || elapsedMs < 1000 ? "active" : "done",
+    };
+  });
+}
+
+/**
+ * Track elapsed time for a workbench agent run.
+ * @param startedAt Epoch milliseconds when the run started.
+ * @returns Elapsed milliseconds.
+ */
+function useWorkbenchElapsedMs(startedAt: number | null): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!startedAt) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
+  return startedAt ? Math.max(0, now - startedAt) : 0;
+}
+
+/**
+ * Format elapsed milliseconds for compact workbench display.
+ * @param elapsedMs Elapsed milliseconds.
+ * @returns Compact elapsed time.
+ */
+function formatWorkbenchElapsedMs(elapsedMs: number): string {
+  const seconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+/**
+ * Detect user-initiated abort errors from fetch or model requests.
+ * @param error Unknown caught error.
+ * @returns Whether the error represents an intentional stop.
+ */
+function isAbortLikeError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === "AbortError") return true;
+  if (error instanceof Error) {
+    return error.name === "AbortError" || /abort|aborted|cancel/i.test(error.message);
+  }
+  return false;
 }
 
 function isReadableRecord(value: unknown): value is Record<string, unknown> {

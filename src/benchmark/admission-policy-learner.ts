@@ -7,6 +7,8 @@ import type {
   AdmissionPolicy,
   AdmissionRule,
   ChannelPolicy,
+  HumanJudgmentChannelGuide,
+  HumanJudgmentSkill,
   LearnPolicyOptions,
 } from "./admission-policy-types.ts";
 
@@ -74,7 +76,154 @@ export function learnAdmissionPolicy(
     generatedAt: options.generatedAt ?? new Date().toISOString(),
     labelCount: labels.length,
     channels: channelPolicies,
+    humanSkill: buildHumanJudgmentSkill(labels, channelPolicies, {
+      generatedAt: options.generatedAt,
+      policyId: options.policyId,
+    }),
   };
+}
+
+/**
+ * Build a reusable human judgment skill from review labels.
+ *
+ * The skill captures reviewer behavior and boundary cases so downstream judges
+ * and samplers can generalize beyond static score thresholds. When labels lack
+ * notes or evidence, it degrades to score/confidence-derived guidance.
+ *
+ * @param labels Human review labels joined with automatic signals.
+ * @param channelPolicies Learned quantitative policy by channel.
+ * @param options Optional deterministic metadata.
+ * @returns Human judgment skill embedded into the admission policy.
+ */
+export function buildHumanJudgmentSkill(
+  labels: AdmissionLabelRow[],
+  channelPolicies: Record<string, ChannelPolicy>,
+  options: { generatedAt?: string; policyId?: string } = {},
+): HumanJudgmentSkill {
+  const labelsByChannel = new Map<string, AdmissionLabelRow[]>();
+  for (const label of labels) {
+    if (!labelsByChannel.has(label.channel)) labelsByChannel.set(label.channel, []);
+    labelsByChannel.get(label.channel)!.push(label);
+  }
+
+  const channelGuides: Record<string, HumanJudgmentChannelGuide> = {};
+  for (const [channel, rows] of labelsByChannel.entries()) {
+    channelGuides[channel] = buildChannelGuide(channel, rows, channelPolicies[channel]);
+  }
+
+  return {
+    skillId: `${options.policyId ?? "admission-policy-v1"}:human-judgment-skill`,
+    version: "v1",
+    generatedAt: options.generatedAt ?? new Date().toISOString(),
+    labelCount: labels.length,
+    purpose: "Generalize human benchmark admission behavior into channel-level review guidance for judge calibration, sampling and case-pool admission.",
+    channelGuides,
+  };
+}
+
+/**
+ * Build one channel guide from human labels and learned quantitative rules.
+ *
+ * @param channel Admission channel id.
+ * @param rows Labels assigned to this channel.
+ * @param policy Learned channel policy, when available.
+ * @returns Human-readable and machine-storable channel guide.
+ */
+function buildChannelGuide(
+  channel: string,
+  rows: AdmissionLabelRow[],
+  policy?: ChannelPolicy,
+): HumanJudgmentChannelGuide {
+  const accepted = rows.filter((row) => row.decision === "accepted");
+  const rejected = rows.filter((row) => row.decision === "rejected");
+  const uncertain = rows.filter((row) => row.decision === "needs_evidence");
+  const correctionCounts = countCorrections(rows);
+  const rationales = rows
+    .map((row) => row.reviewerRationale?.trim())
+    .filter((text): text is string => Boolean(text))
+    .slice(0, 8);
+  const evidenceHeuristics = summarizeEvidenceHeuristics(rows);
+  const acceptMedian = percentile(accepted.map((row) => row.autoScore), 0.5);
+  const rejectMedian = percentile(rejected.map((row) => row.autoScore), 0.5);
+  const confidenceMedian = percentile(rows.map((row) => row.confidence), 0.5);
+  const uncertaintyConfidenceLt = findConfidenceLtRule(policy?.uncertaintyRules);
+
+  return {
+    channel,
+    labelCount: rows.length,
+    objective: `复现人类在 ${channel} channel 中对 case 是否值得沉淀入池的判断。`,
+    acceptBoundary: accepted.length
+      ? `通常接受：人工确认达到 rubric 通过边界，自动分数中位约 ${acceptMedian}，且证据能支撑当前 channel 的核心能力。`
+      : "当前缺少接受样本；默认交给人工继续积累正例。",
+    rejectBoundary: rejected.length
+      ? `通常拒绝或反向入池：人工推翻或确认失败，自动分数中位约 ${rejectMedian}，存在关键遗漏、误判或证据不足。`
+      : "当前缺少拒绝样本；默认避免自动拒绝。",
+    uncertaintyBoundary: uncertain.length
+      ? `存疑边界：已有 ${uncertain.length} 条 needs_evidence，低置信、证据冲突或 judge variance 高时继续交给人工。`
+      : `存疑边界：置信度低于 ${uncertaintyConfidenceLt ?? Math.min(0.65, confidenceMedian)} 或评审分歧明显时交给人工。`,
+    commonCorrections: correctionCounts,
+    evidenceHeuristics,
+    reviewerRationales: rationales,
+    samplingGuidance: `后续抽样优先覆盖 ${channel} 中低置信、分数边界和人机不一致样本；建议人工抽样率 ${Math.round((policy?.sampleRateForHuman ?? 0.3) * 100)}%。`,
+  };
+}
+
+/**
+ * Read the confidenceLt uncertainty threshold from channel rules.
+ *
+ * @param rules Admission rules from one channel policy.
+ * @returns Configured threshold, or undefined when absent.
+ */
+function findConfidenceLtRule(rules: AdmissionRule[] | undefined): number | undefined {
+  const rule = rules?.find((item): item is Extract<AdmissionRule, { type: "confidenceLt" }> => item.type === "confidenceLt");
+  return rule?.confidenceLt;
+}
+
+/**
+ * Count reviewer correction types for one channel.
+ *
+ * @param rows Labels in one channel.
+ * @returns Ranked correction counts.
+ */
+function countCorrections(rows: AdmissionLabelRow[]): Array<{ correctionType: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const type = row.correctionType ?? inferCorrectionType(row);
+    counts.set(type, (counts.get(type) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .map(([correctionType, count]) => ({ correctionType, count }));
+}
+
+/**
+ * Summarize evidence usage from human labels.
+ *
+ * @param rows Labels in one channel.
+ * @returns Compact evidence heuristics.
+ */
+function summarizeEvidenceHeuristics(rows: AdmissionLabelRow[]): string[] {
+  const evidenceSamples = rows.flatMap((row) => row.evidenceUsed ?? []).filter(Boolean).slice(0, 8);
+  const heuristics = [
+    "优先引用原始 transcript、验收标准和被测输出中的可复核片段。",
+    "如果 evidence 无法支撑人工调分或推翻 judge，保持 needs_evidence。",
+  ];
+  if (evidenceSamples.length > 0) {
+    heuristics.push(`近期人工常用证据片段：${evidenceSamples.join(" | ")}`);
+  }
+  return heuristics;
+}
+
+/**
+ * Infer correction behavior when the client did not provide an explicit type.
+ *
+ * @param row Human label row.
+ * @returns Stable correction type.
+ */
+function inferCorrectionType(row: AdmissionLabelRow): NonNullable<AdmissionLabelRow["correctionType"]> {
+  if (row.decision === "needs_evidence") return "needs_more_evidence";
+  if (row.decision === "accepted") return row.autoPassed ? "agree_accept" : "false_positive";
+  return row.autoPassed ? "false_negative" : "agree_reject";
 }
 
 /**

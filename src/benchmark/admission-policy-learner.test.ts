@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 import { evaluatePolicyHoldoutAgreement } from "./admission-policy-holdout.ts";
 import { learnAdmissionPolicy, percentile } from "./admission-policy-learner.ts";
+import { readAdmissionPolicy, saveAdmissionPolicy } from "./admission-policy-store.ts";
 import type { AdmissionLabelRow } from "./admission-policy-types.ts";
 
 const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), "__fixtures__");
@@ -79,6 +80,42 @@ describe("learnAdmissionPolicy", () => {
     const channel = policy.channels.ch_task_completion;
     const expected = Math.max(0.1, Math.min(0.5, 1 - channel.stats.agreementRate));
     assert.equal(channel.sampleRateForHuman, round2(expected));
+  });
+
+  it("builds a human judgment skill from labels", () => {
+    const labels = loadLabels().slice(0, 20).map((label, index) => ({
+      ...label,
+      reviewerRationale: index % 2 === 0 ? "证据充分，符合人工金标边界。" : "证据不足，保留人工复核。",
+      evidenceUsed: ["transcript turn 1", "rubric level 3"],
+      correctionType: index % 2 === 0 ? ("agree_accept" as const) : ("needs_more_evidence" as const),
+    }));
+    const policy = learnAdmissionPolicy(labels, { generatedAt: "2026-01-01T00:00:00.000Z" });
+    assert.ok(policy.humanSkill);
+    assert.equal(policy.humanSkill.labelCount, labels.length);
+    assert.ok(policy.humanSkill.channelGuides.ch_task_completion);
+    assert.ok(policy.humanSkill.channelGuides.ch_task_completion.evidenceHeuristics.length > 0);
+  });
+
+  it("persists a 20-label policy with human skill", async () => {
+    const labels = loadLabels().slice(0, 20).map((label, index) => ({
+      ...label,
+      reviewerRationale: "模拟人工判断理由",
+      evidenceUsed: ["transcript evidence"],
+      correctionType: index % 4 === 0 ? ("agree_reject" as const) : ("agree_accept" as const),
+    }));
+    const projectId = `policy_smoke_${Date.now()}`;
+    const policy = learnAdmissionPolicy(labels, {
+      projectId,
+      policyId: "policy-smoke",
+      generatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    await saveAdmissionPolicy(policy);
+    const saved = await readAdmissionPolicy(projectId);
+
+    assert.equal(saved?.labelCount, 20);
+    assert.ok(saved?.humanSkill);
+    assert.ok(Object.keys(saved.humanSkill.channelGuides).length > 0);
   });
 });
 

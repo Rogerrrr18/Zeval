@@ -32,6 +32,10 @@ const benchmarkAdmitCasesBodySchema = z.object({
     channel: z.string().min(1).optional(),
     reviewer: z.string().max(120).optional(),
     note: z.string().max(4000).optional(),
+    reviewerRationale: z.string().max(4000).optional(),
+    evidenceUsed: z.array(z.string().max(1000)).max(8).optional(),
+    boundaryType: z.enum(["clear_accept", "clear_reject", "uncertain", "human_override"]).optional(),
+    correctionType: z.enum(["agree_accept", "agree_reject", "false_positive", "false_negative", "needs_more_evidence"]).optional(),
     reviewedAt: z.string().optional(),
   })).min(1),
   usePolicySuggestion: z.boolean().optional(),
@@ -114,6 +118,10 @@ function normalizeReviewInputs(
     channel?: string;
     reviewer?: string;
     note?: string;
+    reviewerRationale?: string;
+    evidenceUsed?: string[];
+    boundaryType?: "clear_accept" | "clear_reject" | "uncertain" | "human_override";
+    correctionType?: "agree_accept" | "agree_reject" | "false_positive" | "false_negative" | "needs_more_evidence";
     reviewedAt?: string;
   }>,
 ): BenchmarkHumanReviewInput[] {
@@ -144,6 +152,10 @@ function normalizeReviewInputs(
       channel,
       reviewer: review.reviewer,
       note: review.note,
+      reviewerRationale: review.reviewerRationale,
+      evidenceUsed: review.evidenceUsed,
+      boundaryType: review.boundaryType,
+      correctionType: review.correctionType,
       reviewedAt: review.reviewedAt,
     });
   }

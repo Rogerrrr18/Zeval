@@ -23,6 +23,10 @@ const labelRowSchema = z.object({
   qualityTier: z.string().optional(),
   autoPassed: z.boolean(),
   judgeVariance: z.number().optional(),
+  reviewerRationale: z.string().max(4000).optional(),
+  evidenceUsed: z.array(z.string().max(1000)).max(8).optional(),
+  boundaryType: z.enum(["clear_accept", "clear_reject", "uncertain", "human_override"]).optional(),
+  correctionType: z.enum(["agree_accept", "agree_reject", "false_positive", "false_negative", "needs_more_evidence"]).optional(),
 });
 
 const learnBodySchema = z.object({

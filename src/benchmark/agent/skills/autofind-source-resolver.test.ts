@@ -75,4 +75,53 @@ describe("resolveCandidateDownloadUrls", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("uses GitHub API download_url for default branch and spaced paths", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/contents/")) {
+        return new Response(
+          JSON.stringify([
+            { type: "dir", path: "Financial Rigor Test" },
+            { type: "file", path: "README.md", name: "README.md" },
+          ]),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/contents/Financial Rigor Test")) {
+        return new Response(
+          JSON.stringify([
+            {
+              type: "file",
+              name: "Financial Rigor Test_Index Extraction.csv",
+              path: "Financial Rigor Test/Financial Rigor Test_Index Extraction.csv",
+              download_url:
+                "https://raw.githubusercontent.com/SUFE-AIFLM-Lab/FinEval/master/Financial%20Rigor%20Test/Financial%20Rigor%20Test_Index%20Extraction.csv",
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response("[]", { status: 404 });
+    }) as typeof fetch;
+
+    try {
+      const candidate: DatasetCandidate = {
+        id: "gh:SUFE-AIFLM-Lab/FinEval",
+        source: "github",
+        title: "SUFE-AIFLM-Lab/FinEval",
+        description: "financial benchmark",
+        url: "https://github.com/SUFE-AIFLM-Lab/FinEval",
+        score: 4,
+      };
+      const urls = await resolveCandidateDownloadUrls(candidate);
+      assert.equal(
+        urls[0],
+        "https://raw.githubusercontent.com/SUFE-AIFLM-Lab/FinEval/master/Financial%20Rigor%20Test/Financial%20Rigor%20Test_Index%20Extraction.csv",
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

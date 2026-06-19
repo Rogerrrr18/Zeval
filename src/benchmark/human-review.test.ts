@@ -14,12 +14,38 @@ import {
 import type { BenchmarkHumanReviewRecord } from "./session-store.ts";
 import type { BenchmarkMetricEvaluationResult, BenchmarkRubricMetric } from "./types.ts";
 
+function metricResult(overrides: Partial<BenchmarkMetricEvaluationResult>): BenchmarkMetricEvaluationResult {
+  return {
+    runId: "run_1",
+    benchmarkId: "bench_1",
+    taskId: "task_1",
+    caseId: "case_1",
+    submissionId: "sub_1",
+    agentFramework: "zeval",
+    model: "test-model",
+    metricKey: "metric",
+    metricWeight: 1,
+    capability: "task_completion",
+    evaluatorType: "llm_judge",
+    score: 3,
+    normalizedScore: 60,
+    passed: true,
+    status: "scored",
+    confidence: 0.9,
+    evidence: [],
+    reason: "ok",
+    needsHumanReview: false,
+    failureTags: [],
+    ...overrides,
+  };
+}
+
 describe("human-review", () => {
   it("builds admit rows only when session channel and all metric scores are confirmed", () => {
     const runId = "run_1";
     const submissionId = "sub_1";
     const metricResults = [
-      {
+      metricResult({
         runId,
         submissionId,
         caseId: "case_1",
@@ -27,12 +53,9 @@ describe("human-review", () => {
         score: 5,
         normalizedScore: 100,
         passed: true,
-        status: "scored",
-        confidence: 0.9,
-        evidence: [],
         reason: "ok",
-      },
-      {
+      }),
+      metricResult({
         runId,
         submissionId,
         caseId: "case_1",
@@ -40,12 +63,9 @@ describe("human-review", () => {
         score: 1,
         normalizedScore: 20,
         passed: false,
-        status: "scored",
-        confidence: 0.9,
-        evidence: [],
         reason: "bad",
-      },
-    ] as BenchmarkMetricEvaluationResult[];
+      }),
+    ];
     const records: BenchmarkHumanReviewRecord[] = [
       {
         runId,

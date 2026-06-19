@@ -82,6 +82,41 @@ describe("evaluateExactMatch", () => {
   });
 });
 
+describe("objective evaluator guardrails", () => {
+  it("blocks regex metrics that are missing a pattern", async () => {
+    const result = await evaluateBenchmarkMetric(
+      baseMetric({ evaluatorType: "regex_match", config: {} }),
+      baseCase(),
+      baseSubmission({ answer: "ok" }),
+    );
+    assert.equal(result.status, "blocked");
+    assert.equal(result.needsHumanReview, true);
+  });
+
+  it("blocks numeric metrics with missing numeric fields", async () => {
+    const result = await evaluateBenchmarkMetric(
+      baseMetric({
+        evaluatorType: "numeric_tolerance",
+        config: { expectedPath: "expected.score", outputPath: "parsedOutput.score" },
+      }),
+      baseCase(),
+      baseSubmission({ answer: "ok" }),
+    );
+    assert.equal(result.status, "blocked");
+    assert.equal(result.needsHumanReview, true);
+  });
+
+  it("blocks standalone hybrid metrics instead of reporting unsupported", async () => {
+    const result = await evaluateBenchmarkMetric(
+      baseMetric({ evaluatorType: "hybrid", config: { childMetricKeys: ["a", "b"] } }),
+      baseCase(),
+      baseSubmission({ answer: "ok" }),
+    );
+    assert.equal(result.status, "blocked");
+    assert.equal(result.needsHumanReview, true);
+  });
+});
+
 describe("evaluateLlmJudge", () => {
   it("M1-03: uses multi-level judge score", async () => {
     const result = await evaluateBenchmarkMetric(

@@ -68,4 +68,72 @@ describe("normalizeDatasetToCsv", () => {
     assert.match(normalized!, /cs_neg_/);
     assert.doesNotMatch(normalized!, /companion_pos_/);
   });
+
+  it("normalizes benchmark QA CSV with answer and option columns", () => {
+    const rows = ["id,question,A,B,C,D,answer,explanation"];
+    for (let index = 1; index <= 6; index += 1) {
+      rows.push(
+        [
+          String(index),
+          `"金融指标 ${index} 应如何计算？"`,
+          '"资产/负债"',
+          '"收入-成本"',
+          '"现金/利润"',
+          '"以上都不是"',
+          '"B"',
+          `"第 ${index} 题考察金融指标计算。"`,
+        ].join(","),
+      );
+    }
+
+    const normalized = normalizeDatasetToCsv({
+      rawText: rows.join("\n"),
+      searchProfile: "金融 数值计算 指标抽取",
+      positiveCount: 1,
+      negativeCount: 1,
+      sessionPrefix: "finance_",
+    });
+
+    assert.ok(normalized);
+    assert.match(normalized!, /finance_pos_01/);
+    assert.match(normalized!, /finance_neg_01/);
+    assert.match(normalized!, /A\. 资产\/负债/);
+    assert.match(normalized!, /解析：第 1 题考察金融指标计算。/);
+  });
+
+  it("normalizes nested financial QA JSON with document context", () => {
+    const rows = Array.from({ length: 6 }, (_, index) => ({
+      id: `convfinqa_${index + 1}`,
+      pre_text: [
+        `company revenue increased ${index + 1}% year over year.`,
+        "operating cash flow was reported in the annual statement.",
+      ],
+      post_text: ["management attributed the change to lower receivables."],
+      table: [
+        ["year", "2008", "2009"],
+        ["cash provided by operations", "181001", "206588"],
+      ],
+      qa: {
+        question: `What is the increase in cash provided by operations for row ${index + 1}?`,
+        answer: "25587",
+        program: "subtract(206588,181001)",
+        exe_ans: "25587",
+      },
+    }));
+
+    const normalized = normalizeDatasetToCsv({
+      rawText: JSON.stringify(rows),
+      searchProfile: "finance numerical calculation table reasoning",
+      positiveCount: 1,
+      negativeCount: 1,
+      sessionPrefix: "finance_",
+    });
+
+    assert.ok(normalized);
+    assert.match(normalized!, /finance_pos_01/);
+    assert.match(normalized!, /finance_neg_01/);
+    assert.match(normalized!, /上下文：company revenue increased 1%/);
+    assert.match(normalized!, /表格：year \\| 2008 \\| 2009/);
+    assert.match(normalized!, /计算程序：subtract\(206588,181001\)/);
+  });
 });

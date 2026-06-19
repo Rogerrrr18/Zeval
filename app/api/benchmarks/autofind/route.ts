@@ -27,6 +27,7 @@ export async function POST(request: Request) {
       rubricContext: body.rubricContext,
       message: body.message,
       state: body.state ?? null,
+      signal: request.signal,
     });
     return NextResponse.json(result);
   } catch (error) {

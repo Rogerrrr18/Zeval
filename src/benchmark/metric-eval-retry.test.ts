@@ -16,7 +16,7 @@ const scale = { min: 1, max: 5, passThreshold: 3 };
 function baseMetric(): BenchmarkRubricMetric {
   return {
     metricKey: "empathy",
-    capability: "empathy",
+    capability: "task_completion",
     displayName: "共情",
     description: "test",
     evaluatorType: "llm_judge",

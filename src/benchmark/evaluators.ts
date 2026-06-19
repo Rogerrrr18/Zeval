@@ -10,6 +10,7 @@ import { BenchmarkRunCancelledError } from "@/benchmark/run-cancellation";
 import type {
   BenchmarkAgentSubmission,
   BenchmarkCase,
+  BenchmarkLlmJudgeResult,
   BenchmarkLlmJudge,
   BenchmarkMetricEvaluationResult,
   BenchmarkRubricMetric,
@@ -17,7 +18,14 @@ import type {
 
 export type BenchmarkEvaluatorContext = {
   llmJudge?: BenchmarkLlmJudge;
+  llmJudgeBatch?: BenchmarkBatchLlmJudge;
 };
+
+export type BenchmarkBatchLlmJudge = (input: {
+  metrics: BenchmarkRubricMetric[];
+  taskCase: BenchmarkCase;
+  submission: BenchmarkAgentSubmission;
+}) => Promise<Map<string, BenchmarkLlmJudgeResult>>;
 
 /**
  * Evaluate one approved rubric metric against one agent submission.
@@ -61,12 +69,13 @@ export async function evaluateBenchmarkMetric(
       case "hybrid":
         return buildResult(metric, taskCase, submission, {
           score: metric.scale.min,
-          status: "unsupported",
+          status: "blocked",
           reason: "Hybrid metrics are computed at the runner aggregation layer, not as standalone metrics yet.",
           evidence: [],
           confidence: 0,
           expected: undefined,
           actual: undefined,
+          needsHumanReview: true,
         });
     }
   } catch (error) {
@@ -127,12 +136,13 @@ function evaluateRegexMatch(
   if (!pattern) {
     return buildResult(metric, taskCase, submission, {
       score: metric.scale.min,
-      status: "error",
+      status: "blocked",
       reason: "regex_match metric is missing config.pattern.",
       evidence: [],
-      confidence: 1,
+      confidence: 0,
       expected: undefined,
       actual: submission.rawOutput,
+      needsHumanReview: true,
     });
   }
   const target = String(getSubmissionValue(submission, metric.config?.outputPath) ?? submission.rawOutput);
@@ -159,12 +169,13 @@ function evaluateNumericTolerance(
   if (!Number.isFinite(expected) || !Number.isFinite(actual)) {
     return buildResult(metric, taskCase, submission, {
       score: metric.scale.min,
-      status: "error",
+      status: "blocked",
       reason: "Numeric evaluator received non-numeric expected or actual value.",
       evidence: [`expected=${String(expected)}`, `actual=${String(actual)}`],
-      confidence: 1,
+      confidence: 0,
       expected,
       actual,
+      needsHumanReview: true,
     });
   }
   const matched = Math.abs(actual - expected) <= tolerance;
@@ -188,13 +199,17 @@ function evaluateF1Match(
   const predictedItems = toStringSet(getSubmissionValue(submission, metric.config?.predictedItemsPath));
   if (expectedItems.size === 0 && predictedItems.size === 0) {
     return buildResult(metric, taskCase, submission, {
-      score: metric.scale.max,
-      status: "scored",
-      reason: "Both expected and predicted sets are empty.",
-      evidence: [],
-      confidence: 1,
+      score: metric.scale.min,
+      status: "blocked",
+      reason: "F1 match blocked: expected and predicted sets are both missing.",
+      evidence: [
+        `expectedPath=${metric.config?.expectedItemsPath ?? "(missing)"}`,
+        `predictedItemsPath=${metric.config?.predictedItemsPath ?? "(missing)"}`,
+      ],
+      confidence: 0,
       expected: [],
       actual: [],
+      needsHumanReview: true,
     });
   }
 
@@ -241,6 +256,25 @@ async function evaluateLlmJudge(
   }
 
   const judged = await context.llmJudge({ metric, taskCase, submission });
+  return buildLlmJudgeMetricResult(metric, taskCase, submission, judged);
+}
+
+/**
+ * Convert one LLM judge verdict into a normalized metric result.
+ * Applies rubric-level score snapping, max-score evidence guards, and human-review flags.
+ *
+ * @param metric Rubric metric definition.
+ * @param taskCase Benchmark case being scored.
+ * @param submission Agent submission for the case.
+ * @param judged Structured LLM judge verdict.
+ * @returns Normalized benchmark metric result.
+ */
+export function buildLlmJudgeMetricResult(
+  metric: BenchmarkRubricMetric,
+  taskCase: BenchmarkCase,
+  submission: BenchmarkAgentSubmission,
+  judged: BenchmarkLlmJudgeResult,
+): BenchmarkMetricEvaluationResult {
   const snappedScore = snapScoreToRubricLevels(
     judged.score,
     metric.config?.rubricForm,
@@ -323,12 +357,13 @@ function evaluateExternalArtifact(
   if (!isRecord(result)) {
     return buildResult(metric, taskCase, submission, {
       score: metric.scale.min,
-      status: "unsupported",
+      status: "blocked",
       reason: `${metric.evaluatorType} requires an external evaluator artifact.`,
       evidence: [],
       confidence: 0,
       expected: taskCase.expected,
       actual: submission.parsedOutput ?? submission.rawOutput,
+      needsHumanReview: true,
     });
   }
 

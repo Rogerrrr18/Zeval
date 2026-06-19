@@ -12,6 +12,10 @@ import { getBenchmarkCapabilityDefinition } from "@/benchmark/capabilities";
 import { benchmarkReferencesForCapability, cloneMetricReferences } from "@/benchmark/reference-catalog";
 import { inferBenchmarkTaskType, renderEvalAnythingPhilosophyPrompt } from "@/benchmark/eval-anything-philosophy";
 import { consolidateSparseLlmModules } from "@/benchmark/rubric-structure";
+import {
+  adaptRubricForGenericTranscriptHarness,
+  summarizeGenericTranscriptEvaluatorAdaptations,
+} from "@/benchmark/evaluator-compat";
 import type {
   BenchmarkCapabilityDimension,
   BenchmarkDomain,
@@ -225,7 +229,9 @@ export async function draftBenchmarkRubric(
               "Return JSON only.",
               "Allowed capabilities: task_completion, instruction_following, factual_grounding, data_extraction, reasoning_quality, tool_use_correctness, format_compliance, latency_efficiency, safety_policy, business_judgment.",
               "Allowed evaluatorType for generated custom metrics: llm_judge, human_label, exact_match, regex_match, numeric_tolerance, f1_match, code_exec, unit_test, environment_state_test.",
-              "Evaluator selection rule: use objective evaluators whenever the expected answer can be checked mechanically; use llm_judge only for open-ended semantic quality; use human_label only for high-risk domain expert review.",
+              "当前 Zeval 普通业务评测使用 generic transcript harness：case 只稳定包含 transcript、expected.acceptanceCriteria、sourceSummary；submission 只稳定包含 answer、evidence、notes。",
+              "Evaluator selection rule for this harness: 默认使用 llm_judge；只有当用户明确提供结构化 expected/output schema 或外部 evaluator artifact 时，才允许使用 exact_match、numeric_tolerance、f1_match、code_exec、unit_test、environment_state_test。",
+              "不要为 generic transcript 任务臆造 expected.numerical_answer、expected.decision、parsedOutput.entities 等字段；缺少 schema 时用 llm_judge 在 criteria/rubricForm 中写清语义评分规则。",
               "For exact_match you must provide outputPath and expectedPath, e.g. parsedOutput.decision vs expected.decision.",
               "For regex_match you must provide pattern and preferably outputPath, e.g. JSON/schema/format checks.",
               "For numeric_tolerance you must provide outputPath, expectedPath and tolerance.",
@@ -233,7 +239,7 @@ export async function draftBenchmarkRubric(
               "For code_exec, unit_test, environment_state_test, only use them when the harness can produce evaluatorResults artifacts.",
               "Allowed domain: hr, finance, procurement, software, healthcare, research, custom.",
               'Allowed sourceType: paper, public_benchmark, standard, dataset, framework, documentation, research_report.',
-              'Output schema: {"domain":"custom","title":"中文标题","description":"中文描述","researchSummary":"中文依据摘要","preferredCapabilities":["task_completion","business_judgment"],"modules":[{"capability":"task_completion","displayName":"问题承接与解决","description":"中文说明","weight":3,"metrics":[{"metricKey":"decision_accuracy","displayName":"决策准确率","description":"中文指标说明","evaluatorType":"exact_match","outputPath":"parsedOutput.decision","expectedPath":"expected.decision","weight":3,"passThreshold":3,"evidenceRequired":false,"humanApprovalRequired":false,"failureTags":["wrong_decision"],"criteria":"中文评分准则，包含 [R1] 引用","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明，包含 [R1] 引用"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"论文或公开 benchmark 标题","sourceType":"paper","url":"https://...","authors":["作者"],"publisher":"机构","year":2023,"benchmarkName":"benchmark 名称","relevance":"中文说明该来源如何支撑此指标","confidence":0.9}]},{"metricKey":"solution_quality","displayName":"解决方案可执行性","description":"中文指标说明","evaluatorType":"llm_judge","weight":3,"passThreshold":3,"evidenceRequired":true,"humanApprovalRequired":true,"failureTags":["domain_issue"],"criteria":"中文评分准则","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"来源标题","sourceType":"paper","url":"https://...","relevance":"中文说明","confidence":0.9}]}]}]}',
+              'Output schema: {"domain":"custom","title":"中文标题","description":"中文描述","researchSummary":"中文依据摘要","preferredCapabilities":["task_completion","business_judgment"],"modules":[{"capability":"task_completion","displayName":"问题承接与解决","description":"中文说明","weight":3,"metrics":[{"metricKey":"task_success_quality","displayName":"任务完成质量","description":"中文指标说明","evaluatorType":"llm_judge","weight":3,"passThreshold":3,"evidenceRequired":true,"humanApprovalRequired":false,"failureTags":["task_failed"],"criteria":"中文语义评分准则，说明如何依据 transcript、acceptanceCriteria 和 answer/evidence/notes 判断，包含 [R1] 引用","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明，包含 [R1] 引用"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"论文或公开 benchmark 标题","sourceType":"paper","url":"https://...","authors":["作者"],"publisher":"机构","year":2023,"benchmarkName":"benchmark 名称","relevance":"中文说明该来源如何支撑此指标","confidence":0.9}]},{"metricKey":"solution_quality","displayName":"解决方案可执行性","description":"中文指标说明","evaluatorType":"llm_judge","weight":3,"passThreshold":3,"evidenceRequired":true,"humanApprovalRequired":false,"failureTags":["domain_issue"],"criteria":"中文评分准则","rubricForm":[{"score":5,"label":"优秀","description":"中文评分说明"},{"score":3,"label":"合格","description":"中文评分说明"},{"score":1,"label":"不合格","description":"中文评分说明"}],"references":[{"referenceId":"R1","title":"来源标题","sourceType":"paper","url":"https://...","relevance":"中文说明","confidence":0.9}]}]}]}',
             ].join("\n"),
           },
           {
@@ -322,13 +328,17 @@ export async function draftBenchmarkRubric(
     requirementText: input.requirementText,
     preferredCapabilities,
   });
+  const adapted = adaptRubricForGenericTranscriptHarness(rubric);
+  if (adapted.adaptations.length > 0) {
+    warnings.push(summarizeGenericTranscriptEvaluatorAdaptations(adapted.adaptations));
+  }
 
   return {
     rubric: {
-      ...rubric,
-      generatedBy: source === "llm" ? "copilot" : rubric.generatedBy,
+      ...adapted.rubric,
+      generatedBy: source === "llm" ? "copilot" : adapted.rubric.generatedBy,
     },
-    reviewMarkdown: renderRubricReviewMarkdown(rubric),
+    reviewMarkdown: renderRubricReviewMarkdown(adapted.rubric),
     source,
     warnings,
   };
@@ -360,8 +370,7 @@ function buildRubricFromLlmPayload(input: {
 
   const now = new Date().toISOString();
   const domain = isBenchmarkDomain(input.parsed.domain) ? input.parsed.domain : input.fallbackDomain;
-  return {
-    rubric: {
+  const baseRubric: BenchmarkRubricSet = {
       rubricId: `rubric_${domain}_${randomBytes(3).toString("hex")}`,
       version: "0.1.0",
       title: ensureChineseText(input.parsed.title, input.fallbackTitle),
@@ -373,7 +382,13 @@ function buildRubricFromLlmPayload(input: {
       researchSummary: ensureChineseText(input.parsed.researchSummary, input.researchSummary),
       createdAt: now,
       updatedAt: now,
-    },
+  };
+  const adapted = adaptRubricForGenericTranscriptHarness(baseRubric);
+  if (adapted.adaptations.length > 0) {
+    structureWarnings.push(summarizeGenericTranscriptEvaluatorAdaptations(adapted.adaptations));
+  }
+  return {
+    rubric: adapted.rubric,
     warnings: structureWarnings,
   };
 }
@@ -704,10 +719,13 @@ function normalizeChildMetricKeys(value: unknown): string[] {
 export async function researchBenchmarkReferences(input: DraftBenchmarkRubricInput): Promise<RubricResearchBrief> {
   const fallback = buildFallbackResearchBrief(input);
   const model = readZevalEnvValue(["ZEVAL_RUBRIC_DEEPSEARCH_MODEL", "ZEVAL_DEEPSEARCH_MODEL"]);
-  const providerOptions = readJsonEnvObject([
-    "ZEVAL_RUBRIC_DEEPSEARCH_EXTRA_BODY",
-    "ZEVAL_DEEPSEARCH_EXTRA_BODY",
-  ]);
+  const providerOptions = {
+    response_format: undefined,
+    ...readJsonEnvObject([
+      "ZEVAL_RUBRIC_DEEPSEARCH_EXTRA_BODY",
+      "ZEVAL_DEEPSEARCH_EXTRA_BODY",
+    ]),
+  };
 
   const llm = await requestSiliconFlowChatCompletion(
     [
@@ -754,7 +772,7 @@ export async function researchBenchmarkReferences(input: DraftBenchmarkRubricInp
     },
   );
 
-  const parsed = parseJsonObjectFromLlmOutput(llm) as LlmRubricResearchPayload;
+  const parsed = await parseDeepSearchResearchPayload(llm, input, fallback);
   const references = dedupeReferences([
     ...normalizeResearchReferences(parsed.references),
     ...fallback.references,
@@ -770,6 +788,145 @@ export async function researchBenchmarkReferences(input: DraftBenchmarkRubricInp
     ),
     references,
     source: "deepsearch",
+  };
+}
+
+/**
+ * Parse DeepSearch output, repairing natural-language or Markdown responses
+ * into the research JSON schema before falling back to catalog references.
+ *
+ * @param rawOutput Raw provider output from the research model.
+ * @param input Original rubric drafting input.
+ * @param fallback Built-in catalog brief used as extraction context.
+ * @returns Structured DeepSearch research payload.
+ */
+async function parseDeepSearchResearchPayload(
+  rawOutput: string,
+  input: DraftBenchmarkRubricInput,
+  fallback: RubricResearchBrief,
+): Promise<LlmRubricResearchPayload> {
+  try {
+    return parseJsonObjectFromLlmOutput(rawOutput) as LlmRubricResearchPayload;
+  } catch (error) {
+    const parseMessage = error instanceof Error ? error.message : String(error);
+    try {
+      return await repairDeepSearchResearchPayload(rawOutput, input, fallback, parseMessage);
+    } catch {
+      const heuristicPayload = buildHeuristicResearchPayload(rawOutput, fallback);
+      if (heuristicPayload) return heuristicPayload;
+      throw error;
+    }
+  }
+}
+
+/**
+ * Ask a stable JSON-capable model to extract research references from a
+ * non-JSON DeepSearch response.
+ *
+ * @param rawOutput Raw non-JSON research output.
+ * @param input Original rubric drafting input.
+ * @param fallback Built-in catalog brief used to complete missing metadata.
+ * @param parseMessage Original parse failure message for observability.
+ * @returns Repaired research payload.
+ */
+async function repairDeepSearchResearchPayload(
+  rawOutput: string,
+  input: DraftBenchmarkRubricInput,
+  fallback: RubricResearchBrief,
+  parseMessage: string,
+): Promise<LlmRubricResearchPayload> {
+  const repairModel = readZevalEnvValue([
+    "ZEVAL_RUBRIC_JSON_REPAIR_MODEL",
+    "ZEVAL_JUDGE_MODEL",
+    "SILICONFLOW_MODEL",
+  ]);
+  const repaired = await requestSiliconFlowChatCompletion(
+    [
+      {
+        role: "system",
+        content: [
+          "你是 Zeval DeepSearch JSON 修复器。",
+          "用户会给你一段可能是自然语言、Markdown、搜索摘要或不完整 JSON 的研究结果。",
+          "你的任务是只抽取真实出现或内置候选中可支持的论文、benchmark、标准、框架，整理为严格 JSON。",
+          "不要编造 URL、作者或年份；缺失字段可以省略，confidence 需降低。",
+          "只返回 JSON，不要 Markdown，不要解释。",
+          'Output schema: {"summary":"中文研究摘要","references":[{"referenceId":"R1","title":"标题","sourceType":"paper","url":"https://...","authors":["作者"],"publisher":"机构","year":2023,"benchmarkName":"benchmark","relevance":"中文说明","confidence":0.9}],"suggestedMetricAngles":[{"capability":"task_completion","metricName":"中文指标方向","rationale":"中文理由","referenceIds":["R1"]}]}',
+          "Allowed sourceType: paper, public_benchmark, standard, dataset, framework, documentation, research_report.",
+        ].join("\n"),
+      },
+      {
+        role: "user",
+        content: [
+          `原始解析错误：${parseMessage}`,
+          `Title: ${input.title}`,
+          `Domain: ${input.domain}`,
+          `Requirement: ${input.requirementText}`,
+          "",
+          "原始 DeepSearch 输出：",
+          rawOutput.slice(0, 12000),
+          "",
+          "可用于补全元数据的内置候选来源：",
+          JSON.stringify(fallback.references, null, 2),
+        ].join("\n\n"),
+      },
+    ],
+    {
+      stage: "benchmark_rubric_deepsearch_json_repair",
+      model: repairModel,
+      temperature: 0.1,
+      seed: 43,
+      maxTokens: 3072,
+      timeoutMs: 60000,
+    },
+  );
+  return parseJsonObjectFromLlmOutput(repaired) as LlmRubricResearchPayload;
+}
+
+/**
+ * Recover a conservative research payload from non-JSON DeepSearch text by
+ * matching mentioned catalog references. This keeps useful search prose from
+ * being discarded only because it missed the JSON schema.
+ *
+ * @param rawOutput Raw non-JSON research output.
+ * @param fallback Built-in catalog brief.
+ * @returns Heuristic research payload, or null when the output has no useful text.
+ */
+function buildHeuristicResearchPayload(
+  rawOutput: string,
+  fallback: RubricResearchBrief,
+): LlmRubricResearchPayload | null {
+  const text = rawOutput.trim().replace(/\s+/g, " ");
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  const matched = fallback.references.filter((reference) => {
+    const candidates = [
+      reference.referenceId,
+      reference.title,
+      reference.benchmarkName,
+    ].filter((item): item is string => Boolean(item?.trim()));
+    return candidates.some((candidate) => lower.includes(candidate.toLowerCase()));
+  });
+  const references = (matched.length ? matched : fallback.references)
+    .slice(0, 8)
+    .map((reference, index) => ({
+      referenceId: reference.referenceId ?? `R${index + 1}`,
+      title: reference.title,
+      sourceType: reference.sourceType,
+      url: reference.url,
+      authors: reference.authors,
+      publisher: reference.publisher,
+      year: reference.year,
+      benchmarkName: reference.benchmarkName,
+      relevance: reference.relevance,
+      confidence: Math.min(reference.confidence ?? 0.6, matched.length ? 0.7 : 0.55),
+    }));
+  return {
+    summary: ensureChineseText(
+      text.slice(0, 420),
+      fallback.summary,
+    ),
+    references,
+    suggestedMetricAngles: [],
   };
 }
 

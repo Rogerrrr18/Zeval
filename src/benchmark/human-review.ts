@@ -130,6 +130,10 @@ export function buildSessionAdmitReviews(
   note?: string;
   reviewedAt?: string;
   confirmedScore?: number;
+  reviewerRationale?: string;
+  evidenceUsed?: string[];
+  boundaryType?: "clear_accept" | "clear_reject" | "uncertain" | "human_override";
+  correctionType?: "agree_accept" | "agree_reject" | "false_positive" | "false_negative" | "needs_more_evidence";
 }> {
   const sessionReview = findSessionReviewRecord(records, runId, submissionId);
   const channel = sessionReview?.channel?.trim();
@@ -146,6 +150,10 @@ export function buildSessionAdmitReviews(
     note?: string;
     reviewedAt?: string;
     confirmedScore?: number;
+    reviewerRationale?: string;
+    evidenceUsed?: string[];
+    boundaryType?: "clear_accept" | "clear_reject" | "uncertain" | "human_override";
+    correctionType?: "agree_accept" | "agree_reject" | "false_positive" | "false_negative" | "needs_more_evidence";
   }> = [];
 
   for (const metricResult of metricResults) {
@@ -171,10 +179,50 @@ export function buildSessionAdmitReviews(
       note: metricReview?.note ?? sessionReview.note,
       reviewedAt: metricReview?.reviewedAt ?? sessionReview.reviewedAt ?? new Date().toISOString(),
       confirmedScore,
+      reviewerRationale: metricReview?.reviewerRationale ?? metricReview?.note ?? sessionReview.note,
+      evidenceUsed: metricReview?.evidenceUsed ?? metricResult.evidence.slice(0, 4),
+      boundaryType: metricReview?.boundaryType ?? inferBoundaryType(decision, confirmedScore, metricResult.confidence, passThreshold),
+      correctionType: metricReview?.correctionType ?? inferCorrectionType(decision, metricResult.passed),
     });
   }
 
   return rows;
+}
+
+/**
+ * Infer which human-judgment boundary a review represents.
+ *
+ * @param decision Human review decision.
+ * @param confirmedScore Human-confirmed score.
+ * @param confidence Automatic judge confidence.
+ * @param passThreshold Rubric pass threshold.
+ * @returns Boundary bucket for skill learning.
+ */
+function inferBoundaryType(
+  decision: BenchmarkHumanReviewDecision,
+  confirmedScore: number,
+  confidence: number,
+  passThreshold: number,
+): "clear_accept" | "clear_reject" | "uncertain" | "human_override" {
+  if (decision === "needs_evidence" || confidence < 0.65) return "uncertain";
+  if (Math.abs(confirmedScore - passThreshold) <= 0.5) return "human_override";
+  return confirmedScore >= passThreshold ? "clear_accept" : "clear_reject";
+}
+
+/**
+ * Infer how the human review relates to the automatic evaluator verdict.
+ *
+ * @param decision Human review decision.
+ * @param autoPassed Automatic pass/fail verdict.
+ * @returns Correction type used by human-judgment skill learning.
+ */
+function inferCorrectionType(
+  decision: BenchmarkHumanReviewDecision,
+  autoPassed: boolean,
+): "agree_accept" | "agree_reject" | "false_positive" | "false_negative" | "needs_more_evidence" {
+  if (decision === "needs_evidence") return "needs_more_evidence";
+  if (decision === "accepted") return autoPassed ? "agree_accept" : "false_positive";
+  return autoPassed ? "false_negative" : "agree_reject";
 }
 
 /**
